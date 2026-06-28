@@ -55,7 +55,14 @@ export class MerchantReadService {
         GROUP BY 1 ORDER BY 1`,
       [merchantId],
     );
+    const profile = await this.pool.query<{ name: string; trading_name: string | null; status: string }>(
+      'SELECT name, trading_name, status FROM merchants WHERE id = $1',
+      [merchantId],
+    );
+    const m = profile.rows[0];
     return {
+      merchantName: m?.trading_name || m?.name || null,
+      merchantStatus: m?.status ?? null,
       totalCollections: summary.rows[0].total_collections,
       totalVolume: Number(summary.rows[0].total_volume),
       successRate: summary.rows[0].success_rate,

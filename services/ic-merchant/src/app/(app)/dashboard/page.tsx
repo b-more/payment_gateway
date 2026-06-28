@@ -3,10 +3,12 @@
 import type { ReactNode } from 'react';
 import { useData } from '@/lib/useData';
 import { PageHead } from '@/components/shell';
-import { StatCard, BarList, Sparkline, Spinner, Empty } from '@/components/ui';
+import { StatCard, BarList, Sparkline, Spinner, Empty, Badge } from '@/components/ui';
 import { zmw } from '@/lib/format';
 
 interface Dashboard {
+  merchantName: string | null;
+  merchantStatus: string | null;
   totalCollections: string;
   totalVolume: number;
   successRate: string;
@@ -22,7 +24,11 @@ export default function DashboardPage(): ReactNode {
 
   return (
     <>
-      <PageHead title="Dashboard" subtitle="Your collections, volume and success — across your accounts." />
+      <PageHead
+        title={data.merchantName ?? 'Dashboard'}
+        subtitle="Your collections, volume and success — across your accounts."
+        actions={data.merchantStatus ? <Badge value={data.merchantStatus} /> : undefined}
+      />
       <div className="grid cols-3" style={{ marginBottom: 16 }}>
         <StatCard label="Total Collections" value={zmw(data.totalCollections)} sub="Successful collections" />
         <StatCard label="Total Transactions" value={data.totalVolume.toLocaleString()} sub="All transactions" />

@@ -223,6 +223,47 @@ export function applicationRejectedEmail(merchantName: string, reason: string): 
   };
 }
 
+export interface PortalCredentialsInput {
+  loginEmail: string;
+  tempPassword: string;
+}
+
+/** Portal login details (§7.1) — issued when a merchant's account is first
+ *  provisioned, so the admin user can actually sign in. Sign-in still requires
+ *  an emailed OTP, and the user is told to change the temporary password. */
+export function portalCredentialsEmail(input: PortalCredentialsInput): RenderedEmail {
+  const host = MERCHANT_PORTAL_URL.replace(/^https?:\/\//, '');
+  const cell = `padding:12px 16px; border-bottom:1px solid ${LINE};`;
+  const label = `${cell} background:${CODE_BG}; font-size:12px; color:${MUTED}; width:150px;`;
+  return {
+    subject: 'Your Instacom merchant portal login details',
+    text:
+      `Your Instacom merchant portal access is ready.\n\n` +
+      `Portal:   ${MERCHANT_PORTAL_URL}/login\n` +
+      `Email:    ${input.loginEmail}\n` +
+      `Password: ${input.tempPassword}\n\n` +
+      `At sign-in you’ll be asked for a one-time verification code that we email you. ` +
+      `For your security, please change this temporary password after your first login.\n\n` +
+      `— Instacom Payment Solutions Limited`,
+    html: layout({
+      preheader: 'Your merchant portal login details are inside.',
+      heading: 'Your portal access is ready',
+      bodyHtml:
+        paragraph('You can now sign in to the Instacom merchant portal with the details below:') +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:2px 0 18px; border:1px solid ${LINE}; border-radius:10px; overflow:hidden;">
+          <tr><td style="${label}">Portal</td><td style="${cell}"><a href="${MERCHANT_PORTAL_URL}/login" style="color:${BRAND}; font-weight:700; text-decoration:none;">${host}/login</a></td></tr>
+          <tr><td style="${label}">Email</td><td style="${cell} font-family:'Courier New',Courier,monospace; font-size:14px; color:${INK};">${input.loginEmail}</td></tr>
+          <tr><td style="${label} border-bottom:none;">Temporary password</td><td style="${cell} border-bottom:none; font-family:'Courier New',Courier,monospace; font-size:15px; font-weight:700; color:${BRAND};">${input.tempPassword}</td></tr>
+        </table>` +
+        button(`${MERCHANT_PORTAL_URL}/login`, 'Sign in to the portal') +
+        note(
+          'At sign-in you’ll be asked for a one-time verification code that we email you. ' +
+            'For your security, please <strong>change this temporary password</strong> after your first login.',
+        ),
+    }),
+  };
+}
+
 export interface WelcomeEmailInput {
   merchantName: string;
   accountId: string;

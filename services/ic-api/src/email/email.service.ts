@@ -7,6 +7,7 @@ import {
   applicationRejectedEmail,
   otpEmail,
   passwordResetEmail,
+  portalCredentialsEmail,
   welcomeEmail,
 } from './templates';
 
@@ -40,6 +41,20 @@ export class EmailService {
     const mail = otpEmail(otp.code);
     await this.send({ to: otp.to, subject: mail.subject, text: mail.text, html: mail.html });
     this.logger.debug(`OTP email dispatched to ${otp.to}`);
+  }
+
+  /** Portal login credentials (§7.1) — emailed when an account is first provisioned. */
+  async sendPortalCredentials(input: {
+    to: string;
+    loginEmail: string;
+    tempPassword: string;
+  }): Promise<void> {
+    const mail = portalCredentialsEmail({
+      loginEmail: input.loginEmail,
+      tempPassword: input.tempPassword,
+    });
+    await this.send({ to: input.to, subject: mail.subject, text: mail.text, html: mail.html });
+    this.logger.debug(`Portal credentials email dispatched to ${input.to}`);
   }
 
   /** Onboarding application acknowledgement (ONB-1) — sent on application submit. */

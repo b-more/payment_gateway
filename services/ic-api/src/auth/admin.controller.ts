@@ -419,6 +419,17 @@ export class AdminController {
     });
   }
 
+  @Post('merchants/:id/reset-credentials')
+  @HttpCode(200)
+  @Roles('ADMIN') // portal access reset (SEC-Z3, §7.1)
+  @ApiOperation({ summary: "Reset the merchant's portal login and email new credentials" })
+  async resetMerchantCredentials(
+    @Param('id') merchantId: string,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ sentTo: string[] }> {
+    return this.provisioning.resetPortalCredentials({ merchantId, actorId: principal.userId });
+  }
+
   @Post('accounts/:id/promote')
   @HttpCode(200)
   @Roles('ADMIN') // mode change (SEC-Z3, ONB-8)

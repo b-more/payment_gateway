@@ -124,6 +124,7 @@ export default function MerchantDetailPage(): ReactNode {
   const [busy, setBusy] = useState('');
   const [creds, setCreds] = useState<{ sandbox: CredentialPair; live: CredentialPair } | null>(null);
   const [actionError, setActionError] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState('');
 
@@ -134,6 +135,7 @@ export default function MerchantDetailPage(): ReactNode {
   async function act(label: string, fn: () => Promise<void>): Promise<void> {
     setBusy(label);
     setActionError('');
+    setActionMsg('');
     try {
       await fn();
     } catch (err) {
@@ -173,6 +175,16 @@ export default function MerchantDetailPage(): ReactNode {
       reload();
     });
 
+  const resetCredentials = () =>
+    act('reset-creds', async () => {
+      const r = await apiPost<{ sentTo: string[] }>(`/v1/admin/merchants/${id}/reset-credentials`);
+      setActionMsg(
+        r.sentTo.length
+          ? `New portal login details emailed to ${r.sentTo.join(', ')}.`
+          : 'No portal users to reset for this merchant.',
+      );
+    });
+
   return (
     <>
       <PageHead
@@ -189,14 +201,24 @@ export default function MerchantDetailPage(): ReactNode {
               </button>
             </>
           ) : m.status === 'APPROVED' ? (
-            <button className="btn primary" disabled={!!busy} onClick={() => void provision()}>
-              {busy === 'provision' ? 'Provisioning…' : '+ Provision Account'}
-            </button>
+            <>
+              <button className="btn" disabled={!!busy} onClick={() => void resetCredentials()}>
+                {busy === 'reset-creds' ? 'Sending…' : '↺ Reset portal login'}
+              </button>
+              <button className="btn primary" disabled={!!busy} onClick={() => void provision()}>
+                {busy === 'provision' ? 'Provisioning…' : '+ Provision Account'}
+              </button>
+            </>
           ) : null
         }
       />
 
       {actionError ? <div className="err">{actionError}</div> : null}
+      {actionMsg ? (
+        <div className="devhint" style={{ color: 'var(--success-deep)', background: '#e7f2ec', borderColor: '#cfe6da' }}>
+          {actionMsg}
+        </div>
+      ) : null}
 
       {declining ? (
         <div className="card card-pad" style={{ marginBottom: 16, borderColor: '#f0c9cc' }}>

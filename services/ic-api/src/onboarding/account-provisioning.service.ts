@@ -1,13 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import type { Pool } from 'pg';
 import { PG_POOL } from '../database/database.module';
 import { withTransaction } from '../database/tx';
 import { AuditService } from '../audit/audit.service';
 import { CredentialService } from '../credentials/credential.service';
-import { generateWebhookSecret } from '../credentials/crypto';
+import { generateWebhookSecret, hashSecret } from '../credentials/crypto';
 import { EmailService } from '../email/email.service';
 import { ConflictError, NotFoundError } from '../money/errors';
 import type { AccountType } from '../money/types';
+
+/** A readable, strong one-time portal password (12 url-safe chars). */
+function generateTempPassword(): string {
+  return randomBytes(9).toString('base64url');
+}
 
 export interface CredentialPair {
   apiKey: string;
@@ -98,10 +104,35 @@ export class AccountProvisioningService {
         });
       }
 
+      // §7.1: grant portal access. Any merchant admin user without a password
+      // yet (i.e. first provisioning) gets a temporary one, emailed below. On
+      // later provisioning they already have a password, so none is issued.
+      const pendingUsers = await client.query<{ id: string; email: string }>(
+        "SELECT id, email FROM users WHERE merchant_id = $1 AND scope = 'MERCHANT' AND password_hash IS NULL",
+        [input.merchantId],
+      );
+      const portalInvites: Array<{ email: string; tempPassword: string }> = [];
+      for (const u of pendingUsers.rows) {
+        const tempPassword = generateTempPassword();
+        await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+          await hashSecret(tempPassword),
+          u.id,
+        ]);
+        portalInvites.push({ email: u.email, tempPassword });
+        await this.audit.write(client, {
+          actorId: input.actorId,
+          actorScope: 'SYSTEM',
+          action: 'PORTAL_ACCESS_GRANTED',
+          target: u.id,
+          metadata: { merchantId: input.merchantId },
+        });
+      }
+
       return {
         accountId,
         accountNumber,
         merchant: merchant.rows[0],
+        portalInvites,
         credentials: {
           sandbox: { apiKey: sandbox.apiKey, secret: sandbox.secret, signingKey: sandbox.signingKey },
           live: { apiKey: live.apiKey, secret: live.secret, signingKey: live.signingKey },
@@ -118,11 +149,82 @@ export class AccountProvisioningService {
       sandboxApiKey: result.credentials.sandbox.apiKey,
     });
 
+    // §7.1: email the merchant admin user(s) their portal login details, so the
+    // person who applied can actually sign in. Best-effort, like the welcome.
+    for (const invite of result.portalInvites) {
+      await this.email.sendPortalCredentials({
+        to: invite.email,
+        loginEmail: invite.email,
+        tempPassword: invite.tempPassword,
+      });
+    }
+
     return {
       accountId: result.accountId,
       accountNumber: result.accountNumber,
       credentials: result.credentials,
     };
+  }
+
+  /**
+   * Reset a merchant's portal login (§7.1): issue a fresh temporary password to
+   * each of the merchant's portal user(s), revoke their live sessions, and email
+   * the new credentials. Used by admins when a merchant is locked out or never
+   * received their details.
+   */
+  async resetPortalCredentials(input: {
+    merchantId: string;
+    actorId: string;
+  }): Promise<{ sentTo: string[] }> {
+    const result = await withTransaction(this.pool, async (client) => {
+      const merchant = await client.query<{ id: string }>(
+        'SELECT id FROM merchants WHERE id = $1',
+        [input.merchantId],
+      );
+      if (merchant.rowCount === 0) {
+        throw new NotFoundError(`merchant not found: ${input.merchantId}`);
+      }
+      const users = await client.query<{ id: string; email: string }>(
+        "SELECT id, email FROM users WHERE merchant_id = $1 AND scope = 'MERCHANT' ORDER BY created_at",
+        [input.merchantId],
+      );
+      if (users.rowCount === 0) {
+        throw new ConflictError('this merchant has no portal users to reset');
+      }
+
+      const invites: Array<{ email: string; tempPassword: string }> = [];
+      for (const u of users.rows) {
+        const tempPassword = generateTempPassword();
+        await client.query(
+          'UPDATE users SET password_hash = $1, failed_login_count = 0, locked_until = NULL WHERE id = $2',
+          [await hashSecret(tempPassword), u.id],
+        );
+        // Kill any live sessions so the old password can't keep a session alive.
+        await client.query(
+          'UPDATE auth_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL',
+          [u.id],
+        );
+        invites.push({ email: u.email, tempPassword });
+        await this.audit.write(client, {
+          actorId: input.actorId,
+          actorScope: 'SYSTEM',
+          action: 'PORTAL_CREDENTIALS_RESET',
+          target: u.id,
+          metadata: { merchantId: input.merchantId },
+        });
+      }
+      return { invites };
+    });
+
+    // Best-effort email of the new credentials (after commit).
+    for (const invite of result.invites) {
+      await this.email.sendPortalCredentials({
+        to: invite.email,
+        loginEmail: invite.email,
+        tempPassword: invite.tempPassword,
+      });
+    }
+    return { sentTo: result.invites.map((i) => i.email) };
   }
 
   /** ONB-8: deliberately promote an account to PRODUCTION (audit-logged). */

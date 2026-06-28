@@ -47,3 +47,62 @@ export const FEATURES: Array<{ icon: string; title: string; body: string }> = [
   { icon: I.pulse, title: 'Real-time monitoring', body: 'Watch every transaction, settlement and balance update live from your merchant dashboard.' },
   { icon: I.code, title: 'Developer-ready API', body: 'A clean REST API with HMAC signing, idempotency keys and signed webhooks. Integrate in an afternoon.' },
 ];
+
+/* ── Bank of Zambia licensing (LEGAL-1 — now authorised) ── */
+export const BOZ = {
+  eyebrow: 'Licensed & Regulated',
+  title: 'Licensed by the Bank of Zambia.',
+  body:
+    'Instacom Payment Solutions Limited operates as a regulated payment service provider supervised by the Bank of Zambia. Every kwacha you collect, hold and settle is handled to national regulatory standard — not a workaround.',
+  points: [
+    'Regulated payment service provider, supervised by the Bank of Zambia',
+    'Customer & merchant funds handled to BoZ standards',
+    'Append-only audit trail on every transaction (full traceability)',
+    'Built, hosted and operated in Zambia — settled 100% in ZMW',
+  ],
+};
+
+/* ── Animated proof stats ── */
+export const STATS: Array<{ n?: number; decimals?: number; suffix?: string; text?: string; label: string }> = [
+  { n: 99.9, decimals: 1, suffix: '%', label: 'Platform uptime' },
+  { n: 5, label: 'Payment rails · one API' },
+  { text: 'Seconds', label: 'To collect & settle' },
+  { text: 'Bank-grade', label: 'Encryption & audit trail' },
+];
+
+/* ── Full-bleed use-case bands (campaign photography, headline = the message) ── */
+export const BANDS: Array<{ img: string; eyebrow: string; title: string; body: string; cta: string; href: string }> = [
+  {
+    img: '/campaign/9.jpg',
+    eyebrow: 'Collections',
+    title: 'Streamline your collections.',
+    body: 'Invoices, school fees, retail, field sales — pull payments from MTN, Airtel, Zamtel, Zed Mobile and Visa into one balance, reconciled automatically.',
+    cta: 'Start collecting',
+    href: `${MERCHANT}/getting-started`,
+  },
+  {
+    img: '/campaign/5.jpg',
+    eyebrow: 'Pricing',
+    title: 'Zero integration cost.',
+    body: 'Onboard, integrate and go live for free. No setup fees, no monthly minimums, no lock-in — you only pay as you transact.',
+    cta: 'See how it works',
+    href: '/how-it-works',
+  },
+  {
+    img: '/campaign/10.jpg',
+    eyebrow: 'Why Instacom',
+    title: 'Your payment solutions provider.',
+    body: 'One regulated partner for the whole payment lifecycle — collections, disbursements, settlement and reconciliation — purpose-built for Zambian businesses.',
+    cta: 'Explore the platform',
+    href: '/product',
+  },
+];
+
+/* ── Segment showcase (portrait campaign posters) ── */
+export const SEGMENTS: Array<{ img: string; label: string }> = [
+  { img: '/campaign/1.jpg', label: 'Corporates & enterprise' },
+  { img: '/campaign/2.jpg', label: 'SMEs — free onboarding' },
+  { img: '/campaign/4.jpg', label: 'Schools & campuses' },
+  { img: '/campaign/3.jpg', label: 'Personal & everyday' },
+  { img: '/campaign/7.jpg', label: 'Seamless transactions' },
+];

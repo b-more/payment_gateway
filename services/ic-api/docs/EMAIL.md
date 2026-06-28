@@ -10,7 +10,15 @@ authenticated SMTP via `EmailService` (nodemailer).
 | `SMTP_HOST` | SMTP server (Hostinger). **Empty ⇒ emails are not sent** (dev) |
 | `SMTP_PORT` | 587 (STARTTLS) or 465 (implicit TLS) |
 | `SMTP_USER` / `SMTP_PASSWORD` | authenticated mailbox |
-| `SMTP_FROM` | envelope/From, e.g. `noreply@instacompayzm.com` |
+| `SMTP_FROM` | envelope/From address, e.g. `noreply@instacompayzm.com` |
+| `SMTP_FROM_NAME` | sender display name (default `Instacom Payment Solutions`) |
+| `MERCHANT_PORTAL_URL` | portal link in the welcome email (default `https://merchants.instacompayzm.com`) |
+
+All transactional mail is sent as **branded multipart HTML** (instac•m header,
+ZMW / Bank-of-Zambia footer) with a plain-text fallback — see
+`src/email/templates.ts`. OTP and reset codes render in a highlighted code
+block; the welcome mail carries the public sandbox `api_key` and a dashboard
+button.
 
 OTP mails contain only the code; welcome mails contain the public `api_key` and
 never a secret. Sends are best-effort and never throw, so a mail outage cannot

@@ -392,6 +392,7 @@ export default function LoginPage(): ReactNode {
       <aside className="auth-aside">
         <div className="aside-head">
           <img className="logo" src="/brand/instacom-logo.png" alt="Instacom Payment Solutions" />
+          <span className="portal-tag">Merchant Portal</span>
         </div>
         <div className="aside-body">
           <span className="eyebrow">Merchant workspace</span>

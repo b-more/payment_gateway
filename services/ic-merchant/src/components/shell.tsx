@@ -24,7 +24,7 @@ export function Shell({ children }: { children: ReactNode }): ReactNode {
       <aside className="sidebar">
         <div className="brand">
           <img className="logo" src="/brand/instacom-logo.png" alt="Instacom" />
-          <span>merchant</span>
+          <span className="portal-tag">Merchant Portal</span>
         </div>
         <div className="navlabel">Workspace</div>
         {NAV.map(([label, href]) => {
@@ -45,7 +45,7 @@ export function Shell({ children }: { children: ReactNode }): ReactNode {
 
       <div className="main">
         <header className="topbar">
-          <div className="eyebrow">Instacom Merchant · ZMW</div>
+          <div className="eyebrow">Merchant Portal · ZMW</div>
           <div className="who">
             <span className="status-pill">
               <span className="live" />

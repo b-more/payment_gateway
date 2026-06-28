@@ -237,7 +237,7 @@ services:
       retries: 3
 
   ic-certbot:                          # Let's Encrypt issuance + auto-renewal (TLS-1)
-    image: certbot/certbot:latest
+    image: certbot/dns-cloudflare:latest   # EXP-4: DNS-01 plugin (HTTP-01 won't work behind CF proxy)
     container_name: ic-certbot
     restart: unless-stopped
     volumes:
@@ -245,5 +245,6 @@ services:
       - ic-certbot-webroot:/var/www/certbot
     depends_on:
       - ic-nginx
-    # Renew every 12h (no-op until certs exist). Initial issuance: scripts/init-letsencrypt.sh
-    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+    # Renew every 12h via DNS-01 (renewal config already pins dns-cloudflare + cloudflare.ini).
+    # Initial issuance was done with `certbot certonly --dns-cloudflare` (EXP-4).
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done'

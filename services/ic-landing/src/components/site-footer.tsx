@@ -42,7 +42,7 @@ export function SiteFooter(): ReactNode {
           </div>
         </div>
         <div className="bottom">
-          <span>© 2026 Instacom Payment Solutions Limited · Lusaka, Zambia · Currency: ZMW</span>
+          <span>© 2026 Instacom Payment Solutions Limited · Lusaka, Zambia · Currency: ZMW · Bank of Zambia licensed</span>
           <span className="credit">
             <span className="sep" /> Powered by
             <img src="/brand/codesync-logo.png" alt="Codesync Technologies" />

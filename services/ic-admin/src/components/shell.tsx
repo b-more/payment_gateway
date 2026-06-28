@@ -23,7 +23,7 @@ const NAV: Array<{ group: string; items: Array<[string, string]> }> = [
       ['Security', '/security'],
       ['Notifications', '/notifications'],
       ['User Management', '/users'],
-      ['Configurations', '/configurations'],
+      ['Settings', '/settings'],
     ],
   },
 ];
@@ -38,7 +38,7 @@ export function Shell({ children }: { children: ReactNode }): ReactNode {
       <aside className="sidebar">
         <div className="brand">
           <img className="logo" src="/brand/instacom-logo.png" alt="Instacom" />
-          <span>admin</span>
+          <span className="portal-tag">Admin Console</span>
         </div>
         {NAV.map((g) => (
           <div key={g.group}>
@@ -63,7 +63,7 @@ export function Shell({ children }: { children: ReactNode }): ReactNode {
 
       <div className="main">
         <header className="topbar">
-          <div className="eyebrow">Instacompay Control · ZMW</div>
+          <div className="eyebrow">Admin Console · ZMW</div>
           <div className="who">
             <span className="status-pill">
               <span className="live" />

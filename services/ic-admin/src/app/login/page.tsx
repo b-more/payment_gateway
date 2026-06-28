@@ -6,12 +6,11 @@ import { authApi, ApiError } from '@/lib/api';
 
 const RAILS = ['MTN', 'Airtel', 'Zamtel', 'Zed Mobile', 'Visa'];
 const POINTS = [
-  'Collect & disburse across every Zambian rail',
-  'Settle to your bank in Kwacha, reconciled',
-  'Real-time monitoring, reports & API keys',
+  'Oversee every merchant, account & transaction',
+  'Manage float, settlements & reconciliation',
+  'Full audit trail, RBAC & security controls',
 ];
 const REMEMBER_KEY = 'ic.merchant.email';
-const SIGNUP_URL = 'https://merchants.instacompayzm.com/getting-started';
 type Stage = 'login' | 'otp' | 'forgot' | 'reset' | 'reset-done';
 
 const EyeIcon = ({ off }: { off: boolean }): ReactNode => (
@@ -276,7 +275,7 @@ export default function LoginPage(): ReactNode {
       return (
         <>
           <h1>Welcome back</h1>
-          <p className="hint">Sign in to your merchant workspace.</p>
+          <p className="hint">Sign in to the Instacom admin console.</p>
           {error ? <div className="err">{error}</div> : null}
           <form onSubmit={(e) => void submitLogin(e)}>
             <div className="field">
@@ -301,7 +300,6 @@ export default function LoginPage(): ReactNode {
             </div>
             <button className="btn primary" disabled={busy}>{busy ? 'Checking…' : 'Continue'}</button>
           </form>
-          <p className="auth-alt">New to Instacom? <a href={SIGNUP_URL}>Create a merchant account</a></p>
         </>
       );
     }
@@ -393,10 +391,11 @@ export default function LoginPage(): ReactNode {
       <aside className="auth-aside">
         <div className="aside-head">
           <img className="logo" src="/brand/instacom-logo.png" alt="Instacom Payment Solutions" />
+          <span className="portal-tag">Admin Console</span>
         </div>
         <div className="aside-body">
-          <span className="eyebrow">Merchant workspace</span>
-          <h2>Run your payments from one place.</h2>
+          <span className="eyebrow">Admin console</span>
+          <h2>Run the whole platform from one console.</h2>
           <ul className="aside-points">
             {POINTS.map((p) => (
               <li key={p}><span className="tick" aria-hidden>✓</span>{p}</li>

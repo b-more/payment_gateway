@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { SendMailOptions, Transporter } from 'nodemailer';
 import { EMAIL_TRANSPORT, isEmailConfigured } from './transport';
+import { otpEmail, passwordResetEmail, welcomeEmail } from './templates';
 
 export interface WelcomeEmail {
   to: string;
@@ -17,48 +18,38 @@ export interface WelcomeEmail {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly from = process.env.SMTP_FROM ?? 'noreply@instacompayzm.com';
+  // Branded sender so the inbox shows "Instacom Payment Solutions", not a bare
+  // mailbox address. Display name is overridable via SMTP_FROM_NAME.
+  private readonly from = (() => {
+    const address = process.env.SMTP_FROM ?? 'noreply@instacompayzm.com';
+    const name = process.env.SMTP_FROM_NAME ?? 'Instacom Payment Solutions';
+    return name ? `${name} <${address}>` : address;
+  })();
 
   constructor(@Inject(EMAIL_TRANSPORT) private readonly transport: Transporter) {}
 
   /** OTP email (SEC-A1). The code is never logged. */
   async sendOtp(otp: { to: string; code: string }): Promise<void> {
-    await this.send({
-      to: otp.to,
-      subject: 'Your Instacompay verification code',
-      text:
-        `Your Instacompay verification code is ${otp.code}.\n\n` +
-        `It expires in 5 minutes and can be used once. ` +
-        `If you didn't try to sign in, you can ignore this email.`,
-    });
+    const mail = otpEmail(otp.code);
+    await this.send({ to: otp.to, subject: mail.subject, text: mail.text, html: mail.html });
     this.logger.debug(`OTP email dispatched to ${otp.to}`);
   }
 
   /** Password reset code email (SEC-A1). The code is never logged. */
   async sendPasswordReset(reset: { to: string; code: string }): Promise<void> {
-    await this.send({
-      to: reset.to,
-      subject: 'Reset your Instacompay password',
-      text:
-        `Your Instacompay password reset code is ${reset.code}.\n\n` +
-        `Enter it in the portal to set a new password. It expires in 15 minutes and can be used once. ` +
-        `If you didn't request a reset, you can ignore this email — your password is unchanged.`,
-    });
+    const mail = passwordResetEmail(reset.code);
+    await this.send({ to: reset.to, subject: mail.subject, text: mail.text, html: mail.html });
     this.logger.debug(`Password reset email dispatched to ${reset.to}`);
   }
 
   /** Welcome email (ONB-7). Includes the public sandbox api_key only. */
   async sendWelcome(email: WelcomeEmail): Promise<void> {
-    await this.send({
-      to: email.to,
-      subject: 'Welcome to Instacompay',
-      text:
-        `Welcome, ${email.merchantName}.\n\n` +
-        `Your account ${email.accountId} is ready. ` +
-        `Sandbox API key: ${email.sandboxApiKey}.\n\n` +
-        `Sign in to the merchant portal to view your dashboard. ` +
-        `Your secret and signing keys are shown once in the portal — store them securely.`,
+    const mail = welcomeEmail({
+      merchantName: email.merchantName,
+      accountId: email.accountId,
+      sandboxApiKey: email.sandboxApiKey,
     });
+    await this.send({ to: email.to, subject: mail.subject, text: mail.text, html: mail.html });
     this.logger.debug(`Welcome email dispatched to ${email.to}`);
   }
 

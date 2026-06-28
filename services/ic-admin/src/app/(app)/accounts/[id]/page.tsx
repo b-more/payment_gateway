@@ -6,7 +6,6 @@ import { useData } from '@/lib/useData';
 import { apiPost, apiPut, ApiError } from '@/lib/api';
 import { PageHead } from '@/components/shell';
 import { Badge, Money, Spinner, Empty } from '@/components/ui';
-import { shortId } from '@/lib/format';
 
 interface ChargeConfig {
   processor: string;
@@ -19,6 +18,7 @@ interface ChargeConfig {
 interface AccountConfig {
   account: {
     id: string;
+    account_number: string;
     account_type: string;
     operating_mode: 'SANDBOX' | 'PRODUCTION';
     status: string;
@@ -66,8 +66,8 @@ export default function AccountConfigPage(): ReactNode {
   return (
     <>
       <PageHead
-        title="Manage Account"
-        subtitle={`${a.account_type} · ${shortId(a.id)}`}
+        title={a.account_number}
+        subtitle={`${a.account_type} · Manage account`}
         actions={
           <button className="btn primary" disabled={!!busy} onClick={() => void toggleMode()}>
             {busy === 'mode' ? '…' : `Switch to ${a.operating_mode === 'PRODUCTION' ? 'Sandbox' : 'Production'}`}

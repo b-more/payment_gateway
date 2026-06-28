@@ -71,7 +71,7 @@ export class MerchantReadService {
 
   async accounts(merchantId: string): Promise<unknown[]> {
     const res = await this.pool.query(
-      `SELECT a.id, a.account_type, a.operating_mode, a.status,
+      `SELECT a.id, a.account_number, a.account_type, a.operating_mode, a.status,
               a.float_balance::text AS float_balance,
               s.callback_url, COALESCE(s.ip_whitelist, '{}') AS ip_whitelist,
               to_char(a.created_at, 'YYYY-MM-DD') AS created_at

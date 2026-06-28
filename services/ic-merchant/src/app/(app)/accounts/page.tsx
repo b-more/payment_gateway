@@ -4,10 +4,10 @@ import type { ReactNode } from 'react';
 import { useData } from '@/lib/useData';
 import { PageHead } from '@/components/shell';
 import { Badge, Money, Spinner, Empty } from '@/components/ui';
-import { shortId } from '@/lib/format';
 
 interface Account {
   id: string;
+  account_number: string;
   account_type: string;
   operating_mode: string;
   status: string;
@@ -35,7 +35,7 @@ export default function AccountsPage(): ReactNode {
           <table className="table">
             <thead>
               <tr>
-                <th>Account ID</th>
+                <th>Account Number</th>
                 <th>Type</th>
                 <th>Mode</th>
                 <th className="num">Float</th>
@@ -46,7 +46,7 @@ export default function AccountsPage(): ReactNode {
             <tbody>
               {data.map((a) => (
                 <tr key={a.id}>
-                  <td className="id">{shortId(a.id)}</td>
+                  <td className="mono" style={{ fontWeight: 600 }}>{a.account_number}</td>
                   <td>{a.account_type}</td>
                   <td>
                     <Badge value={a.operating_mode} />

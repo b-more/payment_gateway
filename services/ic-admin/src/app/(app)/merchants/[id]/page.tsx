@@ -7,7 +7,6 @@ import { useData } from '@/lib/useData';
 import { apiPost, ApiError } from '@/lib/api';
 import { PageHead } from '@/components/shell';
 import { Badge, Money, Spinner, Empty } from '@/components/ui';
-import { shortId } from '@/lib/format';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -27,6 +26,7 @@ function fileSize(bytes: number): string {
 
 interface Account {
   id: string;
+  account_number: string;
   account_type: string;
   operating_mode: string;
   status: string;
@@ -362,7 +362,7 @@ export default function MerchantDetailPage(): ReactNode {
             <tbody>
               {data.accounts.map((a) => (
                 <tr key={a.id}>
-                  <td className="id">{shortId(a.id)}</td>
+                  <td className="mono" style={{ fontWeight: 600 }}>{a.account_number}</td>
                   <td>{a.account_type}</td>
                   <td><Badge value={a.operating_mode} /></td>
                   <td className="num"><Money ngwee={a.float_balance} plain /></td>

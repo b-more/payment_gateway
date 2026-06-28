@@ -25,7 +25,7 @@ export class AccountConfigService {
 
   async getAccountConfig(accountId: string): Promise<unknown> {
     const account = await this.pool.query(
-      `SELECT id, merchant_id, account_type, operating_mode, status,
+      `SELECT id, account_number, merchant_id, account_type, operating_mode, status,
               float_balance::text AS float_balance, low_float_threshold::text AS low_float_threshold
          FROM accounts WHERE id = $1`,
       [accountId],

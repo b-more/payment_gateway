@@ -105,7 +105,7 @@ export class AdminReadService {
       [merchantId],
     );
     const accounts = await this.pool.query(
-      `SELECT id, account_type, operating_mode, status, float_balance::text AS float_balance,
+      `SELECT id, account_number, account_type, operating_mode, status, float_balance::text AS float_balance,
               low_float_threshold::text AS low_float_threshold,
               to_char(created_at, 'YYYY-MM-DD') AS created_at
          FROM accounts WHERE merchant_id = $1 ORDER BY created_at`,
@@ -184,7 +184,7 @@ export class AdminReadService {
   /** All accounts with their current float balance (for the Float Management overview). */
   async listAccounts(): Promise<unknown[]> {
     const res = await this.pool.query(
-      `SELECT a.id, m.name AS merchant_name, a.account_type, a.operating_mode, a.status,
+      `SELECT a.id, a.account_number, m.name AS merchant_name, a.account_type, a.operating_mode, a.status,
               a.float_balance::text AS float_balance, a.low_float_threshold::text AS low_float_threshold
          FROM accounts a JOIN merchants m ON m.id = a.merchant_id
         ORDER BY m.name, a.account_type, a.operating_mode`,

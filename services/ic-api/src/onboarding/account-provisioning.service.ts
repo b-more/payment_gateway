@@ -17,6 +17,7 @@ export interface CredentialPair {
 
 export interface ProvisionResult {
   accountId: string;
+  accountNumber: string;
   credentials: { sandbox: CredentialPair; live: CredentialPair };
 }
 
@@ -63,11 +64,13 @@ export class AccountProvisioningService {
       }
 
       // ONB-6 / NN-10: defaults are SANDBOX + zero float (set by the schema).
-      const account = await client.query<{ id: string }>(
-        'INSERT INTO accounts (merchant_id, account_type) VALUES ($1, $2) RETURNING id',
+      // account_number is assigned by the trg_account_number trigger (0013).
+      const account = await client.query<{ id: string; account_number: string }>(
+        'INSERT INTO accounts (merchant_id, account_type) VALUES ($1, $2) RETURNING id, account_number',
         [input.merchantId, input.accountType],
       );
       const accountId = account.rows[0].id;
+      const accountNumber = account.rows[0].account_number;
 
       await client.query(
         'INSERT INTO account_settings (account_id, webhook_signing_secret) VALUES ($1, $2)',
@@ -97,6 +100,7 @@ export class AccountProvisioningService {
 
       return {
         accountId,
+        accountNumber,
         merchant: merchant.rows[0],
         credentials: {
           sandbox: { apiKey: sandbox.apiKey, secret: sandbox.secret, signingKey: sandbox.signingKey },
@@ -105,15 +109,20 @@ export class AccountProvisioningService {
       };
     });
 
-    // ONB-7: welcome email (after commit; never includes secrets).
+    // ONB-7: welcome email (after commit; never includes secrets). Shows the
+    // human-readable account number rather than the internal UUID.
     await this.email.sendWelcome({
       to: result.merchant.email,
       merchantName: result.merchant.name,
-      accountId: result.accountId,
+      accountId: result.accountNumber,
       sandboxApiKey: result.credentials.sandbox.apiKey,
     });
 
-    return { accountId: result.accountId, credentials: result.credentials };
+    return {
+      accountId: result.accountId,
+      accountNumber: result.accountNumber,
+      credentials: result.credentials,
+    };
   }
 
   /** ONB-8: deliberately promote an account to PRODUCTION (audit-logged). */

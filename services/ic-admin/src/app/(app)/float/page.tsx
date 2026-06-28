@@ -34,6 +34,7 @@ interface FloatRequest {
 }
 interface Account {
   id: string;
+  account_number: string;
   merchant_name: string;
   account_type: string;
   operating_mode: string;
@@ -192,7 +193,7 @@ export default function FloatPage(): ReactNode {
               {accounts.map((a) => (
                 <tr key={a.id}>
                   <td style={{ fontWeight: 600 }}>{a.merchant_name}</td>
-                  <td>{a.account_type} <span className="id">{shortId(a.id)}</span></td>
+                  <td>{a.account_type} <span className="id">{a.account_number}</span></td>
                   <td><span className={`envtag ${envTag(a.operating_mode)}`}>{envTag(a.operating_mode)}</span></td>
                   <td className="num"><Money ngwee={a.float_balance} plain /></td>
                   <td className="num muted"><Money ngwee={a.low_float_threshold} plain /></td>
@@ -346,7 +347,7 @@ function CreditFloat({
             <option value="">Select an account…</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.merchant_name} — {a.account_type} · {envTag(a.operating_mode)} ({zmw(a.float_balance)})
+                {a.account_number} · {a.merchant_name} — {a.account_type} · {envTag(a.operating_mode)} ({zmw(a.float_balance)})
               </option>
             ))}
           </select>

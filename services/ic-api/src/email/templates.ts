@@ -134,6 +134,35 @@ export function passwordResetEmail(code: string): RenderedEmail {
   };
 }
 
+/** Onboarding application acknowledgement (ONB-1) — sent the moment a merchant
+ *  applies, so the entered email always gets a confirmation. Carries no secrets. */
+export function applicationReceivedEmail(merchantName: string): RenderedEmail {
+  return {
+    subject: 'We’ve received your Instacom application',
+    text:
+      `Hello ${merchantName},\n\n` +
+      `Thanks for applying for an Instacom merchant account. We’ve received your ` +
+      `application and our compliance team will review it and get back to you within ` +
+      `24–48 hours.\n\n` +
+      `There’s nothing you need to do right now — we’ll email you as soon as your ` +
+      `account is approved and ready to set up.\n\n` +
+      `— Instacom Payment Solutions Limited`,
+    html: layout({
+      preheader: 'We’ve received your merchant application — review takes 24–48 hours.',
+      heading: `Thanks, ${merchantName} — we’ve got your application.`,
+      bodyHtml:
+        paragraph(
+          'Your Instacom merchant application has been received. Our compliance team will ' +
+            'review your details and KYC documents and get back to you within <strong>24–48 hours</strong>.',
+        ) +
+        note(
+          'There’s nothing you need to do right now — we’ll email you the moment your account ' +
+            'is approved and ready to set up.',
+        ),
+    }),
+  };
+}
+
 export interface WelcomeEmailInput {
   merchantName: string;
   accountId: string;

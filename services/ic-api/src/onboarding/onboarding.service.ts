@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { PG_POOL } from '../database/database.module';
 import { withTransaction, isUniqueViolation } from '../database/tx';
 import { AuditService } from '../audit/audit.service';
+import { EmailService } from '../email/email.service';
 import { ConflictError, NotFoundError, ValidationError } from '../money/errors';
 
 export const ONBOARDING_RECEIVED_MESSAGE =
@@ -55,6 +56,7 @@ export class OnboardingService {
   constructor(
     @Inject(PG_POOL) private readonly pool: Pool,
     private readonly audit: AuditService,
+    private readonly email: EmailService,
   ) {}
 
   /** ONB-1: public application creates a PENDING merchant, its INVITED admin user, and stores KYC docs. */
@@ -77,8 +79,9 @@ export class OnboardingService {
     });
 
     const m = input.merchant;
+    let result: { merchantId: string };
     try {
-      return await withTransaction(this.pool, async (client) => {
+      result = await withTransaction(this.pool, async (client) => {
         const merchant = await client.query<{ id: string }>(
           `INSERT INTO merchants
              (name, merchant_type, email, phone, status, kyc_status,
@@ -129,6 +132,16 @@ export class OnboardingService {
       }
       throw error;
     }
+
+    // Best-effort acknowledgement to the email(s) entered on the application, so
+    // the applicant always gets a confirmation (the welcome mail comes later, at
+    // account provisioning). Never throws — a mail failure can't fail onboarding.
+    const recipients = [
+      ...new Set([input.admin.email, input.merchant.email].map((e) => e.trim()).filter(Boolean)),
+    ];
+    await this.email.sendApplicationReceived({ to: recipients, merchantName: input.merchant.name });
+
+    return result;
   }
 
   /** ONB-3: compliance approves or rejects a pending application (audit-logged). */

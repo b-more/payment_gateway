@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { SendMailOptions, Transporter } from 'nodemailer';
 import { EMAIL_TRANSPORT, isEmailConfigured } from './transport';
-import { otpEmail, passwordResetEmail, welcomeEmail } from './templates';
+import { applicationReceivedEmail, otpEmail, passwordResetEmail, welcomeEmail } from './templates';
 
 export interface WelcomeEmail {
   to: string;
@@ -33,6 +33,13 @@ export class EmailService {
     const mail = otpEmail(otp.code);
     await this.send({ to: otp.to, subject: mail.subject, text: mail.text, html: mail.html });
     this.logger.debug(`OTP email dispatched to ${otp.to}`);
+  }
+
+  /** Onboarding application acknowledgement (ONB-1) — sent on application submit. */
+  async sendApplicationReceived(input: { to: string | string[]; merchantName: string }): Promise<void> {
+    const mail = applicationReceivedEmail(input.merchantName);
+    await this.send({ to: input.to, subject: mail.subject, text: mail.text, html: mail.html });
+    this.logger.debug(`Application-received email dispatched to ${String(input.to)}`);
   }
 
   /** Password reset code email (SEC-A1). The code is never logged. */

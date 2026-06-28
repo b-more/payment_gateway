@@ -17,8 +17,9 @@ import { ConflictError } from '../src/money/errors';
 const pool = createPool(process.env.DATABASE_URL);
 const audit = new AuditService();
 const credentials = new CredentialService(pool);
-const onboarding = new OnboardingService(pool, audit);
-const provisioning = new AccountProvisioningService(pool, credentials, audit, new EmailService(createEmailTransport()));
+const email = new EmailService(createEmailTransport());
+const onboarding = new OnboardingService(pool, audit, email);
+const provisioning = new AccountProvisioningService(pool, credentials, audit, email);
 
 after(async () => {
   await pool.end();

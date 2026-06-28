@@ -1,0 +1,17 @@
+import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../database/database.module';
+import { CredentialsModule } from '../credentials/credentials.module';
+import { AuthModule } from '../auth/auth.module';
+import { ReportModule } from '../reports/report.module';
+import { AuditService } from '../audit/audit.service';
+import { MerchantReadService } from './merchant-read.service';
+import { MerchantController } from './merchant.controller';
+
+// Merchant portal API (§6.2). AuthModule provides the JWT/roles guards; all
+// queries are merchant-scoped (NN-6).
+@Module({
+  imports: [DatabaseModule, CredentialsModule, AuthModule, ReportModule],
+  controllers: [MerchantController],
+  providers: [MerchantReadService, AuditService],
+})
+export class MerchantModule {}

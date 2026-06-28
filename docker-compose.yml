@@ -1,0 +1,249 @@
+# Instacompay Gateway — service topology (§2.3, §9.1)
+# One container per service (DEP-1). Only ic-nginx is public (NN-5).
+# ic-postgres and ic-redis sit on an `internal: true` network: no host port
+# mapping and no internet egress — never publicly reachable (SEC-D5, SEC-D6).
+name: instacompay-gateway
+
+networks:
+  # Public-facing + egress. Nginx and the four apps live here.
+  ic-public:
+    name: ic-public
+  # Data tier. internal:true => no route to the host or the internet (NN-5).
+  ic-internal:
+    name: ic-internal
+    internal: true
+
+volumes:
+  ic-postgres-data:
+  ic-redis-data:
+  ic-certbot-webroot:
+  ic-backups:
+
+services:
+  # ── Data tier (internal only) ─────────────────────────────────────────────
+  ic-postgres:
+    image: postgres:16-alpine          # PostgreSQL 16 (§3)
+    container_name: ic-postgres
+    restart: unless-stopped            # DEP-1
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ic-postgres-data:/var/lib/postgresql/data
+    networks:
+      - ic-internal                    # NN-5 / SEC-D5 — no `ports:` mapping, ever
+    healthcheck:                       # DEP-5
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ic-backup:                           # Automated encrypted DB backups (SEC-B1/B2)
+    build: ./backup
+    container_name: ic-backup
+    restart: unless-stopped
+    env_file: .env                     # DATABASE_URL + BACKUP_* (owner connection for pg_dump)
+    volumes:
+      - ic-backups:/backups            # local encrypted staging; off-site via BACKUP_UPLOAD_CMD
+    depends_on:
+      ic-postgres:
+        condition: service_healthy
+    networks:
+      - ic-internal                    # reaches Postgres only; not public
+
+  ic-redis:
+    image: redis:7-alpine              # Redis 7 (§3)
+    container_name: ic-redis
+    restart: unless-stopped            # DEP-1
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+    volumes:
+      - ic-redis-data:/data
+    networks:
+      - ic-internal                    # NN-5 / SEC-D6 — password-protected, no `ports:`
+    healthcheck:                       # DEP-5
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Application tier (NestJS API + three Next.js apps) ────────────────────
+  ic-api:                              # API gateway — NestJS (§3)
+    build: ./services/ic-api
+    container_name: ic-api
+    restart: unless-stopped            # DEP-1
+    env_file: .env                     # DEP-2 — secrets injected, never baked
+    environment:
+      PORT: 8030
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+      ic-redis: { condition: service_healthy }
+    networks:
+      - ic-internal                    # reaches Postgres/Redis
+      - ic-public                      # reachable by Nginx + egress to processors/SMTP
+    ports:
+      - "127.0.0.1:8030:8030"          # host-mapped to loopback only — not public (NN-5)
+    healthcheck:                       # DEP-5
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8030/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+
+  ic-migrate:                          # One-shot DB migration runner (DEP-4)
+    build: ./services/ic-api           # same image as the API
+    container_name: ic-migrate
+    profiles: ["tools"]                # never starts with `up`; run explicitly
+    restart: "no"                      # runs once and exits
+    env_file: .env
+    command: ["node", "dist/db/migrate.js"]
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+    networks:
+      - ic-internal
+    # Run with: docker compose --profile tools run --rm ic-migrate
+
+  ic-provision-roles:                  # One-shot: set LOGIN+password on app roles (SEC-D7)
+    build: ./services/ic-api           # same image as the API
+    container_name: ic-provision-roles
+    profiles: ["tools"]                # never starts with `up`; run after migrate
+    restart: "no"
+    env_file: .env
+    command: ["node", "dist/db/provision-roles.js"]
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+    networks:
+      - ic-internal
+    # Run with: docker compose --profile tools run --rm ic-provision-roles
+
+  ic-settlement-run:                   # Scheduled settlement run (SET-1) — cron/one-shot
+    build: ./services/ic-api
+    container_name: ic-settlement-run
+    profiles: ["tools"]
+    restart: "no"
+    env_file: .env
+    command: ["node", "dist/jobs/run-settlements.js"]
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+    networks:
+      - ic-internal
+    # Run with: docker compose --profile tools run --rm ic-settlement-run
+
+  ic-reconcile-run:                    # Daily reconciliation (REC-1) — cron/one-shot
+    build: ./services/ic-api
+    container_name: ic-reconcile-run
+    profiles: ["tools"]
+    restart: "no"
+    env_file: .env
+    command: ["node", "dist/jobs/run-reconciliation.js"]
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+    networks:
+      - ic-internal
+    # Reads RECON_REPORT_FILE; run with:
+    #   docker compose --profile tools run --rm -e RECON_REPORT_FILE=/reports/mtn.json ic-reconcile-run
+
+  ic-admin:                            # Admin portal — Next.js (§3, §6.1)
+    build:
+      context: ./services/ic-admin
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8030}
+    container_name: ic-admin
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 8010
+    depends_on:
+      ic-api: { condition: service_started }
+    networks:
+      - ic-internal
+      - ic-public
+    ports:
+      - "127.0.0.1:8010:8010"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8010/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+
+  ic-merchant:                         # Merchant portal — Next.js (§3, §6.2)
+    build:
+      context: ./services/ic-merchant
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8030}
+    container_name: ic-merchant
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 8020
+    depends_on:
+      ic-api: { condition: service_started }
+    networks:
+      - ic-internal
+      - ic-public
+    ports:
+      - "127.0.0.1:8020:8020"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8020/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+
+  ic-landing:                          # Marketing site — Next.js (§3, §6.3)
+    build:
+      context: ./services/ic-landing
+      args:
+        NEXT_PUBLIC_MERCHANT_URL: ${NEXT_PUBLIC_MERCHANT_URL:-http://localhost:8020}
+    container_name: ic-landing
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 8040
+    networks:
+      - ic-public                      # §6.3 — no DB tier access by design (SEC-D7)
+    ports:
+      - "127.0.0.1:8040:8040"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8040/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+
+  # ── Edge (the ONLY public service) ────────────────────────────────────────
+  ic-nginx:                            # Reverse proxy / TLS / headers (NN-5, SEC-N4)
+    build: ./nginx
+    container_name: ic-nginx
+    restart: unless-stopped
+    depends_on:
+      - ic-admin
+      - ic-merchant
+      - ic-api
+      - ic-landing
+    networks:
+      - ic-public
+    ports:
+      - "80:80"                        # public
+      - "443:443"                      # public (TLS — §10.2)
+    volumes:
+      - ./certs:/etc/letsencrypt        # certs (git-ignored); written by Certbot + bootstrap
+      - ic-certbot-webroot:/var/www/certbot:ro  # ACME HTTP-01 challenge files
+    healthcheck:                       # DEP-5
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ic-certbot:                          # Let's Encrypt issuance + auto-renewal (TLS-1)
+    image: certbot/certbot:latest
+    container_name: ic-certbot
+    restart: unless-stopped
+    volumes:
+      - ./certs:/etc/letsencrypt
+      - ic-certbot-webroot:/var/www/certbot
+    depends_on:
+      - ic-nginx
+    # Renew every 12h (no-op until certs exist). Initial issuance: scripts/init-letsencrypt.sh
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'

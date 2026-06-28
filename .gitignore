@@ -1,0 +1,42 @@
+# ── Dependencies ──
+node_modules/
+**/node_modules/
+
+# ── Environment / secrets (DEP-2, SEC-D2) ──
+.env
+.env.*
+!.env.example
+
+# ── TLS / certificates (never commit; issued by Certbot per §10.2) ──
+certs/
+**/certs/
+*.pem
+*.key
+*.crt
+*.csr
+
+# ── Backups (never commit DB dumps) ──
+backups/
+*.dump
+*.dump.enc
+
+# ── Build output ──
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# ── Logs ──
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# ── OS / editor ──
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ── Docker / local overrides ──
+docker-compose.override.yml

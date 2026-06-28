@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Instacom">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2aa3df"/>
+      <stop offset="1" stop-color="#16237d"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#g)"/>
+  <circle cx="32" cy="18.5" r="5.6" fill="#e11d2a"/>
+  <rect x="27.4" y="26" width="9.2" height="22" rx="3.2" fill="#ffffff"/>
+</svg>

@@ -1,7 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { SendMailOptions, Transporter } from 'nodemailer';
 import { EMAIL_TRANSPORT, isEmailConfigured } from './transport';
-import { applicationReceivedEmail, otpEmail, passwordResetEmail, welcomeEmail } from './templates';
+import {
+  applicationApprovedEmail,
+  applicationReceivedEmail,
+  applicationRejectedEmail,
+  otpEmail,
+  passwordResetEmail,
+  welcomeEmail,
+} from './templates';
 
 export interface WelcomeEmail {
   to: string;
@@ -40,6 +47,24 @@ export class EmailService {
     const mail = applicationReceivedEmail(input.merchantName);
     await this.send({ to: input.to, subject: mail.subject, text: mail.text, html: mail.html });
     this.logger.debug(`Application-received email dispatched to ${String(input.to)}`);
+  }
+
+  /** Application approved notification (ONB-3). */
+  async sendApplicationApproved(input: { to: string | string[]; merchantName: string }): Promise<void> {
+    const mail = applicationApprovedEmail(input.merchantName);
+    await this.send({ to: input.to, subject: mail.subject, text: mail.text, html: mail.html });
+    this.logger.debug(`Application-approved email dispatched to ${String(input.to)}`);
+  }
+
+  /** Application declined notification (ONB-3). */
+  async sendApplicationRejected(input: {
+    to: string | string[];
+    merchantName: string;
+    reason: string;
+  }): Promise<void> {
+    const mail = applicationRejectedEmail(input.merchantName, input.reason);
+    await this.send({ to: input.to, subject: mail.subject, text: mail.text, html: mail.html });
+    this.logger.debug(`Application-rejected email dispatched to ${String(input.to)}`);
   }
 
   /** Password reset code email (SEC-A1). The code is never logged. */

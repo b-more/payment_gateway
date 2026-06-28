@@ -43,9 +43,6 @@ export type ReviewDecision = 'APPROVED' | 'REJECTED';
 interface RoleRow {
   id: string;
 }
-interface StatusRow {
-  status: string;
-}
 
 /**
  * Merchant onboarding lifecycle (§5.1): public application with KYC documents
@@ -151,16 +148,17 @@ export class OnboardingService {
     actorId: string;
     reason?: string | null;
   }): Promise<{ merchantId: string; status: ReviewDecision }> {
-    return withTransaction(this.pool, async (client: PoolClient) => {
-      const found = await client.query<StatusRow>(
-        'SELECT status FROM merchants WHERE id = $1 FOR UPDATE',
+    const outcome = await withTransaction(this.pool, async (client: PoolClient) => {
+      const found = await client.query<{ status: string; name: string; email: string }>(
+        'SELECT status, name, email FROM merchants WHERE id = $1 FOR UPDATE',
         [input.merchantId],
       );
       if (found.rowCount === 0) {
         throw new NotFoundError(`merchant not found: ${input.merchantId}`);
       }
-      if (found.rows[0].status !== 'PENDING') {
-        throw new ConflictError(`merchant is not PENDING (${found.rows[0].status})`);
+      const merchant = found.rows[0];
+      if (merchant.status !== 'PENDING') {
+        throw new ConflictError(`merchant is not PENDING (${merchant.status})`);
       }
       if (input.decision === 'REJECTED' && (!input.reason || input.reason.trim() === '')) {
         throw new ValidationError('a reason is required when declining a merchant');
@@ -176,6 +174,16 @@ export class OnboardingService {
       await client.query('UPDATE merchant_documents SET status = $1 WHERE merchant_id = $2', [
         approved ? 'VERIFIED' : 'REJECTED', input.merchantId,
       ]);
+      // Notify the email(s) on file: the business email + the invited admin user(s).
+      const contacts = await client.query<{ email: string }>(
+        "SELECT email FROM users WHERE merchant_id = $1 AND scope = 'MERCHANT'",
+        [input.merchantId],
+      );
+      const recipients = [
+        ...new Set(
+          [merchant.email, ...contacts.rows.map((r) => r.email)].map((e) => e.trim()).filter(Boolean),
+        ),
+      ];
       await this.audit.write(client, {
         actorId: input.actorId,
         actorScope: 'SYSTEM',
@@ -183,7 +191,23 @@ export class OnboardingService {
         target: input.merchantId,
         metadata: input.reason ? { reason: input.reason } : {},
       });
-      return { merchantId: input.merchantId, status: input.decision };
+      return { merchantName: merchant.name, recipients };
     });
+
+    // Best-effort notification after commit — a mail failure can't fail the review.
+    if (input.decision === 'APPROVED') {
+      await this.email.sendApplicationApproved({
+        to: outcome.recipients,
+        merchantName: outcome.merchantName,
+      });
+    } else {
+      await this.email.sendApplicationRejected({
+        to: outcome.recipients,
+        merchantName: outcome.merchantName,
+        reason: (input.reason ?? '').trim(),
+      });
+    }
+
+    return { merchantId: input.merchantId, status: input.decision };
   }
 }

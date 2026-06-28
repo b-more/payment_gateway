@@ -163,6 +163,66 @@ export function applicationReceivedEmail(merchantName: string): RenderedEmail {
   };
 }
 
+/** Application approved (ONB-3). The welcome mail with credentials follows once
+ *  an admin provisions the account. */
+export function applicationApprovedEmail(merchantName: string): RenderedEmail {
+  return {
+    subject: 'Your Instacom application is approved 🎉',
+    text:
+      `Good news, ${merchantName}!\n\n` +
+      `Your Instacom merchant account has been approved. Our team is setting up your ` +
+      `account now — you’ll receive a separate email with your dashboard access and ` +
+      `sandbox API key shortly.\n\n` +
+      `Welcome aboard.\n\n` +
+      `— Instacom Payment Solutions Limited`,
+    html: layout({
+      preheader: 'Your Instacom merchant account has been approved.',
+      heading: `Good news, ${merchantName} — you’re approved.`,
+      bodyHtml:
+        paragraph(
+          'Your Instacom merchant account has been <strong>approved</strong>. Welcome aboard — ' +
+            'you’re one step away from collecting and settling in Kwacha across every Zambian rail.',
+        ) +
+        note(
+          'Our team is finishing your account setup. You’ll receive a separate email with your ' +
+            'dashboard access and sandbox API key shortly — no action needed from you right now.',
+        ),
+    }),
+  };
+}
+
+/** Application declined (ONB-3). Carries the reviewer’s reason. */
+export function applicationRejectedEmail(merchantName: string, reason: string): RenderedEmail {
+  return {
+    subject: 'Update on your Instacom application',
+    text:
+      `Hello ${merchantName},\n\n` +
+      `Thank you for your interest in Instacom. After reviewing your application, we’re ` +
+      `unable to approve your merchant account at this time.\n\n` +
+      `Reason: ${reason}\n\n` +
+      `If you believe this was a mistake or can provide more information, reply to this ` +
+      `email and our team will be glad to help.\n\n` +
+      `— Instacom Payment Solutions Limited`,
+    html: layout({
+      preheader: 'An update on your Instacom merchant application.',
+      heading: 'Update on your application',
+      bodyHtml:
+        paragraph(
+          `Thank you for your interest in Instacom, ${merchantName}. After reviewing your ` +
+            'application, we’re unable to approve your merchant account at this time.',
+        ) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#fff6f6; border:1px solid #f3d0d3; border-left:4px solid ${RED}; border-radius:8px; padding:14px 16px; margin:0 0 18px;">
+          <div style="font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:${RED}; margin-bottom:4px;">Reason</div>
+          <div style="font-size:14px; color:${INK}; line-height:1.55;">${reason}</div>
+        </td></tr></table>` +
+        note(
+          'If you believe this was a mistake or can provide more information, simply reply to ' +
+            'this email and our team will be glad to help.',
+        ),
+    }),
+  };
+}
+
 export interface WelcomeEmailInput {
   merchantName: string;
   accountId: string;

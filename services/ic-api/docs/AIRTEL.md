@@ -70,6 +70,22 @@ docker compose --profile tools run --rm ic-airtel-reconcile
 6. Run a tiny real collection + disbursement; confirm via enquiry/callback.
 7. Schedule `ic-airtel-reconcile` (e.g. every 15 min).
 
+## Smoke test (direct, no engine/DB)
+
+Fastest way to validate credentials + collection/disbursement with tiny amounts.
+Calls Airtel directly (attempts held in memory), independent of `AIRTEL_ENABLED`.
+Fill `AIRTEL_PROD_*` in `.env`, restart `ic-api`, then:
+
+```bash
+docker exec ic-api node dist/jobs/airtel-smoke.js kyc      260975020473
+docker exec ic-api node dist/jobs/airtel-smoke.js collect  260975020473 150   # 150 ngwee = K1.50
+docker exec ic-api node dist/jobs/airtel-smoke.js disburse 260975020473 500   # needs PIN + public key
+docker exec ic-api node dist/jobs/airtel-smoke.js balance  COLL
+```
+
+For a collection, the payer approves the USSD/PIN prompt on their phone while the
+CLI polls the enquiry. Amounts are integer **ngwee**.
+
 ## Manual test (curl)
 
 ```bash

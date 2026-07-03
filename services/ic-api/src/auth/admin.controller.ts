@@ -22,8 +22,11 @@ import { toNgwee } from '../money/money';
 import { getClientIp } from '../api/request-context';
 import type { AuthedPortalRequest } from './principal';
 import { Req } from '@nestjs/common';
-import { FloatCreditDto, FloatRejectDto, ProvisionDto, ReviewDto } from './dto/auth.dto';
+import { AirtelDisburseDto, FloatCreditDto, FloatRejectDto, ProvisionDto, ReviewDto } from './dto/auth.dto';
 import { ApplicationDto } from '../onboarding/dto/application.dto';
+import { AirtelKycService } from '../airtel/airtel-kyc.service';
+import { AirtelBalanceService, type BalanceType } from '../airtel/airtel-balance.service';
+import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
 
 // Admin portal actions, gated server-side (SEC-Z1). All require the SYSTEM realm
 // and the elevated role each operation calls for (SEC-Z3). This is where the
@@ -44,7 +47,43 @@ export class AdminController {
     private readonly security: SecurityService,
     private readonly notifications: NotificationsService,
     private readonly reports: ReportService,
+    private readonly airtelKyc: AirtelKycService,
+    private readonly airtelBalance: AirtelBalanceService,
+    private readonly airtelDispatch: AirtelDispatchService,
   ) {}
+
+  // ── Airtel operations (§ integration) — staff-only ────────────────────────
+
+  @Get('airtel/kyc/:msisdn')
+  @Roles('ADMIN', 'COMPLIANCE') // KYC is personal data (SEC-Z3)
+  @ApiOperation({ summary: 'Validate an Airtel payer (KYC pre-check)' })
+  airtelKycLookup(@Param('msisdn') msisdn: string): Promise<unknown> {
+    return this.airtelKyc.validatePayer(msisdn);
+  }
+
+  @Get('airtel/balance')
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Airtel wallet balance (feature-flagged)' })
+  airtelBalanceEnquiry(@Query('type') type?: string): Promise<unknown> {
+    const t: BalanceType = type === 'DISB' ? 'DISB' : 'COLL';
+    return this.airtelBalance.balance(t);
+  }
+
+  @Post('airtel/disbursements/:txnId/dispatch')
+  @HttpCode(200)
+  @Roles('ADMIN') // disbursements move money out — human approval gate (SEC-Z4)
+  @ApiOperation({ summary: 'Approve + dispatch an Airtel B2C disbursement' })
+  async airtelDispatchDisbursement(
+    @Param('txnId') txnId: string,
+    @Body() dto: AirtelDisburseDto,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<unknown> {
+    // The admin acting here IS the approval; record who approved it.
+    return this.airtelDispatch.dispatchDisbursement(
+      { id: txnId, msisdn: dto.msisdn, amountNgwee: toNgwee(dto.amount), reference: dto.reference ?? txnId },
+      `admin:${principal.userId}`,
+    );
+  }
 
   @Get('notifications')
   @ApiOperation({ summary: 'Operator alert centre (derived alerts)' })

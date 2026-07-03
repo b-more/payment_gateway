@@ -88,3 +88,20 @@ export class FloatRejectDto {
   @MinLength(1)
   reason!: string;
 }
+
+export class AirtelDisburseDto {
+  @ApiProperty({ example: '975020473', description: 'Payee Airtel MSISDN.' })
+  @IsString()
+  @MaxLength(20)
+  msisdn!: string;
+
+  @ApiProperty({ example: '5000', description: 'Amount in integer ngwee (NN-1).' })
+  @Matches(/^\d+$/, { message: 'amount must be a non-negative integer string of ngwee' })
+  amount!: string;
+
+  @ApiProperty({ required: false, description: 'Payout reference (defaults to the transaction id).' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  reference?: string;
+}

@@ -143,6 +143,21 @@ services:
     # Reads RECON_REPORT_FILE; run with:
     #   docker compose --profile tools run --rm -e RECON_REPORT_FILE=/reports/mtn.json ic-reconcile-run
 
+  ic-airtel-reconcile:                 # Airtel reconciliation — re-enquire non-final attempts (cron/one-shot)
+    build: ./services/ic-api
+    container_name: ic-airtel-reconcile
+    profiles: ["tools"]
+    restart: "no"
+    env_file: .env
+    command: ["node", "dist/jobs/run-airtel-reconcile.js"]
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+      ic-redis: { condition: service_healthy }
+    networks:
+      - ic-internal                    # reaches Postgres + Redis
+      - ic-public                      # egress to Airtel for enquiry
+    # Run with: docker compose --profile tools run --rm ic-airtel-reconcile
+
   ic-admin:                            # Admin portal — Next.js (§3, §6.1)
     build:
       context: ./services/ic-admin

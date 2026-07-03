@@ -24,6 +24,8 @@ import {
   requireIdempotencyKey,
 } from './request-context';
 import { environmentToMode } from '../credentials/crypto';
+import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
+import { airtelGlobalConfig } from '../airtel/airtel.config';
 import { CollectionDto } from './dto/collection.dto';
 import { DisbursementDto } from './dto/disbursement.dto';
 import { ReverseDto } from './dto/reverse.dto';
@@ -37,7 +39,10 @@ import type { CredentialContext } from '../credentials/credential.service';
 @Controller('collections')
 @UseGuards(RateLimitGuard, ApiAuthGuard)
 export class CollectionsController {
-  constructor(private readonly txns: TransactionService) {}
+  constructor(
+    private readonly txns: TransactionService,
+    private readonly airtel: AirtelDispatchService,
+  ) {}
 
   @Post()
   @HttpCode(200)
@@ -60,6 +65,26 @@ export class CollectionsController {
       environment: environmentToMode(cred.environment),
       actorId: cred.credentialId,
     });
+
+    // Live Airtel dispatch: only for a fresh PROCESSING, PRODUCTION AIRTEL
+    // collection, and only when enabled. Otherwise behaviour is unchanged
+    // (returns PROCESSING; resolution comes via callback/reconciliation).
+    if (
+      airtelGlobalConfig().enabled &&
+      dto.processor === 'AIRTEL' &&
+      record.status === 'PROCESSING' &&
+      record.environment === 'PRODUCTION' &&
+      dto.msisdn
+    ) {
+      await this.airtel.dispatchCollection({
+        id: record.id,
+        msisdn: dto.msisdn,
+        amountNgwee: record.amount,
+        reference: dto.collectionReference ?? record.id,
+      });
+      // Return the latest state (dispatch may have resolved it synchronously).
+      return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
+    }
     return serializeTransaction(record);
   }
 }

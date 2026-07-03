@@ -17,6 +17,7 @@
     "provision:roles:prod": "node dist/db/provision-roles.js",
     "settlements:run": "node dist/jobs/run-settlements.js",
     "reconcile:run": "node dist/jobs/run-reconciliation.js",
+    "airtel:reconcile": "node dist/jobs/run-airtel-reconcile.js",
     "test:unit": "node -r ts-node/register --test test/charges.spec.ts test/state-machine.spec.ts test/money.spec.ts test/webhook.spec.ts test/airtel-money.spec.ts test/airtel-token.spec.ts test/airtel-attempt.spec.ts test/airtel-payments.spec.ts test/airtel-crypto.spec.ts test/airtel-disbursements.spec.ts test/airtel-kyc.spec.ts",
     "test:int": "node -r ts-node/register --test test/engine.itest.ts",
     "test:api": "node -r ts-node/register --test test/api.itest.ts",

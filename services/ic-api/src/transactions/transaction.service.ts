@@ -275,8 +275,13 @@ export class TransactionService {
     result: ProcessorResult;
     actorId?: string | null;
   }): Promise<TransactionRecord> {
-    const updated = await withTransaction(this.pool, async (client) => {
+    const outcome = await withTransaction(this.pool, async (client) => {
       const current = await this.lockTransaction(client, input.transactionId);
+      // Idempotent: a callback and a poll (or a retried callback) can both try to
+      // resolve the same attempt — first one wins, later ones are no-ops.
+      if (TransactionService.isFinal(current.status)) {
+        return { record: current, resolved: false };
+      }
       const next: TransactionStatus = input.result.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
       assertTransition(current.status, next); // STATE-2
 
@@ -305,10 +310,11 @@ export class TransactionService {
         target: current.id,
         metadata: { processorReference: input.result.reference },
       });
-      return updated;
+      return { record: updated, resolved: true };
     });
-    await this.webhooks.enqueue(updated.id, updated.status); // WH-1 (final state)
-    return updated;
+    // Only enqueue a webhook for the call that actually resolved the transaction.
+    if (outcome.resolved) await this.webhooks.enqueue(outcome.record.id, outcome.record.status); // WH-1
+    return outcome.record;
   }
 
   /** Admin reversal (§6.1.3): reverse any transaction by id (not account-scoped). */

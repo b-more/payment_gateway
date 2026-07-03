@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { MoneyModule } from '../money.module';
+import { AirtelModule } from '../airtel/airtel.module';
 import { CredentialsModule } from '../credentials/credentials.module';
 import { ApiAuthGuard } from './api-auth.guard';
 import { RateLimitGuard } from './rate-limit.guard';
@@ -15,7 +16,7 @@ import {
 
 // The §8 HTTP surface: six /v1 endpoints over the money engine, with HMAC auth.
 @Module({
-  imports: [DatabaseModule, MoneyModule, CredentialsModule],
+  imports: [DatabaseModule, MoneyModule, AirtelModule, CredentialsModule],
   controllers: [
     CollectionsController,
     DisbursementsController,

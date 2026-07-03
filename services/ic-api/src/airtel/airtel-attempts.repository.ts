@@ -123,6 +123,27 @@ export class AirtelAttemptsRepository implements AirtelAttemptStore {
     return res.rowCount === 0 ? null : mapRow(res.rows[0]);
   }
 
+  /** Look up by Airtel's own reference (callbacks may carry only this). */
+  async findByAirtelMoneyId(airtelMoneyId: string): Promise<AirtelAttempt | null> {
+    const res = await this.pool.query<AttemptRow>(
+      'SELECT * FROM airtel_attempts WHERE airtel_money_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [airtelMoneyId],
+    );
+    return res.rowCount === 0 ? null : mapRow(res.rows[0]);
+  }
+
+  /** Non-final attempts for the reconciliation job to re-enquire. */
+  async listUnresolved(olderThanSeconds = 0): Promise<AirtelAttempt[]> {
+    const res = await this.pool.query<AttemptRow>(
+      `SELECT * FROM airtel_attempts
+        WHERE state IN ('INITIATED','PENDING','UNKNOWN')
+          AND updated_at < now() - ($1 || ' seconds')::interval
+        ORDER BY created_at`,
+      [olderThanSeconds],
+    );
+    return res.rows.map(mapRow);
+  }
+
   async latestAttemptNo(transactionId: string): Promise<number> {
     const res = await this.pool.query<{ n: string }>(
       'SELECT COALESCE(MAX(attempt_no), 0)::text AS n FROM airtel_attempts WHERE transaction_id = $1',

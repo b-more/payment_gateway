@@ -90,6 +90,11 @@ async function main(): Promise<void> {
         ? await payments.initiateCollection({ transactionId: txnId, msisdn, amountNgwee, reference })
         : await disb.initiateDisbursement({ transactionId: txnId, payeeMsisdn: msisdn, amountNgwee, reference, approvalRef: 'smoke-cli' });
     process.stdout.write(`initiated: id=${outcome.airtelTxnId} state=${outcome.state} moneyId=${outcome.airtelMoneyId ?? '-'}\n`);
+    if (isFinalAttemptState(outcome.state)) {
+      // Disbursements (and immediately-settled collections) are final at initiate.
+      process.stdout.write(`FINAL: ${outcome.state}${outcome.failureReason ? ` (${outcome.failureReason})` : ''}\n`);
+      return;
+    }
 
     // Poll enquiry until final (or give up). The payer approves on their phone.
     for (const wait of [10_000, 15_000, 20_000, 30_000]) {

@@ -38,9 +38,10 @@ export interface KycSummary {
 }
 
 function isRegistered(status: string | undefined): boolean {
-  // Exact token confirmed during UAT; treat REGISTERED/ACTIVE as registered.
+  // Confirmed against production: a live subscriber returns registration.status
+  // "SUBS". Also accept REGISTERED/ACTIVE defensively.
   const s = (status ?? '').toUpperCase();
-  return s === 'REGISTERED' || s === 'ACTIVE';
+  return s === 'SUBS' || s === 'REGISTERED' || s === 'ACTIVE';
 }
 
 export class AirtelKycService {

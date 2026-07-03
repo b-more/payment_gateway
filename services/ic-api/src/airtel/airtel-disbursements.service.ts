@@ -14,6 +14,7 @@ import {
   asOutcome,
   attemptToProcessorResult,
   moneyId,
+  sanitizeReference,
   statusCode,
   summarize,
   zmSubscriberMsisdn,
@@ -73,7 +74,7 @@ export class AirtelDisbursementsService {
     // Encrypt the PIN per request; the plaintext and ciphertext never leave here.
     const requestBody = {
       payee: { msisdn: payee, wallet_type: 'NORMAL' },
-      reference: input.reference,
+      reference: sanitizeReference(input.reference),
       pin: encryptPin(cfg.disbursePin, cfg.publicKeyBase64),
       transaction: { amount: ngweeToKwacha(input.amountNgwee), id, type: 'B2C' },
     };

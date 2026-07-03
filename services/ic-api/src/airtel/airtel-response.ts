@@ -24,7 +24,9 @@ export function summarize(body: AirtelTxnBody): Record<string, unknown> {
 }
 
 export function moneyId(body: AirtelTxnBody): string | null {
-  return body.data?.transaction?.airtel_money_id ?? null;
+  // Airtel returns "NA" as a placeholder before the money id is assigned.
+  const v = body.data?.transaction?.airtel_money_id;
+  return v && v !== 'NA' ? v : null;
 }
 
 export function statusCode(body: AirtelTxnBody): string | undefined {
@@ -37,6 +39,16 @@ export function zmSubscriberMsisdn(raw: string): string {
   if (d.startsWith('260')) d = d.slice(3);
   if (d.length === 10 && d.startsWith('0')) d = d.slice(1);
   return d;
+}
+
+/**
+ * Airtel requires `reference` to be ALPHANUMERIC ONLY, length 4–64. Gateway refs
+ * (e.g. "INV-000123") often contain separators, so strip them and pad if short.
+ */
+export function sanitizeReference(raw: string): string {
+  const clean = (raw ?? '').replace(/[^a-zA-Z0-9]/g, '');
+  if (clean.length >= 4) return clean.slice(0, 64);
+  return (clean + 'REF').padEnd(4, '0').slice(0, 64);
 }
 
 export interface AttemptOutcome {

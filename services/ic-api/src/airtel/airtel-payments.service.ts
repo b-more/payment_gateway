@@ -14,6 +14,7 @@ import {
   asOutcome,
   attemptToProcessorResult,
   moneyId,
+  sanitizeReference,
   statusCode,
   summarize,
   zmSubscriberMsisdn,
@@ -66,7 +67,7 @@ export class AirtelPaymentsService {
     });
 
     const requestBody = {
-      reference: input.reference,
+      reference: sanitizeReference(input.reference),
       subscriber: { country: g.country, currency: g.currency, msisdn: zmSubscriberMsisdn(input.msisdn) },
       transaction: { amount: ngweeToKwacha(input.amountNgwee), country: g.country, currency: g.currency, id },
     };

@@ -44,14 +44,33 @@ export class AirtelClient {
       const parsed = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
       if (res.ok) {
-        const status = (parsed.status ?? {}) as Record<string, string>;
+        // Airtel often returns HTTP 200 with a BODY-level failure
+        // (status.success=false / status.code!="200"). Treat that as an error,
+        // classified by the body's code, so callers don't mistake it for success.
+        const st = (parsed.status ?? {}) as {
+          code?: string | number;
+          success?: boolean;
+          result_code?: string;
+          response_code?: string;
+          message?: string;
+        };
+        const bodyFailed = st.success === false || (st.code != null && String(st.code) !== '200');
+        if (bodyFailed) {
+          const err = classifyAirtelError(Number(st.code) || res.status, parsed);
+          err.meta.requestId = requestId;
+          if (err.kind === 'AUTH' && attempt === 0) {
+            this.tokens.invalidate(this.config().env);
+            continue;
+          }
+          throw err;
+        }
         return {
           httpStatus: res.status,
           body: parsed as T,
           requestId,
           airtelRequestId: res.headers.get('x-request-id') ?? undefined,
-          resultCode: status.result_code ?? status.code,
-          responseCode: status.response_code,
+          resultCode: st.result_code ?? (st.code != null ? String(st.code) : undefined),
+          responseCode: st.response_code,
         };
       }
 

@@ -105,6 +105,23 @@ curl -X POST https://api.instacompayzm.com/v1/admin/airtel/disbursements/<txnId>
   -H 'content-type: application/json' -d '{"msisdn":"975020473","amount":"5000"}'
 ```
 
+## Production-validated behaviour (confirmed against openapi.airtel.co.zm)
+
+- **Body-level status**: Airtel returns HTTP 200 with a body `status.success`/`code`
+  — a `success:false` (e.g. `code:400`) is an error, not a pending. The client
+  enforces this.
+- **`reference`**: alphanumeric only, length 4–64 (`sanitizeReference` handles it).
+- **KYC**: a live subscriber has `registration.status = "SUBS"`.
+- **Collection**: async — initiate returns interim (money id may be `"NA"`), final
+  `status:"TS"` + real `airtel_money_id` (e.g. `MP260703.0712.I36574`) via enquiry.
+  The full id we send is echoed back and accepted by the enquiry.
+- **Disbursement**: final at initiate (synchronous SUCCESS). KNOWN OPEN ITEM: the
+  status-enquiry (`GET /standard/v1/disbursements/{id}`) rejects our id and the
+  returned reference with `"exttRID does not exists"` — the exact enquiry-id format
+  is unconfirmed. This only affects the timeout-recovery path (happy path resolves
+  at initiate). Resolve once Airtel's disbursement-enquiry doc / a real echoed id
+  is available; until then a timed-out payout is checked on the Airtel portal.
+
 ## Runbook
 
 **`403 "IP address not allowed: <ip>"`** — our egress IP isn't whitelisted with

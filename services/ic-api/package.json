@@ -19,7 +19,7 @@
     "reconcile:run": "node dist/jobs/run-reconciliation.js",
     "airtel:reconcile": "node dist/jobs/run-airtel-reconcile.js",
     "airtel:smoke": "node dist/jobs/airtel-smoke.js",
-    "test:unit": "node -r ts-node/register --test test/charges.spec.ts test/state-machine.spec.ts test/money.spec.ts test/webhook.spec.ts test/airtel-money.spec.ts test/airtel-token.spec.ts test/airtel-attempt.spec.ts test/airtel-payments.spec.ts test/airtel-crypto.spec.ts test/airtel-disbursements.spec.ts test/airtel-kyc.spec.ts",
+    "test:unit": "node -r ts-node/register --test test/charges.spec.ts test/state-machine.spec.ts test/money.spec.ts test/webhook.spec.ts test/airtel-money.spec.ts test/airtel-token.spec.ts test/airtel-attempt.spec.ts test/airtel-payments.spec.ts test/airtel-crypto.spec.ts test/airtel-disbursements.spec.ts test/airtel-kyc.spec.ts test/airtel-response.spec.ts",
     "test:int": "node -r ts-node/register --test test/engine.itest.ts",
     "test:api": "node -r ts-node/register --test test/api.itest.ts",
     "test:webhook": "node -r ts-node/register --test test/webhook.itest.ts",

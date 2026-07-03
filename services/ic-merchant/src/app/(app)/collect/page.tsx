@@ -24,6 +24,26 @@ interface TxnResult {
 
 const PROCESSORS = ['AIRTEL', 'MTN', 'ZAMTEL', 'ZED_MOBILE', 'VISA'];
 
+// Turn engine error codes into something a merchant can act on.
+function friendlyError(err: ApiError, processor: string): string {
+  switch (err.code) {
+    case 'CONFIGURATION_ERROR':
+      return `This account isn't set up for ${processor.replace('_', ' ')} yet. Ask your Instacompay admin to configure charges for this rail.`;
+    case 'ACCOUNT_NOT_LIVE':
+      return 'This account is not live yet, or has no float. Contact your Instacompay admin.';
+    case 'RATE_LIMITED':
+      return 'Too many requests — please wait a moment and try again.';
+    default:
+      return err.message;
+  }
+}
+
+function failureText(reason: string | null | undefined): string {
+  if (reason === 'INSUFFICIENT_FLOAT') return 'Insufficient float — please fund this account before collecting.';
+  if (reason === 'SIMULATED_DECLINE') return 'Declined (sandbox simulation).';
+  return reason ? `This collection did not complete (${reason}).` : 'This collection did not complete.';
+}
+
 // Kwacha input (e.g. "1.50") -> integer ngwee string, without floating point.
 function kwachaToNgwee(input: string): string | null {
   const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.trim());
@@ -63,7 +83,7 @@ export default function CollectPage(): ReactNode {
       });
       setResult(r);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not start the collection.');
+      setError(err instanceof ApiError ? friendlyError(err, processor) : 'Could not start the collection.');
     } finally {
       setBusy(false);
     }
@@ -163,7 +183,7 @@ export default function CollectPage(): ReactNode {
                     ? 'Prompt sent — waiting for the customer to approve. This resolves automatically.'
                     : result.status === 'SUCCESS'
                       ? 'Payment collected successfully.'
-                      : 'This collection did not complete.'}
+                      : failureText(result.failure_reason)}
                 </p>
               </div>
             )}

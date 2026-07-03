@@ -198,6 +198,21 @@ export class MerchantReadService {
     });
   }
 
+  /** NN-6: assert the account belongs to the merchant and return its mode. */
+  async assertOwnedAccount(
+    merchantId: string,
+    accountId: string,
+  ): Promise<{ operatingMode: 'SANDBOX' | 'PRODUCTION' }> {
+    const res = await this.pool.query<{ merchant_id: string; operating_mode: 'SANDBOX' | 'PRODUCTION' }>(
+      'SELECT merchant_id, operating_mode FROM accounts WHERE id = $1',
+      [accountId],
+    );
+    if (res.rowCount === 0 || res.rows[0].merchant_id !== merchantId) {
+      throw new NotFoundError(`account not found: ${accountId}`);
+    }
+    return { operatingMode: res.rows[0].operating_mode };
+  }
+
   // NN-6: an account must belong to the authenticated merchant, else 404.
   private async assertOwned(client: PoolClient, merchantId: string, accountId: string): Promise<void> {
     const res = await client.query<{ merchant_id: string }>(

@@ -4,11 +4,18 @@ import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { CurrentPrincipal, RequireScope, Roles, type Principal } from '../auth/principal';
+import { randomUUID } from 'node:crypto';
 import { MerchantReadService } from './merchant-read.service';
 import { ReportService } from '../reports/report.service';
 import { CreateReportDto } from '../reports/report.dto';
 import { ValidationError } from '../money/errors';
 import { UpdateSettingsDto } from './dto/merchant.dto';
+import { MerchantCollectDto } from './dto/collect.dto';
+import { TransactionService } from '../transactions/transaction.service';
+import { toNgwee } from '../money/money';
+import { serializeTransaction, type TransactionResponse } from '../api/serializers';
+import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
+import { airtelGlobalConfig } from '../airtel/airtel.config';
 import type { GeneratedCredential } from '../credentials/credential.service';
 
 // Merchant portal API (§6.2). MERCHANT realm; every handler is scoped to the
@@ -21,10 +28,55 @@ export class MerchantController {
   constructor(
     private readonly read: MerchantReadService,
     private readonly reports: ReportService,
+    private readonly txns: TransactionService,
+    private readonly airtel: AirtelDispatchService,
   ) {}
 
   private merchantId(principal: Principal): string {
     return MerchantReadService.requireMerchant(principal.merchantId);
+  }
+
+  // ── Collections (§6.2) — initiate a collection from the portal ──
+
+  @Post('accounts/:id/collect')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Initiate a collection from one of your accounts' })
+  async collect(
+    @Param('id') accountId: string,
+    @Body() dto: MerchantCollectDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<TransactionResponse> {
+    const merchantId = this.merchantId(p);
+    const { operatingMode } = await this.read.assertOwnedAccount(merchantId, accountId);
+    const input = {
+      accountId,
+      type: 'COLLECTION' as const,
+      processor: dto.processor,
+      amount: toNgwee(dto.amount),
+      msisdn: dto.msisdn,
+      idempotencyKey: randomUUID(),
+      collectionReference: dto.reference ?? null,
+      environment: operatingMode,
+      actorId: p.userId,
+    };
+
+    // SANDBOX: simulate + resolve immediately so merchants see a result (TXN-5).
+    if (operatingMode === 'SANDBOX') {
+      return serializeTransaction(await this.txns.processAndSettle(input));
+    }
+
+    // PRODUCTION: create the PROCESSING transaction, then dispatch live.
+    const record = await this.txns.processTransaction(input);
+    if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL' && record.status === 'PROCESSING') {
+      await this.airtel.dispatchCollection({
+        id: record.id,
+        msisdn: dto.msisdn,
+        amountNgwee: record.amount,
+        reference: dto.reference ?? record.id,
+      });
+      return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
+    }
+    return serializeTransaction(record);
   }
 
   // ── Reports (§6.2.5), scoped to this merchant ──

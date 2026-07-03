@@ -1,7 +1,9 @@
 # Instacompay /v1 API
 
-Base URL: `https://api.instacompayzm.com/v1` (dev: `https://api.dev.instacompayzm.com/v1`).
-Interactive spec (Swagger UI): `/docs`. OpenAPI JSON: `/docs-json` — import this into Postman.
+Base URL: `https://api.instacompayzm.com/v1` — the **same host for SANDBOX and
+PRODUCTION**; your credential (`ic_sand_…` vs `ic_live_…`) determines the
+environment. Interactive spec (Swagger UI): `/docs`. OpenAPI JSON: `/docs-json`
+— import this into Postman.
 
 ## Authentication (dual-key, SEC-API2/3)
 
@@ -25,20 +27,53 @@ Endpoints: `POST /v1/collections`, `POST /v1/disbursements`,
 `GET /v1/transactions/{id}`, `POST /v1/transactions/{id}/reverse`,
 `GET /v1/accounts/{id}/balance`, `GET /v1/settlements`.
 
-Money is integer **ngwee** as JSON strings (NN-1). Errors: `{ "error": { "code", "message" } }`
-with codes `VALIDATION_ERROR`, `INVALID_SIGNATURE`, `DUPLICATE_REQUEST`,
-`IP_NOT_WHITELISTED`, `ACCOUNT_NOT_LIVE`, `INSUFFICIENT_FLOAT`, `RATE_LIMITED`.
+Money is integer **ngwee** as JSON strings (NN-1; K1.50 = `"150"`). Errors:
+`{ "error": { "code", "message" } }` with codes `VALIDATION_ERROR`,
+`INVALID_SIGNATURE`, `DUPLICATE_REQUEST`, `IP_NOT_WHITELISTED`, `ACCOUNT_NOT_LIVE`,
+`INSUFFICIENT_FLOAT`, `RATE_LIMITED`.
+
+## Supported processors
+
+`AIRTEL` (live), `MTN`, `ZAMTEL`, `ZED_MOBILE`, `VISA`. Send the exact enum value
+in `processor`. Which rails your account can use in `PRODUCTION` depends on your
+provisioning; `SANDBOX` credentials simulate all of them deterministically (an
+MSISDN ending `0000` declines).
+
+## Collection lifecycle (async) — read this before integrating
+
+Collections are **asynchronous**. `POST /v1/collections` does not return a final
+result — it debits nothing yet and returns the transaction in `PROCESSING` while
+the customer approves a prompt (e.g. Airtel USSD/PIN) on their phone. Resolve the
+final state one of two ways (use both for reliability):
+
+1. **Webhook** (recommended): we POST a signed `transaction.success` /
+   `transaction.failed` event to your account `callback_url` (see Webhooks below).
+2. **Polling**: `GET /v1/transactions/{id}` until `status` is terminal.
+
+Transaction `status` values: `PENDING` → `PROCESSING` → `SUCCESS` | `FAILED`
+(and `REVERSED` / `EXPIRED`). **Never treat `PROCESSING` as paid.** Each attempt
+is idempotent on your `Idempotency-Key` — a retry with the same key returns the
+original transaction, never a second charge.
+
+Response shape (collections, disbursements, status):
+
+```json
+{ "id": "…", "type": "COLLECTION", "processor": "AIRTEL", "msisdn": "260975020473",
+  "amount": "150", "charge": "0", "net_amount": "150", "status": "PROCESSING",
+  "collection_reference": "INV-000123", "environment": "PRODUCTION",
+  "created_at": "2026-07-03T06:00:00.000Z" }
+```
 
 ## cURL
 
 ```bash
 API_KEY="ic_sand_..."; SIGNING_KEY="base64signingkey..."
 TS=$(date +%s)
-BODY='{"processor":"MTN","amount":"100000","msisdn":"260970000001"}'
+BODY='{"processor":"AIRTEL","amount":"150","msisdn":"260975020473","collectionReference":"INV-000123"}'
 SIG=$(printf '%s.%s.%s.%s' "$TS" "POST" "/v1/collections" "$BODY" \
   | openssl dgst -sha256 -hmac "$SIGNING_KEY" -hex | sed 's/^.* //')
 
-curl -sS https://api.dev.instacompayzm.com/v1/collections \
+curl -sS https://api.instacompayzm.com/v1/collections \
   -H "X-Api-Key: $API_KEY" -H "X-Timestamp: $TS" -H "X-Signature: $SIG" \
   -H "Idempotency-Key: $(uuidgen)" -H 'Content-Type: application/json' \
   -d "$BODY"
@@ -56,9 +91,9 @@ function sign(signingKey, method, path, rawBody, ts) {
 
 const ts = Math.floor(Date.now() / 1000).toString();
 const path = '/v1/collections';
-const body = JSON.stringify({ processor: 'MTN', amount: '100000', msisdn: '260970000001' });
+const body = JSON.stringify({ processor: 'AIRTEL', amount: '150', msisdn: '260975020473' });
 
-await fetch(`https://api.dev.instacompayzm.com${path}`, {
+await fetch(`https://api.instacompayzm.com${path}`, {
   method: 'POST',
   headers: {
     'X-Api-Key': process.env.API_KEY,
@@ -77,10 +112,10 @@ await fetch(`https://api.dev.instacompayzm.com${path}`, {
 <?php
 $ts   = (string) time();
 $path = '/v1/collections';
-$body = json_encode(['processor' => 'MTN', 'amount' => '100000', 'msisdn' => '260970000001']);
+$body = json_encode(['processor' => 'AIRTEL', 'amount' => '150', 'msisdn' => '260975020473']);
 $sig  = hash_hmac('sha256', "$ts.POST.$path.$body", getenv('SIGNING_KEY'));
 
-$ch = curl_init("https://api.dev.instacompayzm.com$path");
+$ch = curl_init("https://api.instacompayzm.com$path");
 curl_setopt_array($ch, [
   CURLOPT_POST => true,
   CURLOPT_RETURNTRANSFER => true,
@@ -130,7 +165,7 @@ POST /v1/admin/float-requests/{id}/approve    FINANCE|ADMIN     dual-control app
 Public application — no auth (the applicant has no credentials yet), rate-limited:
 
 ```bash
-curl -sS https://api.dev.instacompayzm.com/onboarding/applications \
+curl -sS https://api.instacompayzm.com/onboarding/applications \
   -H 'Content-Type: application/json' \
   -d '{"merchant":{"name":"Acme Traders Ltd","merchantType":"PRIVATE","email":"ops@acme.co.zm"},
        "admin":{"name":"Jane Banda","email":"jane@acme.co.zm"}}'

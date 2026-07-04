@@ -93,8 +93,59 @@ export class MerchantController {
     return serializeTransaction(record);
   }
 
+  @Post('accounts/:id/disburse')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN') // money out — restricted to the merchant admin
+  @ApiOperation({ summary: 'Send a disbursement (payout) from one of your accounts' })
+  async disburse(
+    @Param('id') accountId: string,
+    @Body() dto: MerchantCollectDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<TransactionResponse> {
+    const merchantId = this.merchantId(p);
+    const { operatingMode } = await this.read.assertOwnedAccount(merchantId, accountId);
+    const input = {
+      accountId,
+      type: 'DISBURSEMENT' as const,
+      processor: dto.processor,
+      amount: toNgwee(dto.amount),
+      msisdn: dto.msisdn,
+      idempotencyKey: randomUUID(),
+      collectionReference: dto.reference ?? null,
+      environment: operatingMode,
+      actorId: p.userId,
+    };
+
+    // SANDBOX: simulate + resolve immediately.
+    if (operatingMode === 'SANDBOX') {
+      return serializeTransaction(await this.txns.processAndSettle(input));
+    }
+
+    // PRODUCTION: create the PROCESSING transaction, then dispatch the payout.
+    // The merchant admin initiating IS the approver (approvalRef records who).
+    const approvalRef = `merchant:${p.userId}`;
+    const record = await this.txns.processTransaction(input);
+    if (record.status === 'PROCESSING') {
+      if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL') {
+        await this.airtel.dispatchDisbursement(
+          { id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, reference: dto.reference ?? record.id },
+          approvalRef,
+        );
+        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
+      }
+      if (mtnGlobalConfig().enabled && dto.processor === 'MTN') {
+        await this.mtn.dispatchDisbursement(
+          { id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, externalId: dto.reference ?? record.id },
+          approvalRef,
+        );
+        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
+      }
+    }
+    return serializeTransaction(record);
+  }
+
   @Get('accounts/:id/transactions/:txnId/status')
-  @ApiOperation({ summary: 'Poll a collection status (re-enquires the rail on read)' })
+  @ApiOperation({ summary: 'Poll a collection/disbursement status (re-enquires the rail on read)' })
   async transactionStatus(
     @Param('id') accountId: string,
     @Param('txnId') txnId: string,

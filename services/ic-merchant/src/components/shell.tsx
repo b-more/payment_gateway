@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 const NAV: Array<[string, string]> = [
   ['Dashboard', '/dashboard'],
   ['Collect', '/collect'],
+  ['Disburse', '/disburse'],
   ['Accounts', '/accounts'],
   ['Transactions', '/transactions'],
   ['Settlements', '/settlements'],

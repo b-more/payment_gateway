@@ -26,3 +26,10 @@ export class MerchantCollectDto {
   @MaxLength(120)
   reference?: string;
 }
+
+export class PayoutRejectDto {
+  @ApiProperty({ example: 'Wrong recipient number', description: 'Reason shown in the audit trail.' })
+  @IsString()
+  @MaxLength(300)
+  reason!: string;
+}

@@ -10,7 +10,8 @@ import { ReportService } from '../reports/report.service';
 import { CreateReportDto } from '../reports/report.dto';
 import { ValidationError } from '../money/errors';
 import { UpdateSettingsDto } from './dto/merchant.dto';
-import { MerchantCollectDto } from './dto/collect.dto';
+import { MerchantCollectDto, PayoutRejectDto } from './dto/collect.dto';
+import { PayoutService } from './payout.service';
 import { TransactionService } from '../transactions/transaction.service';
 import { toNgwee } from '../money/money';
 import { serializeTransaction, type TransactionResponse } from '../api/serializers';
@@ -33,6 +34,7 @@ export class MerchantController {
     private readonly txns: TransactionService,
     private readonly airtel: AirtelDispatchService,
     private readonly mtn: MtnDispatchService,
+    private readonly payouts: PayoutService,
   ) {}
 
   private merchantId(principal: Principal): string {
@@ -93,55 +95,63 @@ export class MerchantController {
     return serializeTransaction(record);
   }
 
+  // ── Payouts (maker-checker, SEC-Z4) ──
+
   @Post('accounts/:id/disburse')
   @HttpCode(200)
-  @Roles('MERCHANT_ADMIN') // money out — restricted to the merchant admin
-  @ApiOperation({ summary: 'Send a disbursement (payout) from one of your accounts' })
+  @Roles('MERCHANT_ADMIN') // money out — restricted to merchant admins
+  @ApiOperation({ summary: 'Request a payout (parked for a second admin to approve)' })
   async disburse(
     @Param('id') accountId: string,
     @Body() dto: MerchantCollectDto,
     @CurrentPrincipal() p: Principal,
-  ): Promise<TransactionResponse> {
+  ): Promise<{ id: string; status: string }> {
     const merchantId = this.merchantId(p);
-    const { operatingMode } = await this.read.assertOwnedAccount(merchantId, accountId);
-    const input = {
+    await this.read.assertOwnedAccount(merchantId, accountId);
+    return this.payouts.requestPayout({
+      merchantId,
       accountId,
-      type: 'DISBURSEMENT' as const,
       processor: dto.processor,
-      amount: toNgwee(dto.amount),
+      amountNgwee: toNgwee(dto.amount),
       msisdn: dto.msisdn,
-      idempotencyKey: randomUUID(),
-      collectionReference: dto.reference ?? null,
-      environment: operatingMode,
-      actorId: p.userId,
-    };
+      reference: dto.reference ?? null,
+      requestedBy: p.userId,
+    });
+  }
 
-    // SANDBOX: simulate + resolve immediately.
-    if (operatingMode === 'SANDBOX') {
-      return serializeTransaction(await this.txns.processAndSettle(input));
-    }
+  @Get('payout-requests')
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'List payout requests (add ?status=pending for the approval queue)' })
+  listPayouts(@CurrentPrincipal() p: Principal, @Query('status') status?: string): Promise<unknown[]> {
+    return this.payouts.list(this.merchantId(p), status === 'pending');
+  }
 
-    // PRODUCTION: create the PROCESSING transaction, then dispatch the payout.
-    // The merchant admin initiating IS the approver (approvalRef records who).
-    const approvalRef = `merchant:${p.userId}`;
-    const record = await this.txns.processTransaction(input);
-    if (record.status === 'PROCESSING') {
-      if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL') {
-        await this.airtel.dispatchDisbursement(
-          { id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, reference: dto.reference ?? record.id },
-          approvalRef,
-        );
-        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
-      }
-      if (mtnGlobalConfig().enabled && dto.processor === 'MTN') {
-        await this.mtn.dispatchDisbursement(
-          { id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, externalId: dto.reference ?? record.id },
-          approvalRef,
-        );
-        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
-      }
-    }
-    return serializeTransaction(record);
+  @Post('payout-requests/:id/approve')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Approve + dispatch a payout (must differ from the requester)' })
+  approvePayout(@Param('id') id: string, @CurrentPrincipal() p: Principal): Promise<TransactionResponse> {
+    return this.payouts.approve({ requestId: id, merchantId: this.merchantId(p), approverId: p.userId });
+  }
+
+  @Post('payout-requests/:id/reject')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Reject a pending payout (must differ from the requester)' })
+  rejectPayout(
+    @Param('id') id: string,
+    @Body() dto: PayoutRejectDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<{ ok: true }> {
+    return this.payouts.reject({ requestId: id, merchantId: this.merchantId(p), approverId: p.userId, reason: dto.reason });
+  }
+
+  @Post('payout-requests/:id/cancel')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Cancel your own pending payout request' })
+  cancelPayout(@Param('id') id: string, @CurrentPrincipal() p: Principal): Promise<{ ok: true }> {
+    return this.payouts.cancel({ requestId: id, merchantId: this.merchantId(p), userId: p.userId });
   }
 
   @Get('accounts/:id/transactions/:txnId/status')

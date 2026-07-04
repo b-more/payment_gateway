@@ -162,8 +162,10 @@ export class TransactionService {
         const config = await this.loadChargeConfig(client, input.accountId, input.processor);
         const amounts = computeAmounts(config.charge, config.fulfiller, input.amount);
 
-        // TXN-2: insufficient float -> FAILED, no debit.
-        if (balance < amounts.required) {
+        // TXN-2: insufficient float -> FAILED, no debit. Float is a PRODUCTION
+        // concept only — SANDBOX is fully isolated from the real ledger so test
+        // traffic never consumes (or requires) real float.
+        if (input.environment === 'PRODUCTION' && balance < amounts.required) {
           const failed = await this.insertTransaction(client, input, {
             charge: amounts.charge,
             netAmount: amounts.netAmount,
@@ -180,21 +182,24 @@ export class TransactionService {
           return { record: failed, created: true };
         }
 
-        // TXN-3: debit float via the ledger, then mark PROCESSING.
+        // TXN-3: debit float via the ledger, then mark PROCESSING. SANDBOX skips
+        // the ledger entirely (isolated from production float).
         const txn = await this.insertTransaction(client, input, {
           charge: amounts.charge,
           netAmount: amounts.netAmount,
           status: 'PROCESSING',
           failureReason: null,
         });
-        await this.ledger.append(client, {
-          accountId: input.accountId,
-          entryType: 'DEBIT',
-          amount: amounts.required,
-          counterparty: `PROCESSOR_${input.processor}`,
-          reference: txn.id,
-          createdBy: input.actorId ?? null,
-        });
+        if (input.environment === 'PRODUCTION') {
+          await this.ledger.append(client, {
+            accountId: input.accountId,
+            entryType: 'DEBIT',
+            amount: amounts.required,
+            counterparty: `PROCESSOR_${input.processor}`,
+            reference: txn.id,
+            createdBy: input.actorId ?? null,
+          });
+        }
         await this.audit.write(client, {
           actorId: input.actorId ?? null,
           actorScope: 'SYSTEM',
@@ -285,8 +290,9 @@ export class TransactionService {
       const next: TransactionStatus = input.result.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
       assertTransition(current.status, next); // STATE-2
 
-      if (next === 'FAILED') {
+      if (next === 'FAILED' && current.environment === 'PRODUCTION') {
         // Refund the float we debited at PROCESSING (compensating CREDIT).
+        // SANDBOX never debited, so there is nothing to refund.
         await this.ledger.append(client, {
           accountId: current.accountId,
           entryType: 'CREDIT',
@@ -361,14 +367,17 @@ export class TransactionService {
       }
       assertTransition(current.status, 'REVERSED'); // only SUCCESS -> REVERSED
 
-      await this.ledger.append(client, {
-        accountId: current.accountId,
-        entryType: 'CREDIT',
-        amount: current.amount + current.charge,
-        counterparty: `PROCESSOR_${current.processor}`,
-        reference: `REVERSAL:${current.id}`,
-        createdBy: input.actorId,
-      });
+      // SANDBOX never touched the ledger, so a reversal has no float to credit.
+      if (current.environment === 'PRODUCTION') {
+        await this.ledger.append(client, {
+          accountId: current.accountId,
+          entryType: 'CREDIT',
+          amount: current.amount + current.charge,
+          counterparty: `PROCESSOR_${current.processor}`,
+          reference: `REVERSAL:${current.id}`,
+          createdBy: input.actorId,
+        });
+      }
       const updated = await this.updateStatus(client, current.id, 'REVERSED', null);
       await this.audit.write(client, {
         actorId: input.actorId ?? null,

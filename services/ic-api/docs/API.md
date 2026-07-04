@@ -34,10 +34,22 @@ Money is integer **ngwee** as JSON strings (NN-1; K1.50 = `"150"`). Errors:
 
 ## Supported processors
 
-`AIRTEL` (live), `MTN`, `ZAMTEL`, `ZED_MOBILE`, `VISA`. Send the exact enum value
-in `processor`. Which rails your account can use in `PRODUCTION` depends on your
-provisioning; `SANDBOX` credentials simulate all of them deterministically (an
-MSISDN ending `0000` declines).
+| `processor` | Status |
+|---|---|
+| `AIRTEL` | **Live** — collections + disbursements |
+| `MTN` | **Live** — collections (disbursements pending MTN provisioning) |
+| `ZAMTEL` | Not yet integrated (sandbox simulation only) |
+| `ZED_MOBILE` | Not yet integrated (sandbox simulation only) |
+| `VISA` | Not yet integrated (sandbox simulation only) |
+
+Send the exact enum value in `processor`. Which rails your account can use in
+`PRODUCTION` depends on your provisioning; `SANDBOX` credentials simulate all of
+them deterministically (an MSISDN ending `0000` declines).
+
+**MSISDN by rail (Zambia):** MTN uses `096`/`076` prefixes, Airtel `097`/`077` —
+send the full number (with or without the `260` country code; both are
+normalised). A collection to a number on the wrong rail is declined
+(`PAYER_NOT_FOUND`).
 
 ## Collection lifecycle (async) — read this before integrating
 

@@ -143,15 +143,27 @@ export class PayoutService {
     if (operatingMode === 'SANDBOX') {
       record = await this.txns.processAndSettle(txnInput);
     } else {
+      // Guard BEFORE we debit float: only approve if the chosen rail can actually
+      // dispatch right now. Otherwise the transaction would sit stuck in PROCESSING
+      // with float debited but nothing sent (the request stays pending so it can be
+      // approved later once the rail is live, or cancelled).
+      const canDispatch =
+        (req.processor === 'AIRTEL' && airtelGlobalConfig().enabled) ||
+        (req.processor === 'MTN' && mtnGlobalConfig().enabled);
+      if (!canDispatch) {
+        throw new ValidationError(
+          `${req.processor} disbursement is not available right now — approval blocked so no funds are debited. The request stays pending.`,
+        );
+      }
       record = await this.txns.processTransaction(txnInput);
       const approvalRef = `checker:${input.approverId}`;
       if (record.status === 'PROCESSING') {
-        if (airtelGlobalConfig().enabled && req.processor === 'AIRTEL') {
+        if (req.processor === 'AIRTEL') {
           await this.airtel.dispatchDisbursement(
             { id: record.id, msisdn: req.msisdn, amountNgwee, reference: req.reference ?? record.id },
             approvalRef,
           );
-        } else if (mtnGlobalConfig().enabled && req.processor === 'MTN') {
+        } else if (req.processor === 'MTN') {
           await this.mtn.dispatchDisbursement(
             { id: record.id, msisdn: req.msisdn, amountNgwee, externalId: req.reference ?? record.id },
             approvalRef,

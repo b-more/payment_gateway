@@ -41,14 +41,20 @@ export function zmSubscriberMsisdn(raw: string): string {
   return d;
 }
 
+// Airtel documents `reference` as alphanumeric 4–64, but PRODUCTION rejects long
+// references (a 32-char hex ref fails with "Something went wrong"). Cap
+// conservatively — a ~24-char alphanumeric reference is accepted.
+const AIRTEL_REF_MAX = 24;
+
 /**
- * Airtel requires `reference` to be ALPHANUMERIC ONLY, length 4–64. Gateway refs
- * (e.g. "INV-000123") often contain separators, so strip them and pad if short.
+ * Sanitise a reference for Airtel: alphanumeric only, 4–24 chars. Gateway refs
+ * (e.g. "INV-000123", or a fallback UUID) get separators stripped, are capped to
+ * a length Airtel actually accepts, and padded if too short.
  */
 export function sanitizeReference(raw: string): string {
   const clean = (raw ?? '').replace(/[^a-zA-Z0-9]/g, '');
-  if (clean.length >= 4) return clean.slice(0, 64);
-  return (clean + 'REF').padEnd(4, '0').slice(0, 64);
+  if (clean.length >= 4) return clean.slice(0, AIRTEL_REF_MAX);
+  return (clean + 'REF').padEnd(4, '0').slice(0, AIRTEL_REF_MAX);
 }
 
 export interface AttemptOutcome {

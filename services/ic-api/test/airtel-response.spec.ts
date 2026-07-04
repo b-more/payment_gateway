@@ -7,7 +7,9 @@ test('sanitizeReference: alphanumeric only, 4-64 chars (Airtel constraint)', () 
   assert.equal(sanitizeReference('SMOKE-COLLECT-2026'), 'SMOKECOLLECT2026');
   assert.equal(sanitizeReference('ab'), 'abREF'.slice(0, 5)); // padded to >=4
   assert.equal(sanitizeReference('').length >= 4, true); // empty -> padded, never null
-  assert.equal(sanitizeReference('x'.repeat(100)).length, 64); // truncated to 64
+  assert.equal(sanitizeReference('x'.repeat(100)).length, 24); // capped to Airtel's real limit
+  // A 32-hex UUID (the portal's fallback ref) is capped to an accepted length.
+  assert.equal(sanitizeReference('3ccf8df96ffe4a0bb4f410d61dec2e4d').length, 24);
 });
 
 test('moneyId: Airtel "NA" placeholder is treated as no id yet', () => {

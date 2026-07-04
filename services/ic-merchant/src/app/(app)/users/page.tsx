@@ -28,12 +28,69 @@ const ROLE_LABEL: Record<string, string> = {
   MERCHANT_VIEWER: 'Viewer',
 };
 
-function roleTag(role: string): ReactNode {
-  const cls =
-    role === 'MERCHANT_ADMIN' ? 'primary' : role === 'MERCHANT_APPROVER' ? 'ok' : role === 'MERCHANT_INITIATOR' ? 'info' : 'muted';
+const ROLE_COLOR: Record<string, { bg: string; fg: string }> = {
+  MERCHANT_ADMIN: { bg: '#e6efff', fg: '#1c4fd6' },
+  MERCHANT_APPROVER: { bg: '#e7f2ec', fg: '#1f7a4d' },
+  MERCHANT_INITIATOR: { bg: '#eef0f6', fg: '#45507a' },
+  MERCHANT_VIEWER: { bg: '#f0f1f4', fg: '#6b7280' },
+};
+
+// A self-contained pill: label + optional inline × in a single inline-flex box
+// with hard inline styles, so it can neither wrap mid-word nor detach the ×.
+function RoleChip({
+  role,
+  onRemove,
+  removeDisabled,
+}: {
+  role: string;
+  onRemove?: () => void;
+  removeDisabled?: boolean;
+}): ReactNode {
+  const c = ROLE_COLOR[role] ?? ROLE_COLOR.MERCHANT_VIEWER;
   return (
-    <span key={role} className={`role-tag ${cls}`}>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '2px 4px 2px 9px',
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 600,
+        lineHeight: 1.6,
+        whiteSpace: 'nowrap',
+        background: c.bg,
+        color: c.fg,
+      }}
+    >
       {ROLE_LABEL[role] ?? role}
+      {onRemove ? (
+        <button
+          type="button"
+          title="Remove role"
+          disabled={removeDisabled}
+          onClick={onRemove}
+          style={{
+            border: 'none',
+            background: 'none',
+            padding: 0,
+            margin: 0,
+            width: 15,
+            height: 15,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 999,
+            cursor: removeDisabled ? 'default' : 'pointer',
+            color: 'inherit',
+            opacity: removeDisabled ? 0.35 : 0.75,
+            fontSize: 13,
+            lineHeight: 1,
+          }}
+        >
+          ×
+        </button>
+      ) : null}
     </span>
   );
 }
@@ -190,19 +247,20 @@ export default function UsersPage(): ReactNode {
                   <tr key={u.id} style={disabled ? { opacity: 0.55 } : undefined}>
                     <td style={{ fontWeight: 600 }}>{u.name}{self ? <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}> · you</span> : null}</td>
                     <td className="mono" style={{ fontSize: 12 }}>{u.email}</td>
-                    <td>
-                      <div className="role-cell">
-                        {u.roles.length === 0 ? <span className="muted" style={{ fontSize: 12 }}>none</span> : u.roles.map((r) => (
-                          <span key={r} className="role-chip">
-                            {roleTag(r)}
-                            <button
-                              className="role-x"
-                              title="Remove role"
-                              disabled={!!busy || (self && r === 'MERCHANT_ADMIN')}
-                              onClick={() => void revoke(u, r)}
-                            >×</button>
-                          </span>
-                        ))}
+                    <td style={{ minWidth: 230 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                        {u.roles.length === 0 ? (
+                          <span className="muted" style={{ fontSize: 12 }}>none</span>
+                        ) : (
+                          u.roles.map((r) => (
+                            <RoleChip
+                              key={r}
+                              role={r}
+                              removeDisabled={!!busy || (self && r === 'MERCHANT_ADMIN')}
+                              onRemove={() => void revoke(u, r)}
+                            />
+                          ))
+                        )}
                         <RoleAdder
                           have={u.roles}
                           roles={roleDefs}
@@ -235,15 +293,6 @@ export default function UsersPage(): ReactNode {
       </p>
 
       <style jsx>{`
-        .role-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-        .role-tag.primary { background: #e6efff; color: #1c4fd6; }
-        .role-tag.ok { background: #e7f2ec; color: #1f7a4d; }
-        .role-tag.info { background: #eef0f6; color: #45507a; }
-        .role-tag.muted { background: #f0f1f4; color: #6b7280; }
-        .role-cell { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; min-width: 220px; }
-        .role-chip { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
-        .role-x { border: none; background: none; cursor: pointer; color: #9aa2b5; font-size: 14px; line-height: 1; padding: 0 2px; }
-        .role-x:disabled { opacity: 0.3; cursor: default; }
         .role-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .role-opt { display: flex; gap: 8px; align-items: flex-start; padding: 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
         .role-opt.on { border-color: var(--sky-deep); background: #f3f8ff; }

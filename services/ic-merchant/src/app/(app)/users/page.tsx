@@ -235,13 +235,13 @@ export default function UsersPage(): ReactNode {
       </p>
 
       <style jsx>{`
-        .role-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+        .role-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
         .role-tag.primary { background: #e6efff; color: #1c4fd6; }
         .role-tag.ok { background: #e7f2ec; color: #1f7a4d; }
         .role-tag.info { background: #eef0f6; color: #45507a; }
         .role-tag.muted { background: #f0f1f4; color: #6b7280; }
-        .role-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-        .role-chip { display: inline-flex; align-items: center; gap: 2px; }
+        .role-cell { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; min-width: 220px; }
+        .role-chip { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
         .role-x { border: none; background: none; cursor: pointer; color: #9aa2b5; font-size: 14px; line-height: 1; padding: 0 2px; }
         .role-x:disabled { opacity: 0.3; cursor: default; }
         .role-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

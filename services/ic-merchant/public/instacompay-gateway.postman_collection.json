@@ -1,0 +1,143 @@
+{
+  "info": {
+    "name": "Instacompay Gateway API (v1)",
+    "description": "Instacompay Gateway — collections & disbursements for Zambia (ZMW).\n\nAll money is INTEGER NGWEE as strings (K1.50 = \"150\"). Never floats.\n\nAUTH IS AUTOMATIC: fill in the `apiKey` and `signingKey` collection variables (Merchant portal → API Documentation → regenerate a key). The collection's pre-request script signs every call for you — it sets `X-Api-Key`, `X-Timestamp`, `X-Signature` (HMAC-SHA256 of `ts.METHOD.path.body`) and an `Idempotency-Key` on writes. Just press Send.\n\nBase URL and IDs live in the collection Variables tab.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// ── Instacompay request signing (do not edit) ──────────────────────────",
+          "// Signs every request: X-Api-Key + X-Timestamp + X-Signature, plus an",
+          "// Idempotency-Key on mutating calls. Uses the apiKey / signingKey vars.",
+          "var CryptoJS = require('crypto-js');",
+          "",
+          "var apiKey = pm.variables.replaceIn('{{apiKey}}');",
+          "var signingKey = pm.variables.replaceIn('{{signingKey}}');",
+          "var ts = Math.floor(Date.now() / 1000).toString();",
+          "var method = pm.request.method.toUpperCase();",
+          "",
+          "// path + query exactly as the server sees req.originalUrl, e.g. /v1/collections",
+          "var fullUrl = pm.variables.replaceIn(pm.request.url.toString());",
+          "var path = fullUrl.replace(/^[a-z]+:\\/\\/[^/]+/i, '');",
+          "",
+          "// raw JSON body (resolved), or '' for GET / no-body requests",
+          "var rawBody = '';",
+          "if (pm.request.body && pm.request.body.mode === 'raw' && pm.request.body.raw) {",
+          "  rawBody = pm.variables.replaceIn(pm.request.body.raw);",
+          "}",
+          "",
+          "var message = ts + '.' + method + '.' + path + '.' + rawBody;",
+          "var signature = CryptoJS.HmacSHA256(message, signingKey).toString(CryptoJS.enc.Hex);",
+          "",
+          "pm.request.headers.upsert({ key: 'X-Api-Key', value: apiKey });",
+          "pm.request.headers.upsert({ key: 'X-Timestamp', value: ts });",
+          "pm.request.headers.upsert({ key: 'X-Signature', value: signature });",
+          "",
+          "// Idempotency-Key on writes — only if you haven't set one yourself.",
+          "if (['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1) {",
+          "  if (!pm.request.headers.has('Idempotency-Key')) {",
+          "    pm.request.headers.upsert({ key: 'Idempotency-Key', value: pm.variables.replaceIn('{{$guid}}') });",
+          "  }",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Convenience: remember the last transaction id so the status/reverse",
+          "// requests work with no copy-paste.",
+          "try {",
+          "  var b = pm.response.json();",
+          "  if (b && b.id) { pm.collectionVariables.set('txnId', b.id); }",
+          "} catch (e) { /* non-JSON response */ }"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "https://api.instacompayzm.com", "type": "string" },
+    { "key": "apiKey", "value": "ic_sand_replace_me", "type": "string" },
+    { "key": "signingKey", "value": "replace_with_your_signing_key", "type": "string" },
+    { "key": "accountId", "value": "replace_with_your_account_id", "type": "string" },
+    { "key": "msisdn", "value": "260970000001", "type": "string" },
+    { "key": "txnId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Create collection (customer → you)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/v1/collections", "host": ["{{baseUrl}}"], "path": ["v1", "collections"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"processor\": \"MTN\",\n  \"amount\": \"5000\",\n  \"msisdn\": \"{{msisdn}}\",\n  \"collectionReference\": \"order-1001\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Charge a customer's wallet. amount is ngwee (\"5000\" = K50.00). processor: MTN | AIRTEL. Returns a transaction with status PROCESSING; resolve via webhook or the status endpoint."
+      }
+    },
+    {
+      "name": "Create disbursement (you → customer)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/v1/disbursements", "host": ["{{baseUrl}}"], "path": ["v1", "disbursements"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"processor\": \"AIRTEL\",\n  \"amount\": \"5000\",\n  \"msisdn\": \"{{msisdn}}\",\n  \"collectionReference\": \"payout-2001\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Send money to a customer's wallet. amount is ngwee. msisdn is required (12-digit MSISDN, e.g. 260970000001)."
+      }
+    },
+    {
+      "name": "Get transaction status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/v1/transactions/{{txnId}}", "host": ["{{baseUrl}}"], "path": ["v1", "transactions", "{{txnId}}"] },
+        "description": "Fetch a transaction by id. txnId is auto-filled from the last create call. Re-enquires the rail on read where supported."
+      }
+    },
+    {
+      "name": "Reverse transaction",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/v1/transactions/{{txnId}}/reverse", "host": ["{{baseUrl}}"], "path": ["v1", "transactions", "{{txnId}}", "reverse"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"customer refund\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Reverse a SUCCESS transaction."
+      }
+    },
+    {
+      "name": "Get account balance",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/v1/accounts/{{accountId}}/balance", "host": ["{{baseUrl}}"], "path": ["v1", "accounts", "{{accountId}}", "balance"] },
+        "description": "Float/balance enquiry for your account. Balance is ngwee."
+      }
+    },
+    {
+      "name": "List settlements",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/v1/settlements", "host": ["{{baseUrl}}"], "path": ["v1", "settlements"] },
+        "description": "Settlements for the account behind the api key."
+      }
+    }
+  ]
+}

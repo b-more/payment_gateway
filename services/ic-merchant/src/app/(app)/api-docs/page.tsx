@@ -7,6 +7,9 @@ import { PageHead } from '@/components/shell';
 import { Badge, Spinner, Empty } from '@/components/ui';
 import { shortId } from '@/lib/format';
 
+const API_BASE = 'https://api.instacompayzm.com';
+const POSTMAN_HREF = '/instacompay-gateway.postman_collection.json';
+
 interface Credential {
   id: string;
   account_id: string;
@@ -22,28 +25,152 @@ interface Account {
   ip_whitelist: string[];
 }
 
+interface Endpoint {
+  method: string;
+  path: string;
+  summary: string;
+  body?: string;
+}
+const ENDPOINTS: Endpoint[] = [
+  { method: 'POST', path: '/v1/collections', summary: 'Charge a customer (customer → you)', body: '{ "processor": "MTN", "amount": "5000", "msisdn": "260970000001", "collectionReference": "order-1001" }' },
+  { method: 'POST', path: '/v1/disbursements', summary: 'Pay a customer (you → customer)', body: '{ "processor": "AIRTEL", "amount": "5000", "msisdn": "260970000001", "collectionReference": "payout-2001" }' },
+  { method: 'GET', path: '/v1/transactions/{id}', summary: 'Check a transaction status' },
+  { method: 'POST', path: '/v1/transactions/{id}/reverse', summary: 'Reverse a successful transaction', body: '{ "reason": "customer refund" }' },
+  { method: 'GET', path: '/v1/accounts/{accountId}/balance', summary: 'Float / balance enquiry' },
+  { method: 'GET', path: '/v1/settlements', summary: 'List settlements' },
+];
+
+const SIGN_SNIPPET = `import crypto from 'node:crypto';
+
+const API_BASE = '${API_BASE}';
+const API_KEY = 'ic_live_...';        // from this page
+const SIGNING_KEY = '...';            // shown once when you (re)generate a key
+
+async function call(method, path, bodyObj) {
+  const body = bodyObj ? JSON.stringify(bodyObj) : '';
+  const ts = Math.floor(Date.now() / 1000).toString();
+  // sign "timestamp.METHOD.path.rawBody"
+  const message = \`\${ts}.\${method}.\${path}.\${body}\`;
+  const signature = crypto.createHmac('sha256', SIGNING_KEY)
+    .update(message).digest('hex');
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Api-Key': API_KEY,
+    'X-Timestamp': ts,
+    'X-Signature': signature,
+  };
+  if (method !== 'GET') headers['Idempotency-Key'] = crypto.randomUUID();
+
+  const res = await fetch(API_BASE + path, {
+    method, headers, body: body || undefined,
+  });
+  return res.json();
+}
+
+// K50.00 collection (amount is integer ngwee, as a string)
+await call('POST', '/v1/collections', {
+  processor: 'MTN', amount: '5000', msisdn: '260970000001',
+  collectionReference: 'order-1001',
+});`;
+
+function Copy({ text, label }: { text: string; label?: string }): ReactNode {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      className="btn sm"
+      onClick={() => { void navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1200); }}
+    >
+      {done ? 'Copied' : (label ?? 'Copy')}
+    </button>
+  );
+}
+
 export default function ApiDocsPage(): ReactNode {
   const creds = useData<Credential[]>('/v1/merchant/credentials');
   const accounts = useData<Account[]>('/v1/merchant/accounts');
 
   return (
     <>
-      <PageHead title="API Documentation" subtitle="Keys, webhooks and integration." />
+      <PageHead
+        title="API Documentation"
+        subtitle="Everything you need to integrate collections & disbursements."
+        actions={
+          <a className="btn primary" href={POSTMAN_HREF} download>
+            ↓ Download Postman collection
+          </a>
+        }
+      />
 
+      {/* Quickstart */}
       <div className="card card-pad" style={{ marginBottom: 16 }}>
-        <div className="eyebrow" style={{ marginBottom: 10 }}>Request signing</div>
-        <p className="muted" style={{ margin: 0 }}>
-          Authenticate each <span className="mono">/v1</span> request with{' '}
-          <span className="mono">X-Api-Key</span>, <span className="mono">X-Timestamp</span> and{' '}
-          <span className="mono">X-Signature = HMAC-SHA256(signingKey, “ts.METHOD.path.body”)</span>.
-          Mutating calls require an <span className="mono">Idempotency-Key</span>. Webhooks are signed
-          with your account’s webhook secret.
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Quickstart</div>
+        <ol style={{ margin: '0 0 4px 18px', padding: 0, fontSize: 14, lineHeight: 1.7 }}>
+          <li>Grab an <b>API key</b> + <b>signing key</b> below (regenerate to reveal a signing key — it’s shown once).</li>
+          <li><a href={POSTMAN_HREF} download style={{ color: 'var(--sky-deep)' }}>Download the Postman collection</a>, open it, and paste your <span className="mono">apiKey</span> and <span className="mono">signingKey</span> into the collection <b>Variables</b> tab.</li>
+          <li>Press <b>Send</b> — the collection signs every request for you. Start in <b>sandbox</b>, then switch to your live key.</li>
+        </ol>
+        <div className="row" style={{ marginTop: 12, gap: 18, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13 }}><span className="muted">Base URL</span>&nbsp; <span className="mono">{API_BASE}</span></span>
+          <span style={{ fontSize: 13 }}><span className="muted">Interactive reference</span>&nbsp; <a className="mono" href={`${API_BASE}/docs`} target="_blank" rel="noreferrer" style={{ color: 'var(--sky-deep)' }}>{API_BASE}/docs</a></span>
+        </div>
+      </div>
+
+      {/* Signing */}
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Authentication — signed requests</div>
+          <Copy text={SIGN_SNIPPET} label="Copy example" />
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Every <span className="mono">/v1</span> call carries three headers. The signature is an
+          HMAC-SHA256 over <span className="mono">{'`${timestamp}.${METHOD}.${path}.${rawBody}`'}</span>,
+          keyed by your <b>signing key</b>. Mutating calls also need an <span className="mono">Idempotency-Key</span>
+          (any unique string — replays return the original result).
+        </p>
+        <table className="table" style={{ marginBottom: 14 }}>
+          <tbody>
+            <tr><td className="mono" style={{ width: 150 }}>X-Api-Key</td><td className="muted">Your public key, e.g. <span className="mono">ic_live_…</span></td></tr>
+            <tr><td className="mono">X-Timestamp</td><td className="muted">Unix epoch seconds — must be within ±5 minutes of server time.</td></tr>
+            <tr><td className="mono">X-Signature</td><td className="muted">HMAC-SHA256(signingKey, <span className="mono">ts.METHOD.path.body</span>), hex.</td></tr>
+            <tr><td className="mono">Idempotency-Key</td><td className="muted">Unique per write (POST). Safe to retry.</td></tr>
+          </tbody>
+        </table>
+        <pre className="code-block" style={{ margin: 0, maxHeight: 340 }}><code>{SIGN_SNIPPET}</code></pre>
+        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
+          <b>Money is integer ngwee, as strings</b> — K1.50 = <span className="mono">&quot;150&quot;</span>, K50.00 = <span className="mono">&quot;5000&quot;</span>. Never send decimals or JSON numbers.
         </p>
       </div>
 
+      {/* Endpoints */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-pad" style={{ borderBottom: '1px solid var(--line)' }}>
-          <span className="eyebrow">API keys</span>
+          <span className="eyebrow">Endpoints</span>
+        </div>
+        <table className="table">
+          <thead>
+            <tr><th style={{ width: 70 }}>Method</th><th>Path</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            {ENDPOINTS.map((e) => (
+              <tr key={e.method + e.path}>
+                <td><span className={`method-pill ${e.method === 'GET' ? 'get' : 'post'}`}>{e.method}</span></td>
+                <td className="mono" style={{ fontSize: 12.5 }}>{e.path}</td>
+                <td>
+                  <div>{e.summary}</div>
+                  {e.body ? <div className="mono" style={{ fontSize: 11, color: 'var(--slate)', marginTop: 3 }}>{e.body}</div> : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Keys */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-pad" style={{ borderBottom: '1px solid var(--line)' }}>
+          <span className="eyebrow">Your API keys</span>
         </div>
         {creds.loading ? (
           <div className="card-pad"><Spinner /></div>
@@ -52,12 +179,7 @@ export default function ApiDocsPage(): ReactNode {
         ) : (
           <table className="table">
             <thead>
-              <tr>
-                <th>Environment</th>
-                <th>API key</th>
-                <th>Rotated</th>
-                <th>Status</th>
-              </tr>
+              <tr><th>Environment</th><th>API key</th><th>Rotated</th><th>Status</th></tr>
             </thead>
             <tbody>
               {creds.data.map((c) => (
@@ -80,6 +202,13 @@ export default function ApiDocsPage(): ReactNode {
           <AccountConfig key={a.id} account={a} onChange={() => { creds.reload(); accounts.reload(); }} />
         ))
       ) : null}
+
+      <style jsx>{`
+        .method-pill { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; }
+        .method-pill.get { background: #e7f2ec; color: #1f7a4d; }
+        .method-pill.post { background: #e6efff; color: #1c4fd6; }
+        .code-block { background: #0e1726; color: #d7e2f2; padding: 14px 16px; border-radius: 10px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+      `}</style>
     </>
   );
 }
@@ -130,7 +259,7 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
   return (
     <div className="card card-pad" style={{ marginBottom: 16 }}>
       <div className="eyebrow" style={{ marginBottom: 12 }}>
-        {account.account_type} · {shortId(account.id)}
+        Webhooks & keys · {account.account_type} · {shortId(account.id)}
       </div>
       {error ? <div className="err">{error}</div> : null}
       {msg ? <div className="devhint" style={{ color: 'var(--success)', background: '#e6f4ee', borderColor: '#cce8dc' }}>{msg}</div> : null}
@@ -157,9 +286,10 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
 
       {secret ? (
         <div className="devhint" style={{ marginTop: 14, wordBreak: 'break-all' }}>
-          {secret.env} key {secret.apiKey} · secret {secret.secret} · signing {secret.signingKey}
-          <br />
-          Shown once — store it now. Previous {secret.env} keys are revoked.
+          <b>{secret.env} key</b> — copy the signing key now, it is shown only once. Previous {secret.env} keys are revoked.
+          <div className="mono" style={{ marginTop: 8, fontSize: 12 }}>apiKey: {secret.apiKey}</div>
+          <div className="mono" style={{ fontSize: 12 }}>signingKey: {secret.signingKey}</div>
+          <div className="mono" style={{ fontSize: 12 }}>secret: {secret.secret}</div>
         </div>
       ) : null}
     </div>

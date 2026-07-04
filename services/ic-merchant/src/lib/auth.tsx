@@ -5,10 +5,16 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 import { Spinner } from '@/components/ui';
 
-// Auto sign-out after 10 minutes of inactivity, warning with a countdown when
-// 3 minutes remain (SEC-A: idle session limit).
-const IDLE_LIMIT_MS = 10 * 60 * 1000;
-const WARN_BEFORE_MS = 3 * 60 * 1000;
+// Idle session limit (SEC-A). Configurable via build-time env:
+//   NEXT_PUBLIC_IDLE_LIMIT_MIN  (default 10) — sign out after this many idle minutes
+//   NEXT_PUBLIC_IDLE_WARN_MIN   (default 3)  — show the countdown this long before
+const _idleLimitMin = Number(process.env.NEXT_PUBLIC_IDLE_LIMIT_MIN);
+const _idleWarnMin = Number(process.env.NEXT_PUBLIC_IDLE_WARN_MIN);
+const IDLE_LIMIT_MS = (Number.isFinite(_idleLimitMin) && _idleLimitMin > 0 ? _idleLimitMin : 10) * 60_000;
+const WARN_BEFORE_MS = Math.min(
+  (Number.isFinite(_idleWarnMin) && _idleWarnMin > 0 ? _idleWarnMin : 3) * 60_000,
+  IDLE_LIMIT_MS - 30_000, // always leave at least 30s of countdown
+);
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'] as const;
 
 function IdleGuard({ onTimeout }: { onTimeout: () => void }): ReactNode {

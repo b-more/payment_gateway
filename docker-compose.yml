@@ -178,6 +178,8 @@ services:
       context: ./services/ic-admin
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8030}
+        NEXT_PUBLIC_IDLE_LIMIT_MIN: ${NEXT_PUBLIC_IDLE_LIMIT_MIN:-10}
+        NEXT_PUBLIC_IDLE_WARN_MIN: ${NEXT_PUBLIC_IDLE_WARN_MIN:-3}
     container_name: ic-admin
     restart: unless-stopped
     env_file: .env
@@ -202,6 +204,8 @@ services:
       context: ./services/ic-merchant
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8030}
+        NEXT_PUBLIC_IDLE_LIMIT_MIN: ${NEXT_PUBLIC_IDLE_LIMIT_MIN:-10}
+        NEXT_PUBLIC_IDLE_WARN_MIN: ${NEXT_PUBLIC_IDLE_WARN_MIN:-3}
     container_name: ic-merchant
     restart: unless-stopped
     env_file: .env

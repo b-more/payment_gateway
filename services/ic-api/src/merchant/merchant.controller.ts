@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -11,7 +11,9 @@ import { CreateReportDto } from '../reports/report.dto';
 import { ValidationError } from '../money/errors';
 import { UpdateSettingsDto } from './dto/merchant.dto';
 import { MerchantCollectDto, PayoutRejectDto } from './dto/collect.dto';
+import { CreateMerchantUserDto, AssignRoleDto, SetUserStatusDto } from './dto/user.dto';
 import { PayoutService } from './payout.service';
+import { MerchantUserService } from './merchant-user.service';
 import { TransactionService } from '../transactions/transaction.service';
 import { toNgwee } from '../money/money';
 import { serializeTransaction, type TransactionResponse } from '../api/serializers';
@@ -35,6 +37,7 @@ export class MerchantController {
     private readonly airtel: AirtelDispatchService,
     private readonly mtn: MtnDispatchService,
     private readonly payouts: PayoutService,
+    private readonly memberUsers: MerchantUserService,
   ) {}
 
   private merchantId(principal: Principal): string {
@@ -99,8 +102,8 @@ export class MerchantController {
 
   @Post('accounts/:id/disburse')
   @HttpCode(200)
-  @Roles('MERCHANT_ADMIN') // money out — restricted to merchant admins
-  @ApiOperation({ summary: 'Request a payout (parked for a second admin to approve)' })
+  @Roles('MERCHANT_ADMIN', 'MERCHANT_INITIATOR') // maker: requests the payout
+  @ApiOperation({ summary: 'Request a payout (parked for an approver to release)' })
   async disburse(
     @Param('id') accountId: string,
     @Body() dto: MerchantCollectDto,
@@ -120,7 +123,7 @@ export class MerchantController {
   }
 
   @Get('payout-requests')
-  @Roles('MERCHANT_ADMIN')
+  @Roles('MERCHANT_ADMIN', 'MERCHANT_INITIATOR', 'MERCHANT_APPROVER')
   @ApiOperation({ summary: 'List payout requests (add ?status=pending for the approval queue)' })
   listPayouts(@CurrentPrincipal() p: Principal, @Query('status') status?: string): Promise<unknown[]> {
     return this.payouts.list(this.merchantId(p), status === 'pending');
@@ -128,7 +131,7 @@ export class MerchantController {
 
   @Post('payout-requests/:id/approve')
   @HttpCode(200)
-  @Roles('MERCHANT_ADMIN')
+  @Roles('MERCHANT_ADMIN', 'MERCHANT_APPROVER') // checker: releases the payout
   @ApiOperation({ summary: 'Approve + dispatch a payout (must differ from the requester)' })
   approvePayout(@Param('id') id: string, @CurrentPrincipal() p: Principal): Promise<TransactionResponse> {
     return this.payouts.approve({ requestId: id, merchantId: this.merchantId(p), approverId: p.userId });
@@ -136,7 +139,7 @@ export class MerchantController {
 
   @Post('payout-requests/:id/reject')
   @HttpCode(200)
-  @Roles('MERCHANT_ADMIN')
+  @Roles('MERCHANT_ADMIN', 'MERCHANT_APPROVER')
   @ApiOperation({ summary: 'Reject a pending payout (must differ from the requester)' })
   rejectPayout(
     @Param('id') id: string,
@@ -148,7 +151,7 @@ export class MerchantController {
 
   @Post('payout-requests/:id/cancel')
   @HttpCode(200)
-  @Roles('MERCHANT_ADMIN')
+  @Roles('MERCHANT_ADMIN', 'MERCHANT_INITIATOR')
   @ApiOperation({ summary: 'Cancel your own pending payout request' })
   cancelPayout(@Param('id') id: string, @CurrentPrincipal() p: Principal): Promise<{ ok: true }> {
     return this.payouts.cancel({ requestId: id, merchantId: this.merchantId(p), userId: p.userId });
@@ -271,10 +274,73 @@ export class MerchantController {
     return this.read.listCredentials(this.merchantId(p));
   }
 
+  // ── User management (§6.2) — merchant admin staffs their own account ──
+
   @Get('users')
-  @ApiOperation({ summary: 'Sub-users under this merchant' })
+  @ApiOperation({ summary: 'Sub-users under this merchant, with their roles' })
   users(@CurrentPrincipal() p: Principal): Promise<unknown[]> {
-    return this.read.users(this.merchantId(p));
+    return this.memberUsers.list(this.merchantId(p));
+  }
+
+  @Get('roles')
+  @ApiOperation({ summary: 'Roles a merchant admin can assign' })
+  merchantRoles(): Array<{ name: string; description: string }> {
+    return this.memberUsers.roles();
+  }
+
+  @Post('users')
+  @HttpCode(201)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Add a user and assign roles (initiator/approver/…)' })
+  createUser(@CurrentPrincipal() p: Principal, @Body() dto: CreateMerchantUserDto): Promise<{ userId: string }> {
+    return this.memberUsers.create({
+      merchantId: this.merchantId(p),
+      actorId: p.userId,
+      name: dto.name,
+      email: dto.email,
+      phone: dto.phone ?? null,
+      password: dto.password,
+      roles: dto.roles,
+    });
+  }
+
+  @Post('users/:id/roles')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Grant a role to a user' })
+  async assignUserRole(
+    @CurrentPrincipal() p: Principal,
+    @Param('id') userId: string,
+    @Body() dto: AssignRoleDto,
+  ): Promise<{ ok: true }> {
+    await this.memberUsers.assignRole(this.merchantId(p), userId, dto.role, p.userId);
+    return { ok: true };
+  }
+
+  @Delete('users/:id/roles/:role')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Revoke a role from a user' })
+  async removeUserRole(
+    @CurrentPrincipal() p: Principal,
+    @Param('id') userId: string,
+    @Param('role') role: string,
+  ): Promise<{ ok: true }> {
+    await this.memberUsers.removeRole(this.merchantId(p), userId, role, p.userId);
+    return { ok: true };
+  }
+
+  @Post('users/:id/status')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Activate or suspend a user' })
+  async setUserStatus(
+    @CurrentPrincipal() p: Principal,
+    @Param('id') userId: string,
+    @Body() dto: SetUserStatusDto,
+  ): Promise<{ ok: true }> {
+    await this.memberUsers.setStatus(this.merchantId(p), userId, dto.status, p.userId);
+    return { ok: true };
   }
 
   @Put('accounts/:id/settings')

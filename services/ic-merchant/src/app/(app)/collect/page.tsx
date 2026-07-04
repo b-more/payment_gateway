@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useData } from '@/lib/useData';
-import { apiPost, ApiError } from '@/lib/api';
+import { apiGet, apiPost, ApiError } from '@/lib/api';
 import { PageHead } from '@/components/shell';
 import { Badge, Money, Spinner, Empty } from '@/components/ui';
 
@@ -67,6 +67,33 @@ export default function CollectPage(): ReactNode {
 
   const ngwee = kwachaToNgwee(amount);
   const canSubmit = !!accountId && !!processor && !!ngwee && msisdn.trim().length >= 9 && !busy;
+
+  // While a collection is PROCESSING, poll its status (the endpoint re-enquires
+  // the rail on read) so the panel updates to SUCCESS/FAILED in real time.
+  useEffect(() => {
+    if (!result || result.status !== 'PROCESSING' || !accountId) return;
+    let cancelled = false;
+    let tries = 0;
+    const poll = async (): Promise<void> => {
+      tries += 1;
+      try {
+        const r = await apiGet<TxnResult>(`/v1/merchant/accounts/${accountId}/transactions/${result.id}/status`);
+        if (cancelled) return;
+        if (r.status !== 'PROCESSING') {
+          setResult(r);
+          return;
+        }
+      } catch {
+        // transient — keep polling
+      }
+      if (!cancelled && tries < 25) window.setTimeout(() => void poll(), 3000);
+    };
+    const t = window.setTimeout(() => void poll(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [result, accountId]);
 
   async function submit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -180,7 +207,7 @@ export default function CollectPage(): ReactNode {
                 ) : null}
                 <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
                   {result.status === 'PROCESSING'
-                    ? 'Prompt sent — waiting for the customer to approve. This resolves automatically.'
+                    ? 'Prompt sent — waiting for the customer to approve. Updating automatically…'
                     : result.status === 'SUCCESS'
                       ? 'Payment collected successfully.'
                       : failureText(result.failure_reason)}

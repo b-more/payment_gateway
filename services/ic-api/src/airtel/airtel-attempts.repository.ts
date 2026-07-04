@@ -123,6 +123,15 @@ export class AirtelAttemptsRepository implements AirtelAttemptStore {
     return res.rowCount === 0 ? null : mapRow(res.rows[0]);
   }
 
+  /** Latest attempt for a business transaction (for resolve-on-read/status). */
+  async findLatestByTransactionId(transactionId: string): Promise<AirtelAttempt | null> {
+    const res = await this.pool.query<AttemptRow>(
+      'SELECT * FROM airtel_attempts WHERE transaction_id = $1 ORDER BY attempt_no DESC LIMIT 1',
+      [transactionId],
+    );
+    return res.rowCount === 0 ? null : mapRow(res.rows[0]);
+  }
+
   /** Look up by Airtel's own reference (callbacks may carry only this). */
   async findByAirtelMoneyId(airtelMoneyId: string): Promise<AirtelAttempt | null> {
     const res = await this.pool.query<AttemptRow>(

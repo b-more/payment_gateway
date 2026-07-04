@@ -53,6 +53,14 @@ export class AirtelDispatchService {
     return outcome;
   }
 
+  /** Resolve-on-read: re-enquire the latest attempt for a transaction, if any. */
+  async resolveByTransactionId(transactionId: string): Promise<void> {
+    const attempt = await this.attempts.findLatestByTransactionId(transactionId);
+    if (attempt && attempt.state !== 'SUCCESS' && attempt.state !== 'FAILED') {
+      await this.resolveByAirtelTxnId(attempt.airtelTxnId);
+    }
+  }
+
   /** Re-enquire an attempt (callback / reconcile) and resolve the transaction. */
   async resolveByAirtelTxnId(airtelTxnId: string): Promise<AttemptOutcome | null> {
     const attempt = await this.attempts.findByAirtelTxnId(airtelTxnId);

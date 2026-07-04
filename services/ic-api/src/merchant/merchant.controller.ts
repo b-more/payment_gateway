@@ -79,6 +79,27 @@ export class MerchantController {
     return serializeTransaction(record);
   }
 
+  @Get('accounts/:id/transactions/:txnId/status')
+  @ApiOperation({ summary: 'Poll a collection status (re-enquires the rail on read)' })
+  async transactionStatus(
+    @Param('id') accountId: string,
+    @Param('txnId') txnId: string,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<TransactionResponse> {
+    const merchantId = this.merchantId(p);
+    await this.read.assertOwnedAccount(merchantId, accountId);
+    // Resolve-on-read: if the collection is still in flight, ask Airtel now so the
+    // portal updates in real time (the reconcile job is the backstop).
+    if (airtelGlobalConfig().enabled) {
+      try {
+        await this.airtel.resolveByTransactionId(txnId);
+      } catch {
+        // Enquiry failure must not break a status read.
+      }
+    }
+    return serializeTransaction(await this.txns.getForAccount(accountId, txnId));
+  }
+
   // ── Reports (§6.2.5), scoped to this merchant ──
 
   @Post('reports')

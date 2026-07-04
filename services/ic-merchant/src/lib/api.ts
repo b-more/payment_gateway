@@ -24,6 +24,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await res.text();
   const data = text ? (JSON.parse(text) as unknown) : null;
   if (!res.ok) {
+    // Session expired / not authenticated mid-use: bounce to the login page.
+    if (
+      res.status === 401 &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/login')
+    ) {
+      window.location.href = '/login';
+    }
     const err = (data as { error?: { code?: string; message?: string } } | null)?.error;
     throw new ApiError(res.status, err?.code ?? 'ERROR', err?.message ?? res.statusText);
   }

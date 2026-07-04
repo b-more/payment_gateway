@@ -1301,3 +1301,22 @@ textarea:focus {
     transition: none;
   }
 }
+
+/* ── Idle-timeout warning modal ── */
+.idle-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(10, 17, 66, 0.55); backdrop-filter: blur(3px);
+  display: grid; place-items: center; padding: 20px;
+}
+.idle-modal {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: var(--shadow-lift); padding: 28px 30px; width: 100%; max-width: 380px;
+  text-align: center; animation: rise 0.25s ease both;
+}
+.idle-title { font-family: var(--display); font-weight: 800; font-size: 19px; color: var(--text); }
+.idle-text { color: var(--muted); font-size: 13.5px; margin: 8px 0 2px; }
+.idle-countdown {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 40px; font-weight: 700; color: var(--redm); margin: 6px 0 18px; letter-spacing: 0.02em;
+}
+.idle-actions { display: flex; gap: 10px; justify-content: center; }

@@ -34,10 +34,61 @@ async function bootstrap(): Promise<void> {
 
   const openApi = new DocumentBuilder()
     .setTitle('Instacompay Gateway API')
-    .setDescription('v1 payment API. Auth: api_key + HMAC request signature (SEC-API2/3).')
     .setVersion('1.0')
+    .addServer('https://api.instacompayzm.com')
+    .setDescription(
+      [
+        'Collections and disbursements over Zambian mobile money (ZMW).',
+        '',
+        '## Authentication',
+        'Every request is individually signed — there are no session tokens. Send three headers:',
+        '',
+        '| Header | Value |',
+        '| --- | --- |',
+        '| `X-Api-Key` | Your key, `ic_live_…` (or `ic_sand_…` for sandbox). |',
+        '| `X-Timestamp` | Unix epoch **seconds**. Must be within ±5 minutes of server time. |',
+        '| `X-Signature` | `HMAC-SHA256(signingKey, message)` as hex, where <br>`message = "{timestamp}.{METHOD}.{path}.{rawBody}"`. |',
+        '',
+        'Mutating calls (`POST`) also require an `Idempotency-Key` header (any unique string; replays return the original result).',
+        '',
+        '```js',
+        "const ts = Math.floor(Date.now()/1000).toString();",
+        "const message = `${ts}.POST./v1/collections.${body}`;",
+        "const signature = crypto.createHmac('sha256', SIGNING_KEY).update(message).digest('hex');",
+        '```',
+        '',
+        '## Money',
+        'All amounts are **integer ngwee, as strings** — K1.50 = `"150"`, K50.00 = `"5000"`. Never decimals or JSON numbers.',
+        '',
+        '## Status',
+        'Poll `GET /v1/transactions/{id}` to check the status of **any** transaction — collection or disbursement.',
+        'Statuses: `PROCESSING` → `SUCCESS` | `FAILED`. Start on **sandbox** (`ic_sand_…`) before going live.',
+      ].join('\n'),
+    )
     .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, openApi));
+
+  const doc = SwaggerModule.createDocument(app, openApi);
+
+  // Focused integration reference: expose only the core payment operations, not
+  // the full internal surface (auth/onboarding/admin/portal/callbacks).
+  const KEEP: Record<string, string[]> = {
+    '/v1/collections': ['post'],
+    '/v1/transactions/{id}': ['get'],
+    '/v1/disbursements': ['post'],
+  };
+  const paths: typeof doc.paths = {};
+  for (const [path, methods] of Object.entries(KEEP)) {
+    const item = doc.paths[path] as Record<string, unknown> | undefined;
+    if (!item) continue;
+    const kept: Record<string, unknown> = {};
+    for (const method of methods) if (item[method]) kept[method] = item[method];
+    paths[path] = kept as (typeof doc.paths)[string];
+  }
+  doc.paths = paths;
+  const KEEP_TAGS = new Set(['collections', 'disbursements', 'transactions']);
+  if (doc.tags) doc.tags = doc.tags.filter((t) => KEEP_TAGS.has(t.name));
+
+  SwaggerModule.setup('docs', app, doc);
 
   const port = Number(process.env.PORT ?? 8030);
   await app.listen(port, '0.0.0.0');

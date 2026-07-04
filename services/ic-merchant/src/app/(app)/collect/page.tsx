@@ -4,7 +4,18 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useData } from '@/lib/useData';
 import { apiGet, apiPost, ApiError } from '@/lib/api';
 import { PageHead } from '@/components/shell';
-import { Badge, Money, Spinner, Empty } from '@/components/ui';
+import { Spinner, Empty } from '@/components/ui';
+import { zmw } from '@/lib/format';
+
+const ICON_CHECK = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M20 6L9 17l-5-5" /></svg>
+);
+const ICON_X = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>
+);
+const ICON_PHONE = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>
+);
 
 interface Account {
   id: string;
@@ -116,6 +127,17 @@ export default function CollectPage(): ReactNode {
     }
   }
 
+  function tryAgain(): void {
+    setResult(null);
+    setError('');
+  }
+  function newCollection(): void {
+    setResult(null);
+    setError('');
+    setAmount('');
+    setReference('');
+  }
+
   const list = accounts.data ?? [];
 
   return (
@@ -153,14 +175,17 @@ export default function CollectPage(): ReactNode {
               </div>
 
               <div className="field">
-                <label>Amount (ZMW)</label>
-                <input
-                  inputMode="decimal"
-                  placeholder="1.50"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                />
+                <label>Amount</label>
+                <div className="amount-wrap">
+                  <span className="prefix">ZMW</span>
+                  <input
+                    inputMode="decimal"
+                    placeholder="1.50"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                  />
+                </div>
                 {amount && !ngwee ? (
                   <span className="muted" style={{ fontSize: 12, color: 'var(--redm)' }}>Enter a valid amount, e.g. 1.50</span>
                 ) : null}
@@ -189,29 +214,45 @@ export default function CollectPage(): ReactNode {
           </div>
 
           <div className="card card-pad">
-            <div className="eyebrow" style={{ marginBottom: 12 }}>Result</div>
             {!result ? (
-              <p className="muted" style={{ fontSize: 13 }}>
-                The customer receives a prompt on their phone to approve the payment. The status updates
-                here and under <b>Transactions</b> once confirmed.
-              </p>
+              <div className="result-state">
+                <div className="result-icon" style={{ background: 'var(--surface-2)', color: 'var(--faint)' }}>{ICON_PHONE}</div>
+                <div className="result-sub" style={{ maxWidth: 250, margin: '0 auto' }}>
+                  Fill in the details and hit <b>Collect</b>. The customer approves a prompt on their phone —
+                  the result appears here and under <b>Transactions</b>.
+                </div>
+              </div>
+            ) : result.status === 'SUCCESS' ? (
+              <div className="result-state">
+                <div className="result-icon ok">{ICON_CHECK}</div>
+                <div className="result-title">Payment collected</div>
+                <div className="result-amount">{zmw(result.amount)}</div>
+                <div className="result-sub">from {result.msisdn ?? '—'} · {result.processor.replace('_', ' ')}</div>
+                <div className="result-meta">
+                  <div className="kv"><div className="kv-label">Transaction</div><div className="kv-value mono" style={{ fontSize: 12 }}>{result.id}</div></div>
+                </div>
+                <button className="btn primary" onClick={newCollection}>Collect another</button>
+              </div>
+            ) : result.status === 'PROCESSING' ? (
+              <div className="result-state">
+                <div className="result-icon pending">{ICON_PHONE}</div>
+                <div className="result-title">Waiting for approval</div>
+                <div className="result-amount">{zmw(result.amount)}</div>
+                <div className="result-sub">Prompt sent to {result.msisdn ?? '—'}</div>
+                <div style={{ marginTop: 18 }}>
+                  <span className="muted" style={{ fontSize: 12 }}><span className="live-dot" />Updating automatically…</span>
+                </div>
+              </div>
             ) : (
-              <div>
-                <div style={{ marginBottom: 12 }}><Badge value={result.status} /></div>
-                <div className="kv"><div className="kv-label">Amount</div><div className="kv-value"><Money ngwee={result.amount} /></div></div>
-                <div className="kv"><div className="kv-label">Rail</div><div className="kv-value">{result.processor}</div></div>
-                <div className="kv"><div className="kv-label">Customer</div><div className="kv-value mono">{result.msisdn ?? '—'}</div></div>
-                <div className="kv"><div className="kv-label">Transaction</div><div className="kv-value mono" style={{ fontSize: 12 }}>{result.id}</div></div>
-                {result.failure_reason ? (
-                  <div className="kv"><div className="kv-label">Reason</div><div className="kv-value">{result.failure_reason}</div></div>
-                ) : null}
-                <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
-                  {result.status === 'PROCESSING'
-                    ? 'Prompt sent — waiting for the customer to approve. Updating automatically…'
-                    : result.status === 'SUCCESS'
-                      ? 'Payment collected successfully.'
-                      : failureText(result.failure_reason)}
-                </p>
+              <div className="result-state">
+                <div className="result-icon fail">{ICON_X}</div>
+                <div className="result-title">Not completed</div>
+                <div className="result-amount" style={{ color: 'var(--muted)' }}>{zmw(result.amount)}</div>
+                <div className="result-sub">{result.processor.replace('_', ' ')} · {result.msisdn ?? '—'}</div>
+                <div className="result-meta">
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>{failureText(result.failure_reason)}</p>
+                </div>
+                <button className="btn primary" onClick={tryAgain}>Try again</button>
               </div>
             )}
           </div>

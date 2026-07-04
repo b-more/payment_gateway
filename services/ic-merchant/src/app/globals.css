@@ -1300,3 +1300,42 @@ h3 {
     display: none;
   }
 }
+
+/* ── Collect result states (success / failed / processing) ── */
+.result-state { text-align: center; padding: 20px 8px 6px; }
+.result-icon {
+  width: 66px; height: 66px; border-radius: 50%;
+  display: grid; place-items: center; margin: 0 auto 16px;
+}
+.result-icon svg { width: 32px; height: 32px; }
+.result-icon.ok { background: rgba(31, 138, 100, 0.14); color: var(--success); }
+.result-icon.fail { background: rgba(197, 48, 58, 0.12); color: var(--redm); }
+.result-icon.pending {
+  background: rgba(20, 163, 127, 0.12); color: var(--sky);
+  animation: result-pulse 1.7s ease-out infinite;
+}
+@keyframes result-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(20, 163, 127, 0.35); }
+  70% { box-shadow: 0 0 0 13px rgba(20, 163, 127, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(20, 163, 127, 0); }
+}
+.result-title { font-family: var(--display); font-weight: 800; font-size: 18px; color: var(--text); }
+.result-amount {
+  font-family: var(--display); font-weight: 800; font-size: 32px;
+  letter-spacing: -0.02em; color: var(--navy); margin: 8px 0 2px;
+}
+.result-sub { color: var(--muted); font-size: 13px; }
+.result-meta { margin: 18px 0 14px; text-align: left; border-top: 1px solid var(--line); padding-top: 12px; }
+.live-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--sky); margin-right: 6px; vertical-align: middle;
+  animation: live-blink 1.2s ease-in-out infinite;
+}
+@keyframes live-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+/* amount input with a ZMW prefix */
+.amount-wrap { position: relative; }
+.amount-wrap .prefix {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  font-family: var(--mono); font-size: 13px; color: var(--faint); pointer-events: none;
+}
+.amount-wrap input { padding-left: 46px !important; font-weight: 600; }

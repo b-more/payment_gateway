@@ -16,6 +16,8 @@ import { toNgwee } from '../money/money';
 import { serializeTransaction, type TransactionResponse } from '../api/serializers';
 import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
 import { airtelGlobalConfig } from '../airtel/airtel.config';
+import { MtnDispatchService } from '../mtn/mtn-dispatch.service';
+import { mtnGlobalConfig } from '../mtn/mtn.config';
 import type { GeneratedCredential } from '../credentials/credential.service';
 
 // Merchant portal API (§6.2). MERCHANT realm; every handler is scoped to the
@@ -30,6 +32,7 @@ export class MerchantController {
     private readonly reports: ReportService,
     private readonly txns: TransactionService,
     private readonly airtel: AirtelDispatchService,
+    private readonly mtn: MtnDispatchService,
   ) {}
 
   private merchantId(principal: Principal): string {
@@ -67,14 +70,25 @@ export class MerchantController {
 
     // PRODUCTION: create the PROCESSING transaction, then dispatch live.
     const record = await this.txns.processTransaction(input);
-    if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL' && record.status === 'PROCESSING') {
-      await this.airtel.dispatchCollection({
-        id: record.id,
-        msisdn: dto.msisdn,
-        amountNgwee: record.amount,
-        reference: dto.reference ?? record.id,
-      });
-      return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
+    if (record.status === 'PROCESSING') {
+      if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL') {
+        await this.airtel.dispatchCollection({
+          id: record.id,
+          msisdn: dto.msisdn,
+          amountNgwee: record.amount,
+          reference: dto.reference ?? record.id,
+        });
+        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
+      }
+      if (mtnGlobalConfig().enabled && dto.processor === 'MTN') {
+        await this.mtn.dispatchCollection({
+          id: record.id,
+          msisdn: dto.msisdn,
+          amountNgwee: record.amount,
+          externalId: dto.reference ?? record.id,
+        });
+        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
+      }
     }
     return serializeTransaction(record);
   }
@@ -95,6 +109,13 @@ export class MerchantController {
         await this.airtel.resolveByTransactionId(txnId);
       } catch {
         // Enquiry failure must not break a status read.
+      }
+    }
+    if (mtnGlobalConfig().enabled) {
+      try {
+        await this.mtn.resolveByTransactionId(txnId);
+      } catch {
+        // ditto
       }
     }
     return serializeTransaction(await this.txns.getForAccount(accountId, txnId));

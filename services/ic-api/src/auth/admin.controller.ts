@@ -27,6 +27,7 @@ import { ApplicationDto } from '../onboarding/dto/application.dto';
 import { AirtelKycService } from '../airtel/airtel-kyc.service';
 import { AirtelBalanceService, type BalanceType } from '../airtel/airtel-balance.service';
 import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
+import { MtnDispatchService } from '../mtn/mtn-dispatch.service';
 
 // Admin portal actions, gated server-side (SEC-Z1). All require the SYSTEM realm
 // and the elevated role each operation calls for (SEC-Z3). This is where the
@@ -50,6 +51,7 @@ export class AdminController {
     private readonly airtelKyc: AirtelKycService,
     private readonly airtelBalance: AirtelBalanceService,
     private readonly airtelDispatch: AirtelDispatchService,
+    private readonly mtnDispatch: MtnDispatchService,
   ) {}
 
   // ── Airtel operations (§ integration) — staff-only ────────────────────────
@@ -81,6 +83,21 @@ export class AdminController {
     // The admin acting here IS the approval; record who approved it.
     return this.airtelDispatch.dispatchDisbursement(
       { id: txnId, msisdn: dto.msisdn, amountNgwee: toNgwee(dto.amount), reference: dto.reference ?? txnId },
+      `admin:${principal.userId}`,
+    );
+  }
+
+  @Post('mtn/disbursements/:txnId/dispatch')
+  @HttpCode(200)
+  @Roles('ADMIN') // disbursements move money out — human approval gate (SEC-Z4)
+  @ApiOperation({ summary: 'Approve + dispatch an MTN disbursement' })
+  async mtnDispatchDisbursement(
+    @Param('txnId') txnId: string,
+    @Body() dto: AirtelDisburseDto,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<unknown> {
+    return this.mtnDispatch.dispatchDisbursement(
+      { id: txnId, msisdn: dto.msisdn, amountNgwee: toNgwee(dto.amount), externalId: dto.reference ?? txnId },
       `admin:${principal.userId}`,
     );
   }

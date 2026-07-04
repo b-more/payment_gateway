@@ -26,6 +26,8 @@ import {
 import { environmentToMode } from '../credentials/crypto';
 import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
 import { airtelGlobalConfig } from '../airtel/airtel.config';
+import { MtnDispatchService } from '../mtn/mtn-dispatch.service';
+import { mtnGlobalConfig } from '../mtn/mtn.config';
 import { CollectionDto } from './dto/collection.dto';
 import { DisbursementDto } from './dto/disbursement.dto';
 import { ReverseDto } from './dto/reverse.dto';
@@ -42,6 +44,7 @@ export class CollectionsController {
   constructor(
     private readonly txns: TransactionService,
     private readonly airtel: AirtelDispatchService,
+    private readonly mtn: MtnDispatchService,
   ) {}
 
   @Post()
@@ -66,24 +69,28 @@ export class CollectionsController {
       actorId: cred.credentialId,
     });
 
-    // Live Airtel dispatch: only for a fresh PROCESSING, PRODUCTION AIRTEL
-    // collection, and only when enabled. Otherwise behaviour is unchanged
-    // (returns PROCESSING; resolution comes via callback/reconciliation).
-    if (
-      airtelGlobalConfig().enabled &&
-      dto.processor === 'AIRTEL' &&
-      record.status === 'PROCESSING' &&
-      record.environment === 'PRODUCTION' &&
-      dto.msisdn
-    ) {
-      await this.airtel.dispatchCollection({
-        id: record.id,
-        msisdn: dto.msisdn,
-        amountNgwee: record.amount,
-        reference: dto.collectionReference ?? record.id,
-      });
-      // Return the latest state (dispatch may have resolved it synchronously).
-      return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
+    // Live dispatch for a fresh PROCESSING, PRODUCTION collection when the rail is
+    // enabled. Otherwise unchanged (returns PROCESSING; resolution via callback/
+    // status-poll/reconciliation).
+    if (record.status === 'PROCESSING' && record.environment === 'PRODUCTION' && dto.msisdn) {
+      if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL') {
+        await this.airtel.dispatchCollection({
+          id: record.id,
+          msisdn: dto.msisdn,
+          amountNgwee: record.amount,
+          reference: dto.collectionReference ?? record.id,
+        });
+        return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
+      }
+      if (mtnGlobalConfig().enabled && dto.processor === 'MTN') {
+        await this.mtn.dispatchCollection({
+          id: record.id,
+          msisdn: dto.msisdn,
+          amountNgwee: record.amount,
+          externalId: dto.collectionReference ?? record.id,
+        });
+        return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
+      }
     }
     return serializeTransaction(record);
   }

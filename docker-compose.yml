@@ -158,6 +158,21 @@ services:
       - ic-public                      # egress to Airtel for enquiry
     # Run with: docker compose --profile tools run --rm ic-airtel-reconcile
 
+  ic-mtn-reconcile:                    # MTN reconciliation — re-poll non-final attempts (cron/one-shot)
+    build: ./services/ic-api
+    container_name: ic-mtn-reconcile
+    profiles: ["tools"]
+    restart: "no"
+    env_file: .env
+    command: ["node", "dist/jobs/run-mtn-reconcile.js"]
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+      ic-redis: { condition: service_healthy }
+    networks:
+      - ic-internal
+      - ic-public                      # egress to MTN for status polling
+    # Run with: docker compose --profile tools run --rm ic-mtn-reconcile
+
   ic-admin:                            # Admin portal — Next.js (§3, §6.1)
     build:
       context: ./services/ic-admin

@@ -64,6 +64,18 @@ export function airtelEnvConfig(): AirtelEnvConfig {
   };
 }
 
+export interface AirtelCallbackConfig {
+  hashKey: string; // shared key set in the Airtel portal (Callback With Authentication)
+  enforce: boolean; // reject on hash mismatch; start false (log-only) to confirm the scheme
+}
+
+export function airtelCallbackConfig(): AirtelCallbackConfig {
+  return {
+    hashKey: env('AIRTEL_CALLBACK_HASH_KEY'),
+    enforce: env('AIRTEL_CALLBACK_HASH_ENFORCE') === 'true',
+  };
+}
+
 /** Assert the credentials needed for API calls are present (call before use). */
 export function assertAirtelCredentials(cfg: AirtelEnvConfig): void {
   const missing: string[] = [];

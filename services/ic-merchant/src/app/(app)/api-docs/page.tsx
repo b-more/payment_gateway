@@ -117,6 +117,19 @@ export default function ApiDocsPage(): ReactNode {
         </div>
       </div>
 
+      {/* Developer guides */}
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Developer guides</div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Full walkthroughs you can share with your team or integration partners.
+        </p>
+        <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <a className="btn primary" href="/developers" target="_blank" rel="noreferrer">Merchant Portal API guide</a>
+          <a className="btn" href="/partners" target="_blank" rel="noreferrer">Public API guide (server-to-server)</a>
+          <a className="btn" href={`${API_BASE}/docs`} target="_blank" rel="noreferrer">Interactive reference · /docs</a>
+        </div>
+      </div>
+
       {/* Signing */}
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

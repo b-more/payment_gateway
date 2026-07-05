@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How the Instacompay Gateway API works: request signing, the transaction engine, endpoints, and sandbox vs production.">
+<title>Instacompay Gateway — API Implementation Guide</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔐%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --surface: #ffffff;
+    --surface-2: #eef2f7;
+    --ink: #0f1b2d;
+    --text: #26324a;
+    --muted: #5c6a86;
+    --faint: #8a97b0;
+    --line: #dde4ee;
+    --line-strong: #c9d3e2;
+    --accent: #1179b4;
+    --accent-bright: #17a2e0;
+    --accent-soft: #e7f2fb;
+    --code-bg: #0e1726;
+    --code-text: #d7e2f2;
+    --code-faint: #7d8db0;
+    --code-str: #93c9a6;
+    --code-key: #74b9e8;
+    --get: #1f7a4d;
+    --get-soft: #e7f2ec;
+    --post: #1c4fd6;
+    --post-soft: #e6efff;
+    --warn: #8a5a00;
+    --warn-soft: #fbf0d8;
+    --warn-line: #ecd6a3;
+    --shadow: 0 1px 2px rgba(15, 27, 45, .04), 0 8px 24px rgba(15, 27, 45, .05);
+    --measure: 68ch;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", "Menlo", "Cascadia Code", "Roboto Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a1120;
+      --surface: #111c30;
+      --surface-2: #16223a;
+      --ink: #eaf0f8;
+      --text: #c2d0e6;
+      --muted: #8794ae;
+      --faint: #5f6f8d;
+      --line: #22304a;
+      --line-strong: #2d3f5e;
+      --accent: #3aa8e6;
+      --accent-bright: #5cc0f2;
+      --accent-soft: #12293c;
+      --code-bg: #060d19;
+      --code-text: #d7e2f2;
+      --code-faint: #6b7c9e;
+      --get: #62cf9c;
+      --get-soft: #10261b;
+      --post: #83a6ff;
+      --post-soft: #131f3b;
+      --warn: #e2b45f;
+      --warn-soft: #241d0d;
+      --warn-line: #4a3c17;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 10px 30px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8fb; --surface: #ffffff; --surface-2: #eef2f7; --ink: #0f1b2d; --text: #26324a;
+    --muted: #5c6a86; --faint: #8a97b0; --line: #dde4ee; --line-strong: #c9d3e2; --accent: #1179b4;
+    --accent-bright: #17a2e0; --accent-soft: #e7f2fb; --code-bg: #0e1726; --code-text: #d7e2f2;
+    --code-faint: #7d8db0; --get: #1f7a4d; --get-soft: #e7f2ec; --post: #1c4fd6; --post-soft: #e6efff;
+    --warn: #8a5a00; --warn-soft: #fbf0d8; --warn-line: #ecd6a3;
+    --shadow: 0 1px 2px rgba(15,27,45,.04), 0 8px 24px rgba(15,27,45,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a1120; --surface: #111c30; --surface-2: #16223a; --ink: #eaf0f8; --text: #c2d0e6;
+    --muted: #8794ae; --faint: #5f6f8d; --line: #22304a; --line-strong: #2d3f5e; --accent: #3aa8e6;
+    --accent-bright: #5cc0f2; --accent-soft: #12293c; --code-bg: #060d19; --code-text: #d7e2f2;
+    --code-faint: #6b7c9e; --get: #62cf9c; --get-soft: #10261b; --post: #83a6ff; --post-soft: #131f3b;
+    --warn: #e2b45f; --warn-soft: #241d0d; --warn-line: #4a3c17;
+    --shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: var(--accent-soft); }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; border-radius: 3px; }
+
+  /* ── sticky header ── */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px clamp(18px, 5vw, 44px);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    background: linear-gradient(150deg, var(--accent-bright), var(--accent));
+    display: grid; place-items: center; color: #fff; font-family: var(--mono); font-size: 14px; font-weight: 700;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .topbar nav { display: flex; gap: 4px; font-family: var(--mono); font-size: 12.5px; }
+  .topbar nav a { color: var(--muted); padding: 5px 9px; border-radius: 6px; }
+  .topbar nav a:hover { color: var(--ink); background: var(--surface-2); text-decoration: none; }
+  @media (max-width: 720px) { .topbar nav { display: none; } }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 clamp(18px, 5vw, 44px); }
+
+  /* ── hero ── */
+  .hero { padding: clamp(44px, 7vw, 88px) 0 clamp(30px, 4vw, 52px); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  .hero h1 {
+    font-size: clamp(30px, 5.2vw, 50px); line-height: 1.05; letter-spacing: -.025em;
+    color: var(--ink); margin: 16px 0 0; text-wrap: balance; font-weight: 800;
+    max-width: 16ch;
+  }
+  .hero .lede {
+    margin: 20px 0 0; font-size: clamp(16px, 2vw, 19px); color: var(--muted);
+    max-width: 60ch; line-height: 1.55;
+  }
+  .hero .lede b { color: var(--text); font-weight: 600; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; align-items: center; }
+  .chip {
+    font-family: var(--mono); font-size: 12.5px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px;
+    padding: 7px 12px; display: inline-flex; gap: 8px; align-items: center; box-shadow: var(--shadow);
+  }
+  .chip .k { color: var(--faint); }
+  .chip.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--get); box-shadow: 0 0 0 3px var(--get-soft); }
+
+  /* ── the signing thesis card ── */
+  .thesis {
+    margin-top: 34px; border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--line-strong); box-shadow: var(--shadow); background: var(--code-bg);
+  }
+  .thesis .cap {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 18px; border-bottom: 1px solid var(--code-line, #1e2c46);
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--code-faint);
+  }
+  .thesis .cap .dots { display: flex; gap: 6px; }
+  .thesis .cap .dots i { width: 10px; height: 10px; border-radius: 50%; background: #2b3a58; display: block; }
+  .thesis pre { margin: 0; padding: 22px clamp(16px, 3vw, 26px); overflow-x: auto; }
+  .thesis code { font-family: var(--mono); font-size: clamp(12.5px, 1.7vw, 15px); line-height: 1.9; color: var(--code-text); white-space: pre; }
+  .c-key { color: var(--code-key); }
+  .c-str { color: var(--code-str); }
+  .c-fn  { color: #e6c07a; }
+  .c-dim { color: var(--code-faint); }
+  .c-var { color: #d7e2f2; }
+
+  /* ── sections ── */
+  section { padding: clamp(34px, 5vw, 60px) 0; border-top: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+  .sec-head .tag {
+    font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .1em;
+    color: var(--accent); background: var(--accent-soft); padding: 3px 8px; border-radius: 6px; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  h2 { font-size: clamp(21px, 3vw, 28px); letter-spacing: -.02em; color: var(--ink); margin: 0; font-weight: 750; text-wrap: balance; }
+  .sec-sub { color: var(--muted); max-width: var(--measure); margin: 10px 0 26px; }
+  p { max-width: var(--measure); }
+  p.wide { max-width: none; }
+  strong { color: var(--ink); font-weight: 650; }
+  code:not(pre code) {
+    font-family: var(--mono); font-size: .87em; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--text); white-space: nowrap;
+  }
+
+  /* ── numbered step spine ── */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: s; }
+  .steps li {
+    position: relative; padding: 16px 16px 16px 62px; counter-increment: s; border-radius: 10px;
+  }
+  .steps li:hover { background: var(--surface-2); }
+  .steps li::before {
+    content: counter(s, decimal-leading-zero); position: absolute; left: 16px; top: 15px;
+    font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent);
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px;
+    width: 30px; height: 30px; display: grid; place-items: center;
+  }
+  .steps li h4 { margin: 0 0 3px; font-size: 15.5px; color: var(--ink); font-weight: 650; }
+  .steps li p { margin: 0; color: var(--muted); font-size: 14.5px; max-width: 62ch; }
+  .steps li .mono { font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+
+  /* ── cards grid ── */
+  .grid { display: grid; gap: 16px; }
+  .cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 760px) { .cols-2, .cols-3 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card h4 { margin: 0 0 7px; color: var(--ink); font-size: 15.5px; font-weight: 650; display: flex; align-items: center; gap: 9px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; max-width: none; }
+  .card .num { font-family: var(--mono); font-size: 12px; color: var(--accent); font-weight: 700; }
+
+  /* ── state machine ── */
+  .machine { overflow-x: auto; padding: 6px 2px 14px; }
+  .machine .row { display: flex; align-items: center; gap: 12px; min-width: 620px; }
+  .node {
+    font-family: var(--mono); font-size: 13px; font-weight: 650; letter-spacing: .02em;
+    padding: 11px 15px; border-radius: 10px; white-space: nowrap; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  }
+  .node.start { border-style: dashed; color: var(--muted); }
+  .node.proc { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .node.ok { border-color: var(--get); color: var(--get); background: var(--get-soft); }
+  .node.bad { border-color: var(--warn-line); color: var(--warn); background: var(--warn-soft); }
+  .arrow { flex: none; color: var(--faint); font-family: var(--mono); font-size: 18px; }
+  .branch { display: flex; flex-direction: column; gap: 10px; }
+  .terminal-note { margin-top: 12px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── tables ── */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--faint); font-weight: 600; background: var(--surface-2); position: sticky; top: 0;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface-2); }
+  td.path { font-family: var(--mono); font-size: 13px; color: var(--text); white-space: nowrap; }
+  .method { font-family: var(--mono); font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 6px; letter-spacing: .03em; }
+  .method.get { background: var(--get-soft); color: var(--get); }
+  .method.post { background: var(--post-soft); color: var(--post); }
+
+  /* ── code block ── */
+  .codeblock { border-radius: 13px; overflow: hidden; border: 1px solid var(--line-strong); box-shadow: var(--shadow); }
+  .codeblock .cap {
+    padding: 10px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint);
+  }
+  .codeblock pre { margin: 0; background: var(--code-bg); padding: 18px clamp(14px, 2.5vw, 22px); overflow-x: auto; }
+  .codeblock code { font-family: var(--mono); font-size: 13px; line-height: 1.75; color: var(--code-text); white-space: pre; }
+
+  /* ── callout ── */
+  .callout {
+    display: flex; gap: 13px; padding: 16px 18px; border-radius: 12px;
+    background: var(--warn-soft); border: 1px solid var(--warn-line); margin-top: 22px; max-width: var(--measure);
+  }
+  .callout .ic { flex: none; font-size: 17px; line-height: 1.4; }
+  .callout p { margin: 0; font-size: 14px; color: var(--text); max-width: none; }
+  .callout b { color: var(--ink); }
+
+  /* ── model strip ── */
+  .model {
+    margin: 8px 0 0; padding: 22px clamp(18px, 3vw, 28px); border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 30%, var(--surface)));
+    border: 1px solid var(--line-strong);
+  }
+  .model .line { font-family: var(--mono); font-size: clamp(12.5px, 1.7vw, 15px); line-height: 1.9; color: var(--ink); }
+  .model .line b { color: var(--accent); font-weight: 700; }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 60px; color: var(--faint); font-size: 13px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; align-items: center; }
+  footer .mono { font-family: var(--mono); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<header class="topbar">
+  <div class="brand"><span class="mark">i</span> Instacompay&nbsp;Gateway</div>
+  <nav>
+    <a href="#journey">Request flow</a>
+    <a href="#auth">Signing</a>
+    <a href="#engine">Engine</a>
+    <a href="#endpoints">Endpoints</a>
+    <a href="#environments">Sandbox</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Integration Reference · v1</div>
+    <h1>How the gateway API is built</h1>
+    <p class="lede">
+      A field guide for partner engineers integrating <b>collections</b> and <b>disbursements</b> over
+      Zambian mobile money. Every call is individually signed, every amount is integer ngwee, and every
+      transaction runs the same locked state machine. Here is exactly how it fits together.
+    </p>
+    <div class="chips">
+      <span class="chip"><span class="k">base</span> https://api.instacompayzm.com</span>
+      <span class="chip"><span class="k">reference</span> <a href="https://api.instacompayzm.com/docs">/docs</a></span>
+      <span class="chip live">Airtel rails live</span>
+      <a class="chip" href="/developers"><span class="k">also</span> Merchant Portal API →</a>
+    </div>
+
+    <div class="thesis" aria-label="The request signature formula">
+      <div class="cap"><span>the one thing to get right — request signing</span><span class="dots"><i></i><i></i><i></i></span></div>
+      <pre><code><span class="c-dim"># message signed on every /v1 call</span>
+message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
+<span class="c-key">X-Signature</span> = <span class="c-fn">HMAC-SHA256</span>(signingKey, message)   <span class="c-dim">// hex</span>
+
+<span class="c-dim"># the three headers that carry it</span>
+<span class="c-key">X-Api-Key</span>    ic_live_…        <span class="c-dim">// which key + account</span>
+<span class="c-key">X-Timestamp</span>  1751624040       <span class="c-dim">// epoch seconds, ±5 min</span>
+<span class="c-key">X-Signature</span>  9f2c…<span class="c-dim">(hex)</span>       <span class="c-dim">// the HMAC above</span></code></pre>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- REQUEST JOURNEY -->
+  <section id="journey">
+    <div class="sec-head"><span class="tag">Flow</span><h2>A request's journey</h2></div>
+    <p class="sec-sub">Every <code>/v1</code> call passes the same ordered pipeline before it reaches any business logic. This sequence is the contract — get through it and you're talking to the engine.</p>
+    <ol class="steps">
+      <li><h4>nginx → API</h4><p>TLS terminates at the edge; the request is proxied to the service with its <span class="mono">path</span> and body preserved byte-for-byte.</p></li>
+      <li><h4>Raw-body capture</h4><p>The exact bytes of the body are kept as <span class="mono">rawBody</span>. The signature is computed over these bytes — re-serialised JSON would differ and break verification.</p></li>
+      <li><h4>Rate limit</h4><p>Per-credential throttling rejects abusive callers before any lookup work is done.</p></li>
+      <li><h4>Authenticate</h4><p>The signed request is verified (see below). On success a <span class="mono">CredentialContext</span> — key, account, environment — is attached to the request.</p></li>
+      <li><h4>Validate</h4><p>The body is validated against a strict schema. Unknown fields are rejected outright, not ignored.</p></li>
+      <li><h4>Handle</h4><p>The controller does the work, always scoped to the authenticated key's own account — a key can never see another merchant's data.</p></li>
+      <li><h4>Serialize &amp; return</h4><p>Domain errors map to a clean <span class="mono">{ error: { code, message } }</span> envelope; money serialises as integer-ngwee strings.</p></li>
+    </ol>
+  </section>
+
+  <!-- AUTH -->
+  <section id="auth">
+    <div class="sec-head"><span class="tag">Auth</span><h2>Signed requests, no bearer tokens</h2></div>
+    <p class="sec-sub">Authentication is per-request, not per-session. There is nothing to expire or leak beyond your keys — each call proves itself with a fresh HMAC signature.</p>
+
+    <div class="grid cols-3" style="margin-bottom:24px">
+      <div class="card"><h4><span class="num">01</span> X-Api-Key</h4><p>Your public key (<code>ic_sand_…</code> / <code>ic_live_…</code>). Identifies the credential and its account.</p></div>
+      <div class="card"><h4><span class="num">02</span> X-Timestamp</h4><p>Unix epoch seconds. Must be within <strong>±5 minutes</strong> of server time — this is the replay defense.</p></div>
+      <div class="card"><h4><span class="num">03</span> X-Signature</h4><p>Hex HMAC-SHA256 over <span class="mono">ts.METHOD.path.body</span>, keyed by your secret <strong>signing key</strong>.</p></div>
+    </div>
+
+    <p class="wide"><strong>How the server verifies it —</strong> a fixed sequence:</p>
+    <ol class="steps">
+      <li><h4>Resolve the key</h4><p>Look up the credential by <span class="mono">X-Api-Key</span>; reject immediately if it's missing or not active.</p></li>
+      <li><h4>Check the window</h4><p>Reject timestamps outside ±5 minutes — a captured request can't be replayed later.</p></li>
+      <li><h4>Recompute &amp; compare</h4><p>Decrypt the signing key (stored encrypted, never plaintext), recompute the HMAC, and compare in <strong>constant time</strong>.</p></li>
+      <li><h4>Enforce IP allowlist</h4><p>For <strong>live</strong> keys only, the request IP must be on the account's allowlist. Sandbox keys skip this.</p></li>
+    </ol>
+
+    <div class="codeblock" style="margin-top:26px">
+      <div class="cap">reference client — sign &amp; send (Node)</div>
+      <pre><code><span class="c-key">import</span> crypto <span class="c-key">from</span> <span class="c-str">'node:crypto'</span>;
+
+<span class="c-key">const</span> API_BASE = <span class="c-str">'https://api.instacompayzm.com'</span>;
+<span class="c-key">const</span> API_KEY = <span class="c-str">'ic_live_…'</span>, SIGNING_KEY = <span class="c-str">'…'</span>;
+
+<span class="c-key">async function</span> <span class="c-fn">call</span>(method, path, bodyObj) {
+  <span class="c-key">const</span> body = bodyObj ? <span class="c-var">JSON</span>.stringify(bodyObj) : <span class="c-str">''</span>;
+  <span class="c-key">const</span> ts = <span class="c-var">Math</span>.floor(<span class="c-var">Date</span>.now() / <span class="c-str">1000</span>).toString();
+  <span class="c-key">const</span> message = <span class="c-str">`${ts}.${method}.${path}.${body}`</span>;
+  <span class="c-key">const</span> signature = crypto.createHmac(<span class="c-str">'sha256'</span>, SIGNING_KEY)
+    .update(message).digest(<span class="c-str">'hex'</span>);
+
+  <span class="c-key">const</span> headers = {
+    <span class="c-str">'Content-Type'</span>: <span class="c-str">'application/json'</span>,
+    <span class="c-str">'X-Api-Key'</span>: API_KEY,
+    <span class="c-str">'X-Timestamp'</span>: ts,
+    <span class="c-str">'X-Signature'</span>: signature,
+  };
+  <span class="c-key">if</span> (method !== <span class="c-str">'GET'</span>) headers[<span class="c-str">'Idempotency-Key'</span>] = crypto.randomUUID();
+
+  <span class="c-key">const</span> res = <span class="c-key">await</span> fetch(API_BASE + path, { method, headers, body: body || <span class="c-key">undefined</span> });
+  <span class="c-key">return</span> res.json();
+}
+
+<span class="c-dim">// K50.00 collection — amount is integer ngwee, as a string</span>
+<span class="c-key">await</span> <span class="c-fn">call</span>(<span class="c-str">'POST'</span>, <span class="c-str">'/v1/collections'</span>, {
+  processor: <span class="c-str">'MTN'</span>, amount: <span class="c-str">'5000'</span>, msisdn: <span class="c-str">'260970000001'</span>,
+  collectionReference: <span class="c-str">'order-1001'</span>,
+});</code></pre>
+    </div>
+  </section>
+
+  <!-- MONEY -->
+  <section id="money">
+    <div class="sec-head"><span class="tag">Money</span><h2>Integer ngwee, always</h2></div>
+    <p class="sec-sub">The single most important data rule. There are no decimals and no JSON numbers anywhere in the money path.</p>
+    <div class="grid cols-3">
+      <div class="card"><h4>Unit</h4><p>1 Kwacha = 100 ngwee. <strong>K1.50</strong> is sent as <code>"150"</code>; <strong>K50.00</strong> as <code>"5000"</code>.</p></div>
+      <div class="card"><h4>Type</h4><p>Strings on the wire, <span class="mono">bigint</span> internally. A float can't silently round a customer's money.</p></div>
+      <div class="card"><h4>Enforced</h4><p>Validated on input, stored as integers, and re-serialised to strings on output — end to end.</p></div>
+    </div>
+  </section>
+
+  <!-- ENGINE -->
+  <section id="engine">
+    <div class="sec-head"><span class="tag">Engine</span><h2>One transaction state machine</h2></div>
+    <p class="sec-sub">Collections and disbursements share a single entry point. It runs inside one database transaction with the account row locked, so concurrent calls can't race the float balance.</p>
+
+    <div class="machine">
+      <div class="row">
+        <span class="node start">CREATED</span>
+        <span class="arrow">→</span>
+        <span class="node proc">PROCESSING</span>
+        <span class="arrow">→</span>
+        <div class="branch">
+          <span class="node ok">SUCCESS</span>
+          <span class="node bad">FAILED</span>
+        </div>
+        <span class="arrow">⇢</span>
+        <span class="node">REVERSED</span>
+      </div>
+    </div>
+    <p class="terminal-note">SUCCESS and FAILED are terminal; only a SUCCESS may later be REVERSED. Illegal jumps are rejected.</p>
+
+    <div class="grid cols-2" style="margin-top:26px">
+      <div class="card"><h4>Debit, then dispatch</h4><p>On a production transaction the engine loads the charge config, checks float, appends a <strong>DEBIT</strong> to the append-only float ledger, marks the transaction <span class="mono">PROCESSING</span>, then hands off to the rail.</p></div>
+      <div class="card"><h4>Idempotent completion</h4><p>A callback and a status-poll can both try to resolve the same transaction. The <strong>first wins</strong>; the rest are no-ops. A FAILED result appends a compensating refund so the ledger always balances.</p></div>
+      <div class="card"><h4>Insufficient float</h4><p>If the balance can't cover amount + charge, the transaction is written <span class="mono">FAILED</span> with <code>INSUFFICIENT_FLOAT</code> and <strong>nothing is debited</strong>.</p></div>
+      <div class="card"><h4>Append-only ledger</h4><p>Float entries are never updated or deleted — only appended. The ledger is a forensic record you can always reconcile against.</p></div>
+    </div>
+  </section>
+
+  <!-- DISPATCH + RESOLUTION -->
+  <section id="resolution">
+    <div class="sec-head"><span class="tag">Rails</span><h2>Dispatch, then three ways to resolve</h2></div>
+    <p class="sec-sub">Once a transaction is <span class="mono">PROCESSING</span>, the gateway pushes it to the mobile-money rail (Airtel / MTN), recording a per-attempt trail. It then settles by whichever of these fires first — all idempotent, so they never double-count.</p>
+    <div class="grid cols-3">
+      <div class="card"><h4>① Rail callback</h4><p>The processor calls a signed webhook endpoint the moment the customer approves or the transfer lands.</p></div>
+      <div class="card"><h4>② Resolve-on-read</h4><p><span class="mono">GET /v1/transactions/{id}</span> re-enquires the rail live, so polling reflects the true state in real time.</p></div>
+      <div class="card"><h4>③ Reconcile sweep</h4><p>A guarded cron sweeps anything still in flight every few minutes — the backstop that guarantees eventual settlement.</p></div>
+    </div>
+    <div class="callout">
+      <span class="ic">↺</span>
+      <p>Because completion is idempotent, <b>you can safely poll and rely on webhooks at the same time.</b> Whichever arrives first settles the transaction; the other becomes a harmless no-op.</p>
+    </div>
+  </section>
+
+  <!-- IDEMPOTENCY -->
+  <section id="idempotency">
+    <div class="sec-head"><span class="tag">Safety</span><h2>Idempotency on every write</h2></div>
+    <p class="sec-sub">Every mutating call carries an <code>Idempotency-Key</code>. It's what makes retries safe over flaky mobile networks.</p>
+    <div class="grid cols-2">
+      <div class="card"><h4>Replays return the original</h4><p>Re-send the same key and you get the <strong>original</strong> transaction back — no second charge, no second webhook, no second dispatch.</p></div>
+      <div class="card"><h4>Race-safe</h4><p>Two requests with the same key arriving at once resolve to a single transaction; the loser simply returns what the winner created.</p></div>
+    </div>
+  </section>
+
+  <!-- ENDPOINTS -->
+  <section id="endpoints">
+    <div class="sec-head"><span class="tag">Surface</span><h2>The endpoints</h2></div>
+    <p class="sec-sub">Six operations, all signed, all scoped to your account. Full interactive reference lives at <a href="https://api.instacompayzm.com/docs">/docs</a>.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method post">POST</span></td><td class="path">/v1/collections</td><td>Charge a customer's wallet (money in)</td></tr>
+          <tr><td><span class="method post">POST</span></td><td class="path">/v1/disbursements</td><td>Pay a customer's wallet (money out)</td></tr>
+          <tr><td><span class="method get">GET</span></td><td class="path">/v1/transactions/{id}</td><td>Check status — re-enquires the rail on read</td></tr>
+          <tr><td><span class="method post">POST</span></td><td class="path">/v1/transactions/{id}/reverse</td><td>Reverse a successful transaction</td></tr>
+          <tr><td><span class="method get">GET</span></td><td class="path">/v1/accounts/{id}/balance</td><td>Float / balance enquiry</td></tr>
+          <tr><td><span class="method get">GET</span></td><td class="path">/v1/settlements</td><td>Settlement history</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ENVIRONMENTS -->
+  <section id="environments">
+    <div class="sec-head"><span class="tag">Env</span><h2>Sandbox and production</h2></div>
+    <p class="sec-sub">The same code path, branched on the key's environment. Build and test against sandbox with zero risk, then swap one key to go live.</p>
+    <div class="grid cols-2">
+      <div class="card">
+        <h4>🧪 Sandbox &nbsp;<code>ic_sand_…</code></h4>
+        <p>Validate signing, request shapes, and response parsing. Transactions are recorded but never touch a real rail — and are <strong>fully isolated from production float</strong>, so you can test all day without spending a ngwee.</p>
+      </div>
+      <div class="card">
+        <h4>🔟 Production &nbsp;<code>ic_live_…</code></h4>
+        <p>Real rails, real float, real settlement. Live keys additionally enforce your IP allowlist. Money moves the moment the customer approves.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="ic">⚑</span>
+      <p><b>Start in sandbox.</b> A sandbox transaction stays <code>PROCESSING</code> (there's no real rail to settle it) — that's expected. Use it to prove your integration end-to-end before switching to a live key.</p>
+    </div>
+  </section>
+
+  <!-- MODEL -->
+  <section id="model">
+    <div class="sec-head"><span class="tag">Recap</span><h2>The whole model, in one line</h2></div>
+    <div class="model">
+      <div class="line">
+        <b>sign</b> every request → <b>rate-limit</b> + verify <b>HMAC</b> → <b>validate</b> →
+        lock account &amp; run the <b>state machine</b> (debit float → PROCESSING) →
+        <b>dispatch</b> to the rail → <b>resolve</b> via callback / poll / reconcile →
+        return money as <b>integer-ngwee strings</b>.
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>Instacompay Payment Solutions Limited · Lusaka, Zambia</span>
+    <span class="mono">api.instacompayzm.com/docs · v1</span>
+  </div>
+</footer>
+</body>
+</html>

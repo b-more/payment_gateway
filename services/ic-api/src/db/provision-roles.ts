@@ -13,6 +13,9 @@ const ROLES: ReadonlyArray<{ role: string; passwordEnv: string }> = [
   { role: 'ic_app_api', passwordEnv: 'IC_API_DB_PASSWORD' },
   { role: 'ic_app_admin', passwordEnv: 'IC_ADMIN_DB_PASSWORD' },
   { role: 'ic_app_merchant', passwordEnv: 'IC_MERCHANT_DB_PASSWORD' },
+  // Combined runtime login role (0018) — inherits the three above. The app
+  // connects as this instead of the superuser owner.
+  { role: 'ic_app', passwordEnv: 'IC_APP_DB_PASSWORD' },
 ];
 
 // Role names are fixed, code-controlled constants — assert the shape rather than

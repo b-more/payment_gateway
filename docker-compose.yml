@@ -75,6 +75,7 @@ services:
     env_file: .env                     # DEP-2 — secrets injected, never baked
     environment:
       PORT: 8030
+      DATABASE_URL: ${RUNTIME_DATABASE_URL}   # non-superuser runtime role (SEC-D7, 0018)
     depends_on:
       ic-postgres: { condition: service_healthy }
       ic-redis: { condition: service_healthy }
@@ -122,6 +123,8 @@ services:
     profiles: ["tools"]
     restart: "no"
     env_file: .env
+    environment:
+      DATABASE_URL: ${RUNTIME_DATABASE_URL}   # runtime role (SEC-D7)
     command: ["node", "dist/jobs/run-settlements.js"]
     depends_on:
       ic-postgres: { condition: service_healthy }
@@ -135,6 +138,8 @@ services:
     profiles: ["tools"]
     restart: "no"
     env_file: .env
+    environment:
+      DATABASE_URL: ${RUNTIME_DATABASE_URL}   # runtime role (SEC-D7)
     command: ["node", "dist/jobs/run-reconciliation.js"]
     depends_on:
       ic-postgres: { condition: service_healthy }
@@ -149,6 +154,8 @@ services:
     profiles: ["tools"]
     restart: "no"
     env_file: .env
+    environment:
+      DATABASE_URL: ${RUNTIME_DATABASE_URL}   # runtime role (SEC-D7)
     command: ["node", "dist/jobs/run-airtel-reconcile.js"]
     depends_on:
       ic-postgres: { condition: service_healthy }
@@ -164,6 +171,8 @@ services:
     profiles: ["tools"]
     restart: "no"
     env_file: .env
+    environment:
+      DATABASE_URL: ${RUNTIME_DATABASE_URL}   # runtime role (SEC-D7)
     command: ["node", "dist/jobs/run-mtn-reconcile.js"]
     depends_on:
       ic-postgres: { condition: service_healthy }

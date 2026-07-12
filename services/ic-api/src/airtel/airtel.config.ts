@@ -67,12 +67,14 @@ export function airtelEnvConfig(): AirtelEnvConfig {
 export interface AirtelCallbackConfig {
   hashKey: string; // shared key set in the Airtel portal (Callback With Authentication)
   enforce: boolean; // reject on hash mismatch; start false (log-only) to confirm the scheme
+  token: string; // optional shared secret required as ?t= on the callback URL (caller auth)
 }
 
 export function airtelCallbackConfig(): AirtelCallbackConfig {
   return {
     hashKey: env('AIRTEL_CALLBACK_HASH_KEY'),
     enforce: env('AIRTEL_CALLBACK_HASH_ENFORCE') === 'true',
+    token: env('AIRTEL_CALLBACK_TOKEN'),
   };
 }
 

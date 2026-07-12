@@ -1,4 +1,5 @@
 import { Body, Controller, HttpCode, Logger, Post, Req, UseGuards, type RawBodyRequest } from '@nestjs/common';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RateLimitGuard } from '../api/rate-limit.guard';
@@ -15,6 +16,13 @@ interface AirtelCallbackBody {
   transaction?: { id?: string; airtel_money_id?: string; status?: string; message?: string };
   data?: { transaction?: { id?: string; airtel_money_id?: string; status?: string } };
   hash?: string; // present when callback auth is enabled (verified later)
+}
+
+/** Length-safe constant-time string compare (hash both sides so length never leaks). */
+function constantTimeEqual(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a).digest();
+  const hb = createHash('sha256').update(b).digest();
+  return timingSafeEqual(ha, hb);
 }
 
 @ApiTags('processors')
@@ -36,6 +44,19 @@ export class AirtelCallbackController {
     // confirmed, then AIRTEL_CALLBACK_HASH_ENFORCE=true rejects forged callbacks
     // before they consume an enquiry.
     const cb = airtelCallbackConfig();
+
+    // Caller authentication (SEC): Airtel does not sign callbacks, so — since we
+    // control the notification URL registered in the Airtel portal — an optional
+    // shared secret is required as ?t=<token>. Inert until AIRTEL_CALLBACK_TOKEN
+    // is set. Forged callbacks without it are dropped before any enquiry.
+    if (cb.token) {
+      const provided = typeof req.query?.t === 'string' ? req.query.t : '';
+      if (!provided || !constantTimeEqual(provided, cb.token)) {
+        this.logger.warn('airtel callback REJECTED — bad/missing callback token');
+        return { received: true, matched: false };
+      }
+    }
+
     if (cb.hashKey) {
       const raw = req.rawBody instanceof Buffer ? req.rawBody.toString('utf8') : JSON.stringify(body);
       const chk = checkCallbackHash(cb.hashKey, raw, body);

@@ -16,7 +16,17 @@ const MAX_FAILED_LOGINS = Number(process.env.AUTH_MAX_FAILED ?? 5); // SEC-A5
 const LOCK_SECONDS = Number(process.env.AUTH_LOCK_SECONDS ?? 900);
 const OTP_TTL_SECONDS = Number(process.env.OTP_TTL_SECONDS ?? 300); // ≤5m (SEC-A1)
 const RESET_TTL_SECONDS = Number(process.env.RESET_TTL_SECONDS ?? 900); // 15m for password reset
-const OTP_MAX_ATTEMPTS = 5;
+const OTP_MAX_ATTEMPTS = Number(process.env.AUTH_OTP_MAX_ATTEMPTS ?? 5);
+const LOCK_MAX_SECONDS = Number(process.env.AUTH_LOCK_MAX_SECONDS ?? 86_400); // cap backoff at 24h
+
+// Exponential backoff (SEC-A5): each failed attempt past the threshold doubles
+// the lock window, capped at LOCK_MAX_SECONDS. failed=MAX -> LOCK_SECONDS,
+// failed=MAX+1 -> 2×, MAX+2 -> 4×, …
+function lockDurationSeconds(failedCount: number): number {
+  const over = Math.max(0, failedCount - MAX_FAILED_LOGINS);
+  const seconds = LOCK_SECONDS * 2 ** Math.min(over, 20);
+  return Math.min(seconds, LOCK_MAX_SECONDS);
+}
 const EXPOSE_OTP = process.env.AUTH_EXPOSE_OTP === 'true'; // dev/test only
 
 // Lazily-computed dummy hash so a missing user costs ~the same as a present one
@@ -89,7 +99,7 @@ export class AuthService {
   ) {}
 
   /** Step 1 (SEC-A1): verify password, then issue an email OTP challenge. */
-  async login(input: { realm: Realm; email: string; password: string }): Promise<LoginResult> {
+  async login(input: { realm: Realm; email: string; password: string; ip?: string | null }): Promise<LoginResult> {
     const scope = realmToScope(input.realm);
     const found = await this.pool.query<UserRow>(
       `SELECT id, email, scope, merchant_id, status, password_hash, failed_login_count, locked_until
@@ -108,11 +118,26 @@ export class AuthService {
 
     if (!(await verifySecret(input.password, user.password_hash))) {
       const failed = user.failed_login_count + 1;
-      const lockedUntil = failed >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCK_SECONDS * 1000) : null;
-      await this.pool.query(
-        'UPDATE users SET failed_login_count = $1, locked_until = $2 WHERE id = $3',
-        [failed, lockedUntil, user.id],
-      );
+      const lock = failed >= MAX_FAILED_LOGINS;
+      const lockSeconds = lock ? lockDurationSeconds(failed) : 0;
+      const lockedUntil = lock ? new Date(Date.now() + lockSeconds * 1000) : null;
+      await withTransaction(this.pool, async (client) => {
+        await client.query(
+          'UPDATE users SET failed_login_count = $1, locked_until = $2 WHERE id = $3',
+          [failed, lockedUntil, user.id],
+        );
+        // Emit an alertable event on each lock (SEC-A5) so repeated attacks are visible.
+        if (lock) {
+          await this.audit.write(client, {
+            actorId: user.id,
+            actorScope: user.scope,
+            action: 'ACCOUNT_LOCKED',
+            target: user.id,
+            ipAddress: input.ip ?? null,
+            metadata: { failedLoginCount: failed, lockSeconds },
+          });
+        }
+      });
       throw new UnauthorizedError('invalid credentials');
     }
 

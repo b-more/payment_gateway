@@ -38,8 +38,17 @@ export class AuthController {
   @HttpCode(200)
   @UseGuards(RateLimitGuard)
   @ApiOperation({ summary: 'Password login — issues an email OTP challenge' })
-  async login(@Param('realm') realm: string, @Body() dto: LoginDto): Promise<LoginResult> {
-    return this.auth.login({ realm: toRealm(realm), email: dto.email, password: dto.password });
+  async login(
+    @Param('realm') realm: string,
+    @Body() dto: LoginDto,
+    @Req() req: AuthedPortalRequest,
+  ): Promise<LoginResult> {
+    return this.auth.login({
+      realm: toRealm(realm),
+      email: dto.email,
+      password: dto.password,
+      ip: getClientIp(req),
+    });
   }
 
   @Post('verify-otp')

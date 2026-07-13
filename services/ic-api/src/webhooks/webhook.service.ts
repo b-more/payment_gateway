@@ -1,10 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { Redis } from 'ioredis';
 import { PG_POOL } from '../database/database.module';
 import { REDIS } from '../redis/redis.module';
 import { signWebhook } from './webhook.signing';
+import { assertSafeWebhookUrl, UnsafeWebhookUrlError } from './ssrf-guard';
 import type { TransactionStatus } from '../money/types';
 
 export const WEBHOOK_CONFIG = Symbol('WEBHOOK_CONFIG');
@@ -52,6 +53,8 @@ interface SettingsRow {
  */
 @Injectable()
 export class WebhookService {
+  private readonly logger = new Logger(WebhookService.name);
+
   constructor(
     @Inject(PG_POOL) private readonly pool: Pool,
     @Inject(REDIS) private readonly redis: Redis,
@@ -116,6 +119,19 @@ export class WebhookService {
     const url = settings.callback_url;
     const attemptNumber = job.attempt + 1;
 
+    // SSRF guard (SEC): never deliver to a URL that is — or resolves to —
+    // internal space. Unsafe URLs can never become safe, so give up (no retry).
+    try {
+      await assertSafeWebhookUrl(url);
+    } catch (e) {
+      if (e instanceof UnsafeWebhookUrlError) {
+        this.logger.warn(`webhook blocked (unsafe URL) for txn ${txn.id}: ${e.message}`);
+        await this.record(txn.id, url, attemptNumber, null, 'GIVEN_UP', null);
+        return;
+      }
+      throw e;
+    }
+
     if (!settings.webhook_signing_secret) {
       // Misconfiguration: cannot sign (WH-2). Flag for manual, do not retry.
       await this.record(txn.id, url, attemptNumber, null, 'GIVEN_UP', null);
@@ -176,6 +192,7 @@ export class WebhookService {
       const res = await fetch(url, {
         method: 'POST',
         signal: controller.signal,
+        redirect: 'error', // SSRF: don't follow a 3xx into internal space
         headers: {
           'Content-Type': 'application/json',
           'X-Instacompay-Event': eventType,

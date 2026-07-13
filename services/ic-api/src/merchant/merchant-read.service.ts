@@ -4,7 +4,8 @@ import { PG_POOL } from '../database/database.module';
 import { withTransaction } from '../database/tx';
 import { AuditService } from '../audit/audit.service';
 import { CredentialService, type GeneratedCredential } from '../credentials/credential.service';
-import { ForbiddenError, NotFoundError } from '../money/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '../money/errors';
+import { assertSafeWebhookUrl, UnsafeWebhookUrlError } from '../webhooks/ssrf-guard';
 
 // Every method is scoped to the authenticated merchant's accounts (NN-6/SEC-Z2):
 // the merchant id comes from the session principal, never the request body, and
@@ -151,6 +152,16 @@ export class MerchantReadService {
     input: { callbackUrl?: string | null; ipWhitelist?: string[] | null },
     actorId: string,
   ): Promise<{ accountId: string }> {
+    // Reject an unsafe webhook URL up front (SSRF), so merchants get immediate
+    // feedback rather than silent give-ups at delivery time.
+    if (input.callbackUrl) {
+      try {
+        await assertSafeWebhookUrl(input.callbackUrl);
+      } catch (e) {
+        if (e instanceof UnsafeWebhookUrlError) throw new ValidationError(e.message);
+        throw e;
+      }
+    }
     return withTransaction(this.pool, async (client) => {
       await this.assertOwned(client, merchantId, accountId);
       await client.query(

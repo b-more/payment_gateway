@@ -48,6 +48,7 @@ export class MerchantController {
 
   @Post('accounts/:id/collect')
   @HttpCode(200)
+  @Roles('MERCHANT_ADMIN', 'MERCHANT_INITIATOR') // initiator runs collections (parity with disburse)
   @ApiOperation({ summary: 'Initiate a collection from one of your accounts' })
   async collect(
     @Param('id') accountId: string,

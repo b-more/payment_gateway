@@ -23,6 +23,7 @@
     "test:webhook": "node -r ts-node/register --test test/webhook.itest.ts",
     "test:onboarding": "node -r ts-node/register --test test/onboarding.itest.ts",
     "test:settlement": "node -r ts-node/register --test test/settlement.itest.ts",
+    "test:audit": "node -r ts-node/register --test test/audit-money-paths.itest.ts",
     "test:auth": "node -r ts-node/register --test test/auth.itest.ts",
     "test:merchant": "node -r ts-node/register --test test/merchant.itest.ts",
     "test:email": "node -r ts-node/register --test test/email.itest.ts"

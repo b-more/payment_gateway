@@ -40,38 +40,55 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'GET', path: '/v1/settlements', summary: 'List settlements' },
 ];
 
-const SIGN_SNIPPET = `import crypto from 'node:crypto';
+const SIMPLE_SNIPPET = `import crypto from 'node:crypto';
 
 const API_BASE = '${API_BASE}';
-const API_KEY = 'ic_live_...';        // from this page
-const SIGNING_KEY = '...';            // shown once when you (re)generate a key
+const API_KEY = 'ic_live_...';     // from this page
+const API_SECRET = 'sk_...';       // shown once when you (re)generate a key
 
-async function call(method, path, bodyObj) {
-  const body = bodyObj ? JSON.stringify(bodyObj) : '';
-  const ts = Math.floor(Date.now() / 1000).toString();
-  // sign "timestamp.METHOD.path.rawBody"
-  const message = \`\${ts}.\${method}.\${path}.\${body}\`;
-  const signature = crypto.createHmac('sha256', SIGNING_KEY)
-    .update(message).digest('hex');
-
+async function call(method, path, body) {
   const headers = {
     'Content-Type': 'application/json',
     'X-Api-Key': API_KEY,
-    'X-Timestamp': ts,
-    'X-Signature': signature,
+    'X-Api-Secret': API_SECRET,
   };
+  // Any unique string. Re-send the same one to safely retry.
   if (method !== 'GET') headers['Idempotency-Key'] = crypto.randomUUID();
 
   const res = await fetch(API_BASE + path, {
-    method, headers, body: body || undefined,
+    method, headers, body: body ? JSON.stringify(body) : undefined,
   });
   return res.json();
 }
 
 // K50.00 collection (amount is integer ngwee, as a string)
 await call('POST', '/v1/collections', {
-  processor: 'MTN', amount: '5000', msisdn: '260970000001',
+  processor: 'AIRTEL', amount: '5000', msisdn: '260970000001',
   collectionReference: 'order-1001',
+});`;
+
+const SIGNED_SNIPPET = `// Optional hardened mode: sign each request instead of sending the secret.
+// Adds replay protection + body integrity. Send X-Signature and the API
+// switches to signed mode automatically.
+const SIGNING_KEY = '...';   // shown once alongside the secret
+
+const body = JSON.stringify({ processor: 'AIRTEL', amount: '5000', msisdn: '260970000001' });
+const ts = Math.floor(Date.now() / 1000).toString();
+
+// sign "timestamp.METHOD.path.rawBody"
+const signature = crypto.createHmac('sha256', SIGNING_KEY)
+  .update(\`\${ts}.POST./v1/collections.\${body}\`).digest('hex');
+
+await fetch(API_BASE + '/v1/collections', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Api-Key': API_KEY,
+    'X-Timestamp': ts,          // must be within ±5 minutes
+    'X-Signature': signature,
+    'Idempotency-Key': crypto.randomUUID(),
+  },
+  body,
 });`;
 
 function Copy({ text, label }: { text: string; label?: string }): ReactNode {
@@ -107,9 +124,9 @@ export default function ApiDocsPage(): ReactNode {
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>Quickstart</div>
         <ol style={{ margin: '0 0 4px 18px', padding: 0, fontSize: 14, lineHeight: 1.7 }}>
-          <li>Grab an <b>API key</b> + <b>signing key</b> below (regenerate to reveal a signing key — it’s shown once).</li>
-          <li><a href={POSTMAN_HREF} download style={{ color: 'var(--sky-deep)' }}>Download the Postman collection</a>, open it, and paste your <span className="mono">apiKey</span> and <span className="mono">signingKey</span> into the collection <b>Variables</b> tab.</li>
-          <li>Press <b>Send</b> — the collection signs every request for you. Start in <b>sandbox</b>, then switch to your live key.</li>
+          <li>Grab an <b>API key</b> + <b>secret</b> below (regenerate to reveal them — they’re shown once).</li>
+          <li><a href={POSTMAN_HREF} download style={{ color: 'var(--sky-deep)' }}>Download the Postman collection</a>, open it, and paste your <span className="mono">apiKey</span> and <span className="mono">apiSecret</span> into the collection <b>Variables</b> tab.</li>
+          <li>Press <b>Send</b>. Start in <b>sandbox</b> (<span className="mono">ic_sand_…</span>) — it simulates and settles instantly, so you can test the full <span className="mono">PROCESSING → SUCCESS</span> lifecycle with no real money. Then switch to your live key.</li>
         </ol>
         <div className="row" style={{ marginTop: 12, gap: 18, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13 }}><span className="muted">Base URL</span>&nbsp; <span className="mono">{API_BASE}</span></span>
@@ -130,30 +147,49 @@ export default function ApiDocsPage(): ReactNode {
         </div>
       </div>
 
-      {/* Signing */}
+      {/* Authentication — simple (recommended) */}
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Authentication — signed requests</div>
-          <Copy text={SIGN_SNIPPET} label="Copy example" />
+          <div className="eyebrow" style={{ margin: 0 }}>Authentication — key + secret <span style={{ color: 'var(--success-deep)' }}>(recommended)</span></div>
+          <Copy text={SIMPLE_SNIPPET} label="Copy example" />
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Every <span className="mono">/v1</span> call carries three headers. The signature is an
-          HMAC-SHA256 over <span className="mono">{'`${timestamp}.${METHOD}.${path}.${rawBody}`'}</span>,
-          keyed by your <b>signing key</b>. Mutating calls also need an <span className="mono">Idempotency-Key</span>
-          (any unique string — replays return the original result).
+          Send your key and secret on every <span className="mono">/v1</span> call — that&apos;s it. No signing,
+          no timestamps. Writes also take an <span className="mono">Idempotency-Key</span> (any unique string;
+          re-send the same one to safely retry).
         </p>
         <table className="table" style={{ marginBottom: 14 }}>
           <tbody>
-            <tr><td className="mono" style={{ width: 150 }}>X-Api-Key</td><td className="muted">Your public key, e.g. <span className="mono">ic_live_…</span></td></tr>
-            <tr><td className="mono">X-Timestamp</td><td className="muted">Unix epoch seconds — must be within ±5 minutes of server time.</td></tr>
-            <tr><td className="mono">X-Signature</td><td className="muted">HMAC-SHA256(signingKey, <span className="mono">ts.METHOD.path.body</span>), hex.</td></tr>
+            <tr><td className="mono" style={{ width: 160 }}>X-Api-Key</td><td className="muted">Your key, e.g. <span className="mono">ic_live_…</span></td></tr>
+            <tr><td className="mono">X-Api-Secret</td><td className="muted">Your secret (<span className="mono">sk_…</span>). Or send <span className="mono">Authorization: Bearer &lt;secret&gt;</span>.</td></tr>
             <tr><td className="mono">Idempotency-Key</td><td className="muted">Unique per write (POST). Safe to retry.</td></tr>
           </tbody>
         </table>
-        <pre className="code-block" style={{ margin: 0, maxHeight: 340 }}><code>{SIGN_SNIPPET}</code></pre>
-        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
+        <pre className="code-block" style={{ margin: 0, maxHeight: 320 }}><code>{SIMPLE_SNIPPET}</code></pre>
+        <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 12 }}>
           <b>Money is integer ngwee, as strings</b> — K1.50 = <span className="mono">&quot;150&quot;</span>, K50.00 = <span className="mono">&quot;5000&quot;</span>. Never send decimals or JSON numbers.
         </p>
+      </div>
+
+      {/* Authentication — signed (hardened) */}
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Authentication — signed requests (hardened, optional)</div>
+          <Copy text={SIGNED_SNIPPET} label="Copy example" />
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Prefer not to send your secret on every call? Sign the request instead: an HMAC-SHA256 over{' '}
+          <span className="mono">{'`${timestamp}.${METHOD}.${path}.${rawBody}`'}</span> keyed by your{' '}
+          <b>signing key</b>. This adds <b>replay protection</b> and <b>body integrity</b>. Just send{' '}
+          <span className="mono">X-Signature</span> and the API uses signed mode automatically.
+        </p>
+        <table className="table" style={{ marginBottom: 14 }}>
+          <tbody>
+            <tr><td className="mono" style={{ width: 160 }}>X-Timestamp</td><td className="muted">Unix epoch seconds — must be within ±5 minutes of server time.</td></tr>
+            <tr><td className="mono">X-Signature</td><td className="muted">HMAC-SHA256(signingKey, <span className="mono">ts.METHOD.path.body</span>), hex.</td></tr>
+          </tbody>
+        </table>
+        <pre className="code-block" style={{ margin: 0, maxHeight: 320 }}><code>{SIGNED_SNIPPET}</code></pre>
       </div>
 
       {/* Endpoints */}

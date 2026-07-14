@@ -308,16 +308,18 @@
       <a class="chip" href="/developers"><span class="k">also</span> Merchant Portal API →</a>
     </div>
 
-    <div class="thesis" aria-label="The request signature formula">
-      <div class="cap"><span>the one thing to get right — request signing</span><span class="dots"><i></i><i></i><i></i></span></div>
-      <pre><code><span class="c-dim"># message signed on every /v1 call</span>
-message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
-<span class="c-key">X-Signature</span> = <span class="c-fn">HMAC-SHA256</span>(signingKey, message)   <span class="c-dim">// hex</span>
+    <div class="thesis" aria-label="Authentication">
+      <div class="cap"><span>authenticating — two headers, that's the whole thing</span><span class="dots"><i></i><i></i><i></i></span></div>
+      <pre><code><span class="c-dim"># every /v1 call carries your key + secret</span>
+<span class="c-key">X-Api-Key</span>     ic_live_…      <span class="c-dim">// which key + account</span>
+<span class="c-key">X-Api-Secret</span>  sk_…           <span class="c-dim">// or: Authorization: Bearer sk_…</span>
 
-<span class="c-dim"># the three headers that carry it</span>
-<span class="c-key">X-Api-Key</span>    ic_live_…        <span class="c-dim">// which key + account</span>
-<span class="c-key">X-Timestamp</span>  1751624040       <span class="c-dim">// epoch seconds, ±5 min</span>
-<span class="c-key">X-Signature</span>  9f2c…<span class="c-dim">(hex)</span>       <span class="c-dim">// the HMAC above</span></code></pre>
+<span class="c-dim"># writes also take an idempotency key — re-send it to safely retry</span>
+<span class="c-key">Idempotency-Key</span>  <span class="c-str">"any-unique-string"</span>
+
+<span class="c-dim"># prefer not to send the secret? sign instead (hardened, optional):</span>
+message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
+<span class="c-key">X-Signature</span> = <span class="c-fn">HMAC-SHA256</span>(signingKey, message)  <span class="c-dim">// + X-Timestamp</span></code></pre>
     </div>
   </div>
 </div>
@@ -341,46 +343,47 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
 
   <!-- AUTH -->
   <section id="auth">
-    <div class="sec-head"><span class="tag">Auth</span><h2>Signed requests, no bearer tokens</h2></div>
-    <p class="sec-sub">Authentication is per-request, not per-session. There is nothing to expire or leak beyond your keys — each call proves itself with a fresh HMAC signature.</p>
+    <div class="sec-head"><span class="tag">Auth</span><h2>Two ways in — pick your level</h2></div>
+    <p class="sec-sub">Authentication is per-request, not per-session: nothing to expire or refresh. Start with key + secret; move to signing if you want the extra hardening.</p>
 
-    <div class="grid cols-3" style="margin-bottom:24px">
-      <div class="card"><h4><span class="num">01</span> X-Api-Key</h4><p>Your public key (<code>ic_sand_…</code> / <code>ic_live_…</code>). Identifies the credential and its account.</p></div>
-      <div class="card"><h4><span class="num">02</span> X-Timestamp</h4><p>Unix epoch seconds. Must be within <strong>±5 minutes</strong> of server time — this is the replay defense.</p></div>
-      <div class="card"><h4><span class="num">03</span> X-Signature</h4><p>Hex HMAC-SHA256 over <span class="mono">ts.METHOD.path.body</span>, keyed by your secret <strong>signing key</strong>.</p></div>
+    <div class="grid cols-2" style="margin-bottom:24px">
+      <div class="card">
+        <h4>✅ Simple — key + secret <span class="mono" style="font-size:11px;color:var(--get)">recommended</span></h4>
+        <p>Send <code>X-Api-Key</code> + <code>X-Api-Secret</code> (or <code>Authorization: Bearer &lt;secret&gt;</code>) on every call. The familiar key-and-secret-over-TLS model — you can be live in minutes.</p>
+      </div>
+      <div class="card">
+        <h4>🔐 Signed — HMAC <span class="mono" style="font-size:11px;color:var(--faint)">hardened</span></h4>
+        <p>Don't send the secret at all — prove each call with a signature. Adds <strong>replay protection</strong> and <strong>body integrity</strong>. Send <code>X-Signature</code> and the API switches automatically.</p>
+      </div>
     </div>
 
-    <p class="wide"><strong>How the server verifies it —</strong> a fixed sequence:</p>
+    <p class="wide"><strong>How the server verifies a signed request —</strong> a fixed sequence:</p>
     <ol class="steps">
       <li><h4>Resolve the key</h4><p>Look up the credential by <span class="mono">X-Api-Key</span>; reject immediately if it's missing or not active.</p></li>
       <li><h4>Check the window</h4><p>Reject timestamps outside ±5 minutes — a captured request can't be replayed later.</p></li>
       <li><h4>Recompute &amp; compare</h4><p>Decrypt the signing key (stored encrypted, never plaintext), recompute the HMAC, and compare in <strong>constant time</strong>.</p></li>
-      <li><h4>Enforce IP allowlist</h4><p>For <strong>live</strong> keys only, the request IP must be on the account's allowlist. Sandbox keys skip this.</p></li>
+      <li><h4>Enforce IP allowlist</h4><p>For <strong>live</strong> keys only, the request IP must be on the account's allowlist — in <em>both</em> auth modes. Sandbox keys skip this.</p></li>
     </ol>
 
     <div class="codeblock" style="margin-top:26px">
-      <div class="cap">reference client — sign &amp; send (Node)</div>
+      <div class="cap">reference client — key + secret (Node)</div>
       <pre><code><span class="c-key">import</span> crypto <span class="c-key">from</span> <span class="c-str">'node:crypto'</span>;
 
 <span class="c-key">const</span> API_BASE = <span class="c-str">'https://api.instacompayzm.com'</span>;
-<span class="c-key">const</span> API_KEY = <span class="c-str">'ic_live_…'</span>, SIGNING_KEY = <span class="c-str">'…'</span>;
+<span class="c-key">const</span> API_KEY = <span class="c-str">'ic_live_…'</span>, API_SECRET = <span class="c-str">'sk_…'</span>;
 
-<span class="c-key">async function</span> <span class="c-fn">call</span>(method, path, bodyObj) {
-  <span class="c-key">const</span> body = bodyObj ? <span class="c-var">JSON</span>.stringify(bodyObj) : <span class="c-str">''</span>;
-  <span class="c-key">const</span> ts = <span class="c-var">Math</span>.floor(<span class="c-var">Date</span>.now() / <span class="c-str">1000</span>).toString();
-  <span class="c-key">const</span> message = <span class="c-str">`${ts}.${method}.${path}.${body}`</span>;
-  <span class="c-key">const</span> signature = crypto.createHmac(<span class="c-str">'sha256'</span>, SIGNING_KEY)
-    .update(message).digest(<span class="c-str">'hex'</span>);
-
+<span class="c-key">async function</span> <span class="c-fn">call</span>(method, path, body) {
   <span class="c-key">const</span> headers = {
     <span class="c-str">'Content-Type'</span>: <span class="c-str">'application/json'</span>,
     <span class="c-str">'X-Api-Key'</span>: API_KEY,
-    <span class="c-str">'X-Timestamp'</span>: ts,
-    <span class="c-str">'X-Signature'</span>: signature,
+    <span class="c-str">'X-Api-Secret'</span>: API_SECRET,
   };
+  <span class="c-dim">// any unique string — re-send the same one to safely retry</span>
   <span class="c-key">if</span> (method !== <span class="c-str">'GET'</span>) headers[<span class="c-str">'Idempotency-Key'</span>] = crypto.randomUUID();
 
-  <span class="c-key">const</span> res = <span class="c-key">await</span> fetch(API_BASE + path, { method, headers, body: body || <span class="c-key">undefined</span> });
+  <span class="c-key">const</span> res = <span class="c-key">await</span> fetch(API_BASE + path, {
+    method, headers, body: body ? <span class="c-var">JSON</span>.stringify(body) : <span class="c-key">undefined</span>,
+  });
   <span class="c-key">return</span> res.json();
 }
 
@@ -483,7 +486,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
     <div class="grid cols-2">
       <div class="card">
         <h4>🧪 Sandbox &nbsp;<code>ic_sand_…</code></h4>
-        <p>Validate signing, request shapes, and response parsing. Transactions are recorded but never touch a real rail — and are <strong>fully isolated from production float</strong>, so you can test all day without spending a ngwee.</p>
+        <p>Sandbox <strong>simulates and settles instantly</strong>, so you can exercise the real <span class="mono">PROCESSING → SUCCESS</span> lifecycle. Nothing touches a live rail, and it's <strong>fully isolated from production float</strong> — test all day without spending a ngwee.</p>
       </div>
       <div class="card">
         <h4>🔟 Production &nbsp;<code>ic_live_…</code></h4>
@@ -492,7 +495,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
     </div>
     <div class="callout">
       <span class="ic">⚑</span>
-      <p><b>Start in sandbox.</b> A sandbox transaction stays <code>PROCESSING</code> (there's no real rail to settle it) — that's expected. Use it to prove your integration end-to-end before switching to a live key.</p>
+      <p><b>Start in sandbox.</b> It resolves to <code>SUCCESS</code> immediately, so you can prove your whole integration — create, poll, handle the result — before switching a single key to live.</p>
     </div>
   </section>
 

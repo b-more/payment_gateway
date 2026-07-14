@@ -15,6 +15,7 @@ import { CreateMerchantUserDto, AssignRoleDto, SetUserStatusDto } from './dto/us
 import { PayoutService } from './payout.service';
 import { MerchantUserService } from './merchant-user.service';
 import { TransactionService } from '../transactions/transaction.service';
+import { assertRailReady } from '../transactions/rails';
 import { toNgwee } from '../money/money';
 import { serializeTransaction, type TransactionResponse } from '../api/serializers';
 import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
@@ -74,27 +75,19 @@ export class MerchantController {
       return serializeTransaction(await this.txns.processAndSettle(input));
     }
 
-    // PRODUCTION: create the PROCESSING transaction, then dispatch live.
+    // PRODUCTION: refuse before any float is debited if the rail can't dispatch —
+    // otherwise the transaction sits PROCESSING forever with the money gone.
+    assertRailReady(dto.processor);
+
     const record = await this.txns.processTransaction(input);
     if (record.status === 'PROCESSING') {
-      if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL') {
-        await this.airtel.dispatchCollection({
-          id: record.id,
-          msisdn: dto.msisdn,
-          amountNgwee: record.amount,
-          reference: dto.reference ?? record.id,
-        });
-        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
+      const reference = dto.reference ?? record.id;
+      if (dto.processor === 'AIRTEL') {
+        await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, reference });
+      } else {
+        await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, externalId: reference });
       }
-      if (mtnGlobalConfig().enabled && dto.processor === 'MTN') {
-        await this.mtn.dispatchCollection({
-          id: record.id,
-          msisdn: dto.msisdn,
-          amountNgwee: record.amount,
-          externalId: dto.reference ?? record.id,
-        });
-        return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
-      }
+      return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
     }
     return serializeTransaction(record);
   }

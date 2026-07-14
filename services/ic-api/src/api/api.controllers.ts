@@ -11,7 +11,8 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TransactionService } from '../transactions/transaction.service';
 import { toNgwee } from '../money/money';
-import { NotFoundError } from '../money/errors';
+import { NotFoundError, ValidationError } from '../money/errors';
+import { assertRailReady } from '../transactions/rails';
 import { ApiAuthGuard } from './api-auth.guard';
 import { RateLimitGuard } from './rate-limit.guard';
 import { ApiReadService, type BalanceResponse, type SettlementResponse } from './read.service';
@@ -25,15 +26,13 @@ import {
 } from './request-context';
 import { environmentToMode } from '../credentials/crypto';
 import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
-import { airtelGlobalConfig } from '../airtel/airtel.config';
 import { MtnDispatchService } from '../mtn/mtn-dispatch.service';
-import { mtnGlobalConfig } from '../mtn/mtn.config';
 import { CollectionDto } from './dto/collection.dto';
 import { DisbursementDto } from './dto/disbursement.dto';
 import { ReverseDto } from './dto/reverse.dto';
 import type { CredentialContext } from '../credentials/credential.service';
 
-// Every /v1 controller is gated by rate limiting (SEC-API6) then HMAC auth
+// Every /v1 controller is gated by rate limiting (SEC-API6) then auth
 // (SEC-API2/3/4). All work is scoped to the authenticated credential's account.
 
 @ApiTags('collections')
@@ -57,40 +56,38 @@ export class CollectionsController {
     @Req() req: AuthedRequest,
   ): Promise<TransactionResponse> {
     const idempotencyKey = requireIdempotencyKey(req);
-    const record = await this.txns.processTransaction({
+    const environment = environmentToMode(cred.environment);
+    const input = {
       accountId: cred.accountId,
-      type: 'COLLECTION',
+      type: 'COLLECTION' as const,
       processor: dto.processor,
       amount: toNgwee(dto.amount),
       msisdn: dto.msisdn ?? null,
       idempotencyKey,
       collectionReference: dto.collectionReference ?? null,
-      environment: environmentToMode(cred.environment),
+      environment,
       actorId: cred.credentialId,
-    });
+    };
 
-    // Live dispatch for a fresh PROCESSING, PRODUCTION collection when the rail is
-    // enabled. Otherwise unchanged (returns PROCESSING; resolution via callback/
-    // status-poll/reconciliation).
-    if (record.status === 'PROCESSING' && record.environment === 'PRODUCTION' && dto.msisdn) {
-      if (airtelGlobalConfig().enabled && dto.processor === 'AIRTEL') {
-        await this.airtel.dispatchCollection({
-          id: record.id,
-          msisdn: dto.msisdn,
-          amountNgwee: record.amount,
-          reference: dto.collectionReference ?? record.id,
-        });
-        return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
+    // SANDBOX simulates and settles, so integrators can exercise the full
+    // lifecycle (PROCESSING -> SUCCESS) without a live rail or any float.
+    if (environment === 'SANDBOX') {
+      return serializeTransaction(await this.txns.processAndSettle(input));
+    }
+
+    // PRODUCTION: refuse before any float is debited if the rail can't dispatch.
+    assertRailReady(dto.processor);
+    if (!dto.msisdn) throw new ValidationError('msisdn is required for a production collection');
+
+    const record = await this.txns.processTransaction(input);
+    if (record.status === 'PROCESSING') {
+      const reference = dto.collectionReference ?? record.id;
+      if (dto.processor === 'AIRTEL') {
+        await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, reference });
+      } else {
+        await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, externalId: reference });
       }
-      if (mtnGlobalConfig().enabled && dto.processor === 'MTN') {
-        await this.mtn.dispatchCollection({
-          id: record.id,
-          msisdn: dto.msisdn,
-          amountNgwee: record.amount,
-          externalId: dto.collectionReference ?? record.id,
-        });
-        return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
-      }
+      return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
     }
     return serializeTransaction(record);
   }
@@ -101,7 +98,11 @@ export class CollectionsController {
 @Controller('disbursements')
 @UseGuards(RateLimitGuard, ApiAuthGuard)
 export class DisbursementsController {
-  constructor(private readonly txns: TransactionService) {}
+  constructor(
+    private readonly txns: TransactionService,
+    private readonly airtel: AirtelDispatchService,
+    private readonly mtn: MtnDispatchService,
+  ) {}
 
   @Post()
   @HttpCode(200)
@@ -113,17 +114,39 @@ export class DisbursementsController {
     @Req() req: AuthedRequest,
   ): Promise<TransactionResponse> {
     const idempotencyKey = requireIdempotencyKey(req);
-    const record = await this.txns.processTransaction({
+    const environment = environmentToMode(cred.environment);
+    const input = {
       accountId: cred.accountId,
-      type: 'DISBURSEMENT',
+      type: 'DISBURSEMENT' as const,
       processor: dto.processor,
       amount: toNgwee(dto.amount),
       msisdn: dto.msisdn,
       idempotencyKey,
       collectionReference: dto.collectionReference ?? null,
-      environment: environmentToMode(cred.environment),
+      environment,
       actorId: cred.credentialId,
-    });
+    };
+
+    if (environment === 'SANDBOX') {
+      return serializeTransaction(await this.txns.processAndSettle(input));
+    }
+
+    // PRODUCTION: refuse before any float is debited if the rail can't dispatch.
+    assertRailReady(dto.processor);
+
+    const record = await this.txns.processTransaction(input);
+    // Actually push the money out. Without this the transaction sat PROCESSING
+    // forever with float debited and nothing ever sent to the customer.
+    if (record.status === 'PROCESSING') {
+      const reference = dto.collectionReference ?? record.id;
+      const actor = `api:${cred.credentialId}`;
+      if (dto.processor === 'AIRTEL') {
+        await this.airtel.dispatchDisbursement({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, reference }, actor);
+      } else {
+        await this.mtn.dispatchDisbursement({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, externalId: reference }, actor);
+      }
+      return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
+    }
     return serializeTransaction(record);
   }
 }

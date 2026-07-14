@@ -12,6 +12,7 @@ import {
   hashSecret,
   signRequest,
   signaturesMatch,
+  verifySecret,
 } from './crypto';
 
 const REPLAY_WINDOW_SECONDS = Number(process.env.API_REPLAY_WINDOW_SECONDS ?? 300); // SEC-API3
@@ -39,12 +40,27 @@ export interface SignedRequest {
   clientIp: string | null;
 }
 
+/** Simple auth (SEC-API2b): api_key + secret over TLS, no request signing. */
+export interface SecretRequest {
+  apiKey: string | undefined;
+  secret: string | undefined;
+  clientIp: string | null;
+}
+
 interface CredentialRow {
   id: string;
   account_id: string;
   environment: 'SANDBOX' | 'LIVE';
   status: string;
   signing_key_ciphertext: string | null;
+}
+
+interface SecretCredentialRow {
+  id: string;
+  account_id: string;
+  environment: 'SANDBOX' | 'LIVE';
+  status: string;
+  secret_hash: string;
 }
 interface WhitelistRow {
   ip_whitelist: string[];
@@ -126,22 +142,62 @@ export class CredentialService {
       throw new InvalidSignatureError();
     }
 
-    // Live keys honour the per-account IP whitelist (SEC-API4).
-    if (credential.environment === 'LIVE') {
-      const settings = await this.pool.query<WhitelistRow>(
-        'SELECT ip_whitelist FROM account_settings WHERE account_id = $1',
-        [credential.account_id],
-      );
-      const whitelist = settings.rowCount === 0 ? [] : settings.rows[0].ip_whitelist;
-      if (whitelist.length > 0 && (req.clientIp === null || !whitelist.includes(req.clientIp))) {
-        throw new IpNotWhitelistedError();
-      }
-    }
+    await this.assertIpAllowed(credential.environment, credential.account_id, req.clientIp);
 
     return {
       credentialId: credential.id,
       accountId: credential.account_id,
       environment: credential.environment,
     };
+  }
+
+  /**
+   * Simple auth (SEC-API2b): api_key + secret over TLS, no request signing.
+   * The secret is compared against the stored argon2 hash (plaintext is never
+   * stored, NN-7). Easier to integrate than HMAC; the signed flow above stays
+   * available and remains the stronger option (it adds replay protection and
+   * body integrity). Live keys still honour the IP allowlist.
+   */
+  async authenticateWithSecret(req: SecretRequest): Promise<CredentialContext> {
+    if (!req.apiKey || !req.secret) {
+      throw new InvalidSignatureError();
+    }
+    const found = await this.pool.query<SecretCredentialRow>(
+      `SELECT id, account_id, environment, status, secret_hash
+         FROM api_credentials WHERE api_key = $1`,
+      [req.apiKey],
+    );
+    if (found.rowCount === 0) throw new InvalidSignatureError();
+    const credential = found.rows[0];
+    if (credential.status !== 'ACTIVE') throw new InvalidSignatureError(); // revoked (SEC-API7)
+
+    if (!(await verifySecret(req.secret, credential.secret_hash))) {
+      throw new InvalidSignatureError();
+    }
+
+    await this.assertIpAllowed(credential.environment, credential.account_id, req.clientIp);
+
+    return {
+      credentialId: credential.id,
+      accountId: credential.account_id,
+      environment: credential.environment,
+    };
+  }
+
+  /** Live keys honour the per-account IP whitelist (SEC-API4). */
+  private async assertIpAllowed(
+    environment: 'SANDBOX' | 'LIVE',
+    accountId: string,
+    clientIp: string | null,
+  ): Promise<void> {
+    if (environment !== 'LIVE') return;
+    const settings = await this.pool.query<WhitelistRow>(
+      'SELECT ip_whitelist FROM account_settings WHERE account_id = $1',
+      [accountId],
+    );
+    const whitelist = settings.rowCount === 0 ? [] : settings.rows[0].ip_whitelist;
+    if (whitelist.length > 0 && (clientIp === null || !whitelist.includes(clientIp))) {
+      throw new IpNotWhitelistedError();
+    }
   }
 }

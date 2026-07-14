@@ -1,15 +1,29 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiHeader } from '@nestjs/swagger';
 
-/** Signed-request headers required on every /v1 call (SEC-API2/3). */
+/**
+ * Auth headers for every /v1 call. Two modes:
+ *   SIMPLE — X-Api-Key + X-Api-Secret (SEC-API2b)
+ *   SIGNED — X-Api-Key + X-Timestamp + X-Signature (SEC-API2/3)
+ */
 export function ApiAuthHeaders(): ReturnType<typeof applyDecorators> {
   return applyDecorators(
     ApiHeader({ name: 'X-Api-Key', required: true, description: 'Public api_key, e.g. ic_live_…' }),
-    ApiHeader({ name: 'X-Timestamp', required: true, description: 'Unix epoch seconds (±5m window)' }),
+    ApiHeader({
+      name: 'X-Api-Secret',
+      required: false,
+      description: 'SIMPLE auth: your api secret (or send `Authorization: Bearer <secret>`).',
+    }),
+    ApiHeader({
+      name: 'X-Timestamp',
+      required: false,
+      description: 'SIGNED auth only: Unix epoch seconds (±5m window)',
+    }),
     ApiHeader({
       name: 'X-Signature',
-      required: true,
-      description: 'HMAC-SHA256(signingKey, `${ts}.${METHOD}.${path}.${rawBody}`) as hex',
+      required: false,
+      description:
+        'SIGNED auth only: HMAC-SHA256(signingKey, `${ts}.${METHOD}.${path}.${rawBody}`) as hex. Sending this selects signed mode.',
     }),
   );
 }

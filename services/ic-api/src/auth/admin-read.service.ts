@@ -150,11 +150,16 @@ export class AdminReadService {
   }
 
   async listSettlements(): Promise<unknown[]> {
+    // Joined so an operator can see WHO they're paying without cross-referencing ids.
     const res = await this.pool.query(
-      `SELECT id, account_id, amount::text AS amount, status,
-              to_char(settled_at, 'YYYY-MM-DD HH24:MI') AS settled_at,
-              to_char(created_at, 'YYYY-MM-DD HH24:MI') AS created_at
-         FROM settlements ORDER BY created_at DESC LIMIT 100`,
+      `SELECT s.id, s.account_id, s.amount::text AS amount, s.status,
+              to_char(s.settled_at, 'YYYY-MM-DD HH24:MI') AS settled_at,
+              to_char(s.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
+              a.account_number, a.operating_mode, m.name AS merchant_name
+         FROM settlements s
+         JOIN accounts a ON a.id = s.account_id
+         JOIN merchants m ON m.id = a.merchant_id
+        ORDER BY s.created_at DESC LIMIT 100`,
     );
     return res.rows;
   }

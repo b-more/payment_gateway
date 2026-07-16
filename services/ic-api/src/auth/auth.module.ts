@@ -6,6 +6,7 @@ import { EmailModule } from '../email/email.module';
 import { ReportModule } from '../reports/report.module';
 import { AirtelModule } from '../airtel/airtel.module';
 import { MtnModule } from '../mtn/mtn.module';
+import { SettlementModule } from '../settlements/settlement.module';
 import { AuditService } from '../audit/audit.service';
 import { RateLimitGuard } from '../api/rate-limit.guard';
 import { AuthService } from './auth.service';
@@ -22,7 +23,7 @@ import { AdminController } from './admin.controller';
 // Portal authentication (§7.1) + RBAC (§7.2). MoneyModule provides Float/Transaction
 // services and OnboardingModule the merchant/account services for AdminController.
 @Module({
-  imports: [DatabaseModule, MoneyModule, OnboardingModule, EmailModule, ReportModule, AirtelModule, MtnModule],
+  imports: [DatabaseModule, MoneyModule, OnboardingModule, EmailModule, ReportModule, AirtelModule, MtnModule, SettlementModule],
   controllers: [AuthController, AdminController],
   providers: [
     AuthService,

@@ -22,7 +22,16 @@ import { toNgwee } from '../money/money';
 import { getClientIp } from '../api/request-context';
 import type { AuthedPortalRequest } from './principal';
 import { Req } from '@nestjs/common';
-import { AirtelDisburseDto, FloatCreditDto, FloatRejectDto, ProvisionDto, ReviewDto } from './dto/auth.dto';
+import {
+  AirtelDisburseDto,
+  FloatCreditDto,
+  FloatRejectDto,
+  ProvisionDto,
+  ReviewDto,
+  SettlementConfirmDto,
+  SettlementFailDto,
+} from './dto/auth.dto';
+import { SettlementService } from '../settlements/settlement.service';
 import { ApplicationDto } from '../onboarding/dto/application.dto';
 import { AirtelKycService } from '../airtel/airtel-kyc.service';
 import { AirtelBalanceService, type BalanceType } from '../airtel/airtel-balance.service';
@@ -41,6 +50,7 @@ export class AdminController {
     private readonly onboarding: OnboardingService,
     private readonly provisioning: AccountProvisioningService,
     private readonly floats: FloatService,
+    private readonly settlements: SettlementService,
     private readonly transactions: TransactionService,
     private readonly read: AdminReadService,
     private readonly config: AccountConfigService,
@@ -314,6 +324,46 @@ export class AdminController {
   @ApiOperation({ summary: 'List settlements' })
   listSettlements(): Promise<unknown[]> {
     return this.read.listSettlements();
+  }
+
+  // ── Settlement lifecycle (§5.8). The scheduled job (ic-settlement-run) also
+  // calls runAll; these let an operator drive it from the admin portal. FINANCE
+  // is the role defined for "float credit/debit and settlements". ──
+
+  @Post('settlements/run')
+  @HttpCode(200)
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Run settlement now — creates a PENDING settlement per account (SET-1)' })
+  runSettlements(@CurrentPrincipal() p: Principal): Promise<{ created: number }> {
+    return this.settlements.runAll(p.userId);
+  }
+
+  @Post('settlements/:id/confirm')
+  @HttpCode(200)
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Confirm a settlement was paid to the bank — PENDING → SETTLED (SET-2/3)' })
+  confirmSettlement(
+    @Param('id') id: string,
+    @Body() dto: SettlementConfirmDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<{ settlementId: string; status: 'SETTLED' }> {
+    return this.settlements.confirmSettlement({
+      settlementId: id,
+      actorId: p.userId,
+      bankReference: dto.bankReference ?? null,
+    });
+  }
+
+  @Post('settlements/:id/fail')
+  @HttpCode(200)
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Mark a settlement failed — funds return to settleable on the next run (SET-2)' })
+  failSettlement(
+    @Param('id') id: string,
+    @Body() dto: SettlementFailDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<{ settlementId: string; status: 'FAILED' }> {
+    return this.settlements.failSettlement({ settlementId: id, actorId: p.userId, reason: dto.reason });
   }
 
   @Get('float-requests')

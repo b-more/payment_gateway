@@ -105,3 +105,25 @@ export class AirtelDisburseDto {
   @MaxLength(120)
   reference?: string;
 }
+
+// ── Settlements (§5.8, SET-2) ──
+
+export class SettlementConfirmDto {
+  @ApiProperty({
+    required: false,
+    example: 'FNB-TRF-20260713-0042',
+    description: 'Bank transfer reference, recorded in the audit trail.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  bankReference?: string;
+}
+
+export class SettlementFailDto {
+  @ApiProperty({ example: 'Bank rejected the transfer — account details invalid.' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(300)
+  reason!: string;
+}

@@ -32,19 +32,19 @@ interface Endpoint {
   body?: string;
 }
 const ENDPOINTS: Endpoint[] = [
-  { method: 'POST', path: '/v1/collections', summary: 'Charge a customer (customer → you)', body: '{ "processor": "MTN", "amount": "5000", "msisdn": "260970000001", "collectionReference": "order-1001" }' },
-  { method: 'POST', path: '/v1/disbursements', summary: 'Pay a customer (you → customer)', body: '{ "processor": "AIRTEL", "amount": "5000", "msisdn": "260970000001", "collectionReference": "payout-2001" }' },
+  { method: 'POST', path: '/v1/collections', summary: 'Charge a customer', body: '{ "processor": "MTN", "amount": "5000", "msisdn": "260970000001", "collectionReference": "order-1001" }' },
+  { method: 'POST', path: '/v1/disbursements', summary: 'Pay out to a customer', body: '{ "processor": "AIRTEL", "amount": "5000", "msisdn": "260970000001", "collectionReference": "payout-2001" }' },
   { method: 'GET', path: '/v1/transactions/{id}', summary: 'Check a transaction status' },
-  { method: 'POST', path: '/v1/disbursements', summary: 'Refund a customer — send back what they paid', body: '{ "processor": "AIRTEL", "amount": "103", "msisdn": "260970000001", "collectionReference": "refund-of-order-1001" }' },
-  { method: 'GET', path: '/v1/accounts/{accountId}/balance', summary: 'Float / balance enquiry' },
+  { method: 'POST', path: '/v1/disbursements', summary: 'Refund a customer by sending back what they paid', body: '{ "processor": "AIRTEL", "amount": "103", "msisdn": "260970000001", "collectionReference": "refund-of-order-1001" }' },
+  { method: 'GET', path: '/v1/accounts/{accountId}/balance', summary: 'Account balance enquiry' },
   { method: 'GET', path: '/v1/settlements', summary: 'List settlements' },
 ];
 
 const SIMPLE_SNIPPET = `import crypto from 'node:crypto';
 
 const API_BASE = '${API_BASE}';
-const API_KEY = 'ic_live_...';     // from this page
-const API_SECRET = 'sk_...';       // shown once when you (re)generate a key
+const API_KEY = 'ic_live_...';     // from the Keys section on this page
+const API_SECRET = 'sk_...';       // shown once when you regenerate a key
 
 async function call(method, path, body) {
   const headers = {
@@ -52,7 +52,7 @@ async function call(method, path, body) {
     'X-Api-Key': API_KEY,
     'X-Api-Secret': API_SECRET,
   };
-  // Any unique string. Re-send the same one to safely retry.
+  // Any unique string. Send the same value again to safely retry.
   if (method !== 'GET') headers['Idempotency-Key'] = crypto.randomUUID();
 
   const res = await fetch(API_BASE + path, {
@@ -69,7 +69,7 @@ await call('POST', '/v1/collections', {
 
 const WEBHOOK_PAYLOAD = `POST <your callback url>
 X-Instacompay-Event:     transaction.success
-X-Instacompay-Signature: t=1752380000,v1=9f2c…
+X-Instacompay-Signature: t=1752380000,v1=9f2c1b7a
 
 {
   "id": "<event id>",
@@ -87,7 +87,7 @@ X-Instacompay-Signature: t=1752380000,v1=9f2c…
 
 const VERIFY_SNIPPET = `import crypto from 'node:crypto';
 
-const WEBHOOK_SECRET = 'whsec_...';   // reveal it per account below
+const WEBHOOK_SECRET = 'whsec_...';   // reveal it for your account below
 
 // IMPORTANT: verify against the RAW body bytes, before any JSON parsing.
 function verify(rawBody, signatureHeader) {
@@ -105,16 +105,16 @@ function verify(rawBody, signatureHeader) {
 
 app.post('/webhooks/instacompay', (req, res) => {
   if (!verify(req.rawBody, req.get('X-Instacompay-Signature'))) {
-    return res.sendStatus(400);           // forged or tampered — reject
+    return res.sendStatus(400);           // signature invalid, reject
   }
   const event = JSON.parse(req.rawBody);
-  // ... mark the order paid (idempotently — we may retry)
+  // Mark the order paid. Do this idempotently, because we may retry.
   res.sendStatus(200);                    // acknowledge
 });`;
 
-const SIGNED_SNIPPET = `// Optional hardened mode: sign each request instead of sending the secret.
-// Adds replay protection + body integrity. Send X-Signature and the API
-// switches to signed mode automatically.
+const SIGNED_SNIPPET = `// Optional: sign each request instead of sending the secret.
+// Adds replay protection and body integrity. Send X-Signature and the
+// API switches to signed mode automatically.
 const SIGNING_KEY = '...';   // shown once alongside the secret
 
 const body = JSON.stringify({ processor: 'AIRTEL', amount: '5000', msisdn: '260970000001' });
@@ -129,24 +129,65 @@ await fetch(API_BASE + '/v1/collections', {
   headers: {
     'Content-Type': 'application/json',
     'X-Api-Key': API_KEY,
-    'X-Timestamp': ts,          // must be within ±5 minutes
+    'X-Timestamp': ts,          // must be within 5 minutes of server time
     'X-Signature': signature,
     'Idempotency-Key': crypto.randomUUID(),
   },
   body,
 });`;
 
+/**
+ * Copy to clipboard. Only reports success once the write actually resolves.
+ * navigator.clipboard needs a secure context and can be refused (denied
+ * permission, document not focused, older browser), so there is a textarea
+ * fallback and a visible failure state rather than a false "Copied".
+ */
 function Copy({ text, label }: { text: string; label?: string }): ReactNode {
-  const [done, setDone] = useState(false);
+  const [state, setState] = useState<'idle' | 'done' | 'failed'>('idle');
+
+  async function copy(): Promise<void> {
+    let ok = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch {
+      ok = false;
+    }
+    if (!ok) ok = copyViaTextarea(text);
+    setState(ok ? 'done' : 'failed');
+    window.setTimeout(() => setState('idle'), 2000);
+  }
+
   return (
     <button
       type="button"
       className="btn sm"
-      onClick={() => { void navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1200); }}
+      onClick={() => void copy()}
+      title={state === 'failed' ? 'Copy failed. Select the text and copy manually.' : 'Copy to clipboard'}
     >
-      {done ? 'Copied' : (label ?? 'Copy')}
+      {state === 'done' ? 'Copied' : state === 'failed' ? 'Copy failed' : (label ?? 'Copy')}
     </button>
   );
+}
+
+/** Fallback for browsers without the async clipboard API. */
+function copyViaTextarea(text: string): boolean {
+  try {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.position = 'fixed';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(el);
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 export default function ApiDocsPage(): ReactNode {
@@ -157,10 +198,10 @@ export default function ApiDocsPage(): ReactNode {
     <>
       <PageHead
         title="API Documentation"
-        subtitle="Everything you need to integrate collections & disbursements."
+        subtitle="Keys, authentication, webhooks and endpoints for integrating collections and disbursements."
         actions={
           <a className="btn primary" href={POSTMAN_HREF} download>
-            ↓ Download Postman collection
+            Download Postman collection
           </a>
         }
       />
@@ -169,9 +210,9 @@ export default function ApiDocsPage(): ReactNode {
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>Quickstart</div>
         <ol style={{ margin: '0 0 4px 18px', padding: 0, fontSize: 14, lineHeight: 1.7 }}>
-          <li>Grab an <b>API key</b> + <b>secret</b> below (regenerate to reveal them — they’re shown once).</li>
+          <li>Get an <b>API key</b> and <b>secret</b> from the Keys section below. Regenerating reveals them once.</li>
           <li><a href={POSTMAN_HREF} download style={{ color: 'var(--sky-deep)' }}>Download the Postman collection</a>, open it, and paste your <span className="mono">apiKey</span> and <span className="mono">apiSecret</span> into the collection <b>Variables</b> tab.</li>
-          <li>Press <b>Send</b>. Start in <b>sandbox</b> (<span className="mono">ic_sand_…</span>) — it simulates and settles instantly, so you can test the full <span className="mono">PROCESSING → SUCCESS</span> lifecycle with no real money. Then switch to your live key.</li>
+          <li>Press <b>Send</b>. Start with a sandbox key (<span className="mono">ic_sand_</span>). Sandbox simulates and settles immediately, so you can test the full <span className="mono">PROCESSING</span> to <span className="mono">SUCCESS</span> lifecycle without moving real money. Switch to your live key when you are ready.</li>
         </ol>
         <div className="row" style={{ marginTop: 12, gap: 18, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13 }}><span className="muted">Base URL</span>&nbsp; <span className="mono">{API_BASE}</span></span>
@@ -183,54 +224,56 @@ export default function ApiDocsPage(): ReactNode {
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>Developer guides</div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Full walkthroughs you can share with your team or integration partners.
+          Detailed guides you can share with your team or an integration partner.
         </p>
         <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <a className="btn primary" href="/developers" target="_blank" rel="noreferrer">Merchant Portal API guide</a>
           <a className="btn" href="/partners" target="_blank" rel="noreferrer">Public API guide (server-to-server)</a>
-          <a className="btn" href={`${API_BASE}/docs`} target="_blank" rel="noreferrer">Interactive reference · /docs</a>
+          <a className="btn" href={`${API_BASE}/docs`} target="_blank" rel="noreferrer">Interactive reference (/docs)</a>
         </div>
       </div>
 
-      {/* Authentication — simple (recommended) */}
+      {/* Authentication: key and secret */}
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Authentication — key + secret <span style={{ color: 'var(--success-deep)' }}>(recommended)</span></div>
+          <div className="eyebrow" style={{ margin: 0 }}>Authentication: key and secret <span style={{ color: 'var(--success-deep)' }}>(recommended)</span></div>
           <Copy text={SIMPLE_SNIPPET} label="Copy example" />
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Send your key and secret on every <span className="mono">/v1</span> call — that&apos;s it. No signing,
-          no timestamps. Writes also take an <span className="mono">Idempotency-Key</span> (any unique string;
-          re-send the same one to safely retry).
+          Send your key and secret on every <span className="mono">/v1</span> call. There is no signing and no
+          timestamp to manage. Write requests also take an <span className="mono">Idempotency-Key</span>, which can
+          be any unique string. Sending the same value again safely returns the original result instead of
+          creating a second transaction.
         </p>
         <table className="table" style={{ marginBottom: 14 }}>
           <tbody>
-            <tr><td className="mono" style={{ width: 160 }}>X-Api-Key</td><td className="muted">Your key, e.g. <span className="mono">ic_live_…</span></td></tr>
-            <tr><td className="mono">X-Api-Secret</td><td className="muted">Your secret (<span className="mono">sk_…</span>). Or send <span className="mono">Authorization: Bearer &lt;secret&gt;</span>.</td></tr>
+            <tr><td className="mono" style={{ width: 160 }}>X-Api-Key</td><td className="muted">Your key, for example <span className="mono">ic_live_...</span></td></tr>
+            <tr><td className="mono">X-Api-Secret</td><td className="muted">Your secret, for example <span className="mono">sk_...</span>. You can send <span className="mono">Authorization: Bearer &lt;secret&gt;</span> instead.</td></tr>
             <tr><td className="mono">Idempotency-Key</td><td className="muted">Unique per write (POST). Safe to retry.</td></tr>
           </tbody>
         </table>
         <pre className="code-block" style={{ margin: 0, maxHeight: 320 }}><code>{SIMPLE_SNIPPET}</code></pre>
         <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 12 }}>
-          <b>Money is integer ngwee, as strings</b> — K1.50 = <span className="mono">&quot;150&quot;</span>, K50.00 = <span className="mono">&quot;5000&quot;</span>. Never send decimals or JSON numbers.
+          <b>All amounts are integer ngwee, sent as strings.</b> K1.50 is <span className="mono">&quot;150&quot;</span> and
+          K50.00 is <span className="mono">&quot;5000&quot;</span>. Do not send decimals or JSON numbers.
         </p>
       </div>
 
-      {/* Authentication — signed (hardened) */}
+      {/* Authentication: signed requests */}
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Authentication — signed requests (hardened, optional)</div>
+          <div className="eyebrow" style={{ margin: 0 }}>Authentication: signed requests (optional)</div>
           <Copy text={SIGNED_SNIPPET} label="Copy example" />
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Prefer not to send your secret on every call? Sign the request instead: an HMAC-SHA256 over{' '}
-          <span className="mono">{'`${timestamp}.${METHOD}.${path}.${rawBody}`'}</span> keyed by your{' '}
-          <b>signing key</b>. This adds <b>replay protection</b> and <b>body integrity</b>. Just send{' '}
-          <span className="mono">X-Signature</span> and the API uses signed mode automatically.
+          If you would rather not send your secret on every call, sign the request instead. The signature is an
+          HMAC-SHA256 of <span className="mono">{'`${timestamp}.${METHOD}.${path}.${rawBody}`'}</span> using your{' '}
+          <b>signing key</b>. This adds replay protection and body integrity. Send an{' '}
+          <span className="mono">X-Signature</span> header and the API uses signed mode automatically.
         </p>
         <table className="table" style={{ marginBottom: 14 }}>
           <tbody>
-            <tr><td className="mono" style={{ width: 160 }}>X-Timestamp</td><td className="muted">Unix epoch seconds — must be within ±5 minutes of server time.</td></tr>
+            <tr><td className="mono" style={{ width: 160 }}>X-Timestamp</td><td className="muted">Unix epoch seconds. Must be within 5 minutes of server time.</td></tr>
             <tr><td className="mono">X-Signature</td><td className="muted">HMAC-SHA256(signingKey, <span className="mono">ts.METHOD.path.body</span>), hex.</td></tr>
           </tbody>
         </table>
@@ -240,18 +283,20 @@ export default function ApiDocsPage(): ReactNode {
       {/* Webhooks */}
       <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Webhooks — how you learn a payment succeeded</div>
+          <div className="eyebrow" style={{ margin: 0 }}>Webhooks</div>
           <Copy text={VERIFY_SNIPPET} label="Copy verifier" />
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          In production a collection returns <span className="mono">PROCESSING</span> and resolves once the
-          customer approves on their phone — so we <b>POST the outcome</b> to your callback URL (set it per
-          account below). We retry with backoff until you answer <span className="mono">2xx</span>.
+          In production a collection returns <span className="mono">PROCESSING</span> and completes only after the
+          customer approves it on their phone. We then POST the result to your callback URL, which you set per
+          account below. We retry with backoff until your endpoint returns a <span className="mono">2xx</span>
+          response.
         </p>
         <pre className="code-block" style={{ margin: '0 0 14px' }}><code>{WEBHOOK_PAYLOAD}</code></pre>
         <p className="muted" style={{ marginTop: 0 }}>
-          <b>Always verify the signature</b> — otherwise anyone who learns your URL could post a fake
-          &ldquo;payment received&rdquo;. Reveal your secret (<span className="mono">whsec_…</span>) per account below.
+          <b>Always verify the signature.</b> Without it, anyone who discovers your callback URL could post a
+          fake payment confirmation. Reveal your signing secret (<span className="mono">whsec_...</span>) for each
+          account below.
         </p>
         <pre className="code-block" style={{ margin: 0, maxHeight: 300 }}><code>{VERIFY_SNIPPET}</code></pre>
       </div>
@@ -299,7 +344,7 @@ export default function ApiDocsPage(): ReactNode {
                 <tr key={c.id}>
                   <td>{c.environment}</td>
                   <td className="mono" style={{ fontSize: 12 }}>{c.api_key}</td>
-                  <td className="mono" style={{ fontSize: 12 }}>{c.last_rotated_at ?? '—'}</td>
+                  <td className="mono" style={{ fontSize: 12 }}>{c.last_rotated_at ?? 'Never'}</td>
                   <td><Badge value={c.status} /></td>
                 </tr>
               ))}
@@ -344,7 +389,7 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
         ? await apiPost<{ webhookSecret: string }>(`/v1/merchant/accounts/${account.id}/webhook-secret/rotate`)
         : await apiGet<{ webhookSecret: string }>(`/v1/merchant/accounts/${account.id}/webhook-secret`);
       setWebhookSecret(r.webhookSecret);
-      if (rotate) setMsg('Webhook secret rotated — update your receiver now; old signatures no longer verify.');
+      if (rotate) setMsg('Webhook secret rotated. Update your receiver now, because older signatures will no longer verify.');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load the webhook secret.');
     } finally {
@@ -373,10 +418,10 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
 
   async function regenerate(env: 'SANDBOX' | 'LIVE'): Promise<void> {
     // Regenerating REVOKES the current key immediately, and the new secret is
-    // shown exactly once — so make the consequence explicit before doing it.
+    // shown exactly once, so make the consequence explicit before doing it.
     const warning =
       env === 'LIVE'
-        ? 'This immediately REVOKES your current live key — any running integration using it will stop working.\n\nThe new secret is shown only once. Have somewhere ready to paste it.\n\nContinue?'
+        ? 'This immediately revokes your current live key. Any integration using it will stop working.\n\nThe new secret is shown only once, so have somewhere ready to paste it.\n\nContinue?'
         : 'This revokes your current sandbox key. The new secret is shown only once.\n\nContinue?';
     if (!window.confirm(warning)) return;
 
@@ -387,7 +432,7 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
         `/v1/merchant/accounts/${account.id}/credentials/${env}/regenerate`,
       );
       setSecret({ env, ...r });
-      // NOTE: deliberately NOT reloading the account list here — a reload used to
+      // NOTE: deliberately not reloading the account list here. A reload used to
       // unmount this panel and destroy the credentials above before they could be
       // copied. Only the key table needs refreshing.
       onChange();
@@ -401,7 +446,7 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
   return (
     <div className="card card-pad" style={{ marginBottom: 16 }}>
       <div className="eyebrow" style={{ marginBottom: 12 }}>
-        Webhooks & keys · {account.account_type} · {shortId(account.id)}
+        Webhooks and keys for {account.account_type} account {shortId(account.id)}
       </div>
       {error ? <div className="err">{error}</div> : null}
       {msg ? <div className="devhint" style={{ color: 'var(--success)', background: '#e6f4ee', borderColor: '#cce8dc' }}>{msg}</div> : null}
@@ -409,14 +454,14 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
       <form onSubmit={(e) => void saveSettings(e)}>
         <div className="field">
           <label>Callback / webhook URL</label>
-          <input value={callbackUrl} onChange={(e) => setCallbackUrl(e.target.value)} placeholder="https://…" />
+          <input value={callbackUrl} onChange={(e) => setCallbackUrl(e.target.value)} placeholder="https://your-server.example/webhooks" />
         </div>
         <div className="field">
-          <label>IP whitelist (comma-separated, live keys)</label>
+          <label>Allowed IP addresses for live keys (comma separated)</label>
           <input className="mono" value={ipList} onChange={(e) => setIpList(e.target.value)} placeholder="41.x.x.x, 102.x.x.x" />
         </div>
         <div className="row">
-          <button className="btn primary" disabled={busy === 'save'}>{busy === 'save' ? 'Saving…' : 'Save settings'}</button>
+          <button className="btn primary" disabled={busy === 'save'}>{busy === 'save' ? 'Saving' : 'Save settings'}</button>
           <button type="button" className="btn" disabled={busy === 'SANDBOX'} onClick={() => void regenerate('SANDBOX')}>
             Regenerate sandbox key
           </button>
@@ -429,14 +474,14 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
         <div className="eyebrow" style={{ marginBottom: 8 }}>Webhook signing secret</div>
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
-          Use this to verify the <span className="mono">X-Instacompay-Signature</span> on webhooks we send you.
+          Use this to verify the <span className="mono">X-Instacompay-Signature</span> header on webhooks we send you.
         </p>
         <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <button type="button" className="btn" disabled={busy === 'reveal'} onClick={() => void revealWebhookSecret(false)}>
-            {busy === 'reveal' ? 'Loading…' : 'Reveal secret'}
+            {busy === 'reveal' ? 'Loading' : 'Reveal secret'}
           </button>
           <button type="button" className="btn" disabled={busy === 'rotate'} onClick={() => void revealWebhookSecret(true)}>
-            {busy === 'rotate' ? 'Rotating…' : 'Rotate'}
+            {busy === 'rotate' ? 'Rotating' : 'Rotate'}
           </button>
         </div>
         {webhookSecret ? (
@@ -450,10 +495,10 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
         <div className="cred-reveal">
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
             <div>
-              <b>⚠️ Your new {secret.env} credentials — shown once</b>
+              <b>Your new {secret.env} credentials. Shown once.</b>
               <div style={{ fontSize: 13, marginTop: 2 }}>
-                Copy them now. We store only a hash, so they can <b>never</b> be shown again.
-                Previous {secret.env} keys are revoked.
+                Copy them now. We store only a hash, so they cannot be shown again.
+                Any previous {secret.env} key is now revoked.
               </div>
             </div>
             <Copy
@@ -465,7 +510,7 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
           <div className="cred-row"><span>apiSecret</span><code>{secret.secret}</code><Copy text={secret.secret} label="Copy" /></div>
           <div className="cred-row"><span>signingKey</span><code>{secret.signingKey}</code><Copy text={secret.signingKey} label="Copy" /></div>
           <button className="btn sm" style={{ marginTop: 10 }} onClick={() => setSecret(null)}>
-            I&apos;ve saved them — hide
+            I have saved them, hide
           </button>
         </div>
       ) : null}

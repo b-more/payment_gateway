@@ -5,7 +5,7 @@ import '@fontsource-variable/inter';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Instacompay — Merchant Portal',
+  title: 'Instacompay Merchant Portal',
   description: 'Collections and payouts over MTN, Airtel, Zamtel, Zed Mobile and Visa, in ZMW.',
 };
 

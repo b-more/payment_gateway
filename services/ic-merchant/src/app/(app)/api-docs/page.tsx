@@ -35,7 +35,7 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'POST', path: '/v1/collections', summary: 'Charge a customer (customer → you)', body: '{ "processor": "MTN", "amount": "5000", "msisdn": "260970000001", "collectionReference": "order-1001" }' },
   { method: 'POST', path: '/v1/disbursements', summary: 'Pay a customer (you → customer)', body: '{ "processor": "AIRTEL", "amount": "5000", "msisdn": "260970000001", "collectionReference": "payout-2001" }' },
   { method: 'GET', path: '/v1/transactions/{id}', summary: 'Check a transaction status' },
-  { method: 'POST', path: '/v1/transactions/{id}/reverse', summary: 'Reverse a successful transaction', body: '{ "reason": "customer refund" }' },
+  { method: 'POST', path: '/v1/disbursements', summary: 'Refund a customer — send back what they paid', body: '{ "processor": "AIRTEL", "amount": "103", "msisdn": "260970000001", "collectionReference": "refund-of-order-1001" }' },
   { method: 'GET', path: '/v1/accounts/{accountId}/balance', summary: 'Float / balance enquiry' },
   { method: 'GET', path: '/v1/settlements', summary: 'List settlements' },
 ];

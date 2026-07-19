@@ -478,7 +478,13 @@ export class AdminController {
   @Post('transactions/:id/reverse')
   @HttpCode(200)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Reverse a transaction (authorized reversal)' })
+  @ApiOperation({
+    summary: 'Reverse a transaction — LEDGER CORRECTION ONLY, does not refund the customer',
+    description:
+      'Adjusts float and marks the transaction REVERSED. It does NOT send money back to the ' +
+      'customer’s wallet. To actually refund someone, create a disbursement to their number for ' +
+      'the amount they paid. Admin-only: the merchant API deliberately does not expose this.',
+  })
   async reverse(
     @Param('id') id: string,
     @CurrentPrincipal() principal: Principal,

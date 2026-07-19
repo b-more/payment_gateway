@@ -304,6 +304,7 @@
     <a href="#journey">Request flow</a>
     <a href="#auth">Signing</a>
     <a href="#engine">Engine</a>
+    <a href="#refunds">Refunds</a>
     <a href="#webhooks">Webhooks</a>
     <a href="#endpoints">Endpoints</a>
     <a href="#environments">Sandbox</a>
@@ -541,6 +542,39 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
     </div>
   </section>
 
+  <!-- REFUNDS -->
+  <section id="refunds">
+    <div class="sec-head"><span class="tag">Refunds</span><h2>How to refund a customer</h2></div>
+    <p class="sec-sub">There is no reverse or void call — and that is deliberate. Marking a payment "reversed" would only move numbers in our ledger; the customer's wallet would never actually receive anything. A refund has to be a <b>real transfer back</b>, so you send a disbursement.</p>
+
+    <div class="codeblock">
+      <div class="cap">refunding a K1.03 payment</div>
+      <pre><code><span class="c-key">POST</span> /v1/disbursements
+
+{
+  <span class="c-str">"processor"</span>: <span class="c-str">"AIRTEL"</span>,
+  <span class="c-str">"amount"</span>: <span class="c-str">"103"</span>,                        <span class="c-dim">// what the customer PAID</span>
+  <span class="c-str">"msisdn"</span>: <span class="c-str">"260970000001"</span>,              <span class="c-dim">// the original payer</span>
+  <span class="c-str">"collectionReference"</span>: <span class="c-str">"refund-of-order-1001"</span>
+}</code></pre>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:22px">
+      <div class="card">
+        <h4>Refund the amount they paid</h4>
+        <p>If the customer covered the fee, they paid <span class="mono">amount + charge</span> — K1.00 + K0.03 = <b>K1.03</b> — not the <span class="mono">net_amount</span> you received. Refunding only the net leaves them short.</p>
+      </div>
+      <div class="card">
+        <h4>Tie it back for reconciliation</h4>
+        <p>Put the original order in <span class="mono">collectionReference</span>. The refund is its own transaction with its own id and status — poll it like any other.</p>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:22px"><span class="ic">💡</span>
+      <p><b>You need float to refund.</b> A refund pays money out, so the account must hold enough. If you have already settled the money to your bank, top the account up first.</p>
+    </div>
+  </section>
+
   <!-- ENDPOINTS -->
   <section id="endpoints">
     <div class="sec-head"><span class="tag">Surface</span><h2>The endpoints</h2></div>
@@ -552,7 +586,6 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
           <tr><td><span class="method post">POST</span></td><td class="path">/v1/collections</td><td>Charge a customer's wallet (money in)</td></tr>
           <tr><td><span class="method post">POST</span></td><td class="path">/v1/disbursements</td><td>Pay a customer's wallet (money out)</td></tr>
           <tr><td><span class="method get">GET</span></td><td class="path">/v1/transactions/{id}</td><td>Check status — re-enquires the rail on read</td></tr>
-          <tr><td><span class="method post">POST</span></td><td class="path">/v1/transactions/{id}/reverse</td><td>Reverse a successful transaction</td></tr>
           <tr><td><span class="method get">GET</span></td><td class="path">/v1/accounts/{id}/balance</td><td>Float / balance enquiry</td></tr>
           <tr><td><span class="method get">GET</span></td><td class="path">/v1/settlements</td><td>Settlement history</td></tr>
         </tbody>

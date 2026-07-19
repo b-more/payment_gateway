@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Instacompay Gateway API (v1)",
-    "description": "**Import → fill in 3 variables → Send.** No signing, no scripts, no setup.\n\n1. Open the collection's **Variables** tab\n2. Paste your `apiKey`, `apiSecret` and `accountId` (Merchant Portal → API Documentation → regenerate a SANDBOX key to reveal them)\n3. Hit **Send** on any request\n\nStart with a sandbox key (`ic_sand_…`) — it simulates and settles instantly, so no real money moves and no float is used.\n\n---\n\nInstacompay Gateway — collections & disbursements over Zambian mobile money (ZMW).\n\n## Set up (30 seconds)\nOpen the collection's **Variables** tab and paste:\n- `apiKey`    — e.g. ic_sand_… (Merchant Portal → API Documentation)\n- `apiSecret` — shown once when you generate/regenerate a key\n- `accountId` — your account id\n\nThen press **Send**. That's it — no signing, no scripts.\n\n## Auth\nEvery request carries two headers:\n\n    X-Api-Key: {{apiKey}}\n    X-Api-Secret: {{apiSecret}}\n\n(You can send `Authorization: Bearer <secret>` instead of `X-Api-Secret` if you prefer.)\n\nHMAC request signing is also supported for higher-security integrations — see the Public API guide at https://merchants.instacompayzm.com/partners.\n\n## Rails\nOnly rails that are live in production are accepted — currently **AIRTEL**. Sandbox rejects anything production would reject, so if it works here it works when you go live.\n\n## Money\nAll amounts are **integer ngwee, as strings**: K1.50 = \"150\", K50.00 = \"5000\". Never decimals.\n\n## Sandbox\nStart with a sandbox key (`ic_sand_…`). Sandbox simulates and settles instantly — no real money, no float used — so you can test the full PROCESSING → SUCCESS lifecycle.\n\n`Idempotency-Key` is set automatically to a fresh GUID on every write; reuse the same value to safely retry a request.",
+    "description": "**Import → fill in 3 variables → Send.** No signing, no scripts, no setup.\n\n1. Open the collection's **Variables** tab\n2. Paste your `apiKey`, `apiSecret` and `accountId` (Merchant Portal → API Documentation → regenerate a SANDBOX key to reveal them)\n3. Hit **Send** on any request\n\nStart with a sandbox key (`ic_sand_…`) — it simulates and settles instantly, so no real money moves and no float is used.\n\n---\n\nInstacompay Gateway — collections & disbursements over Zambian mobile money (ZMW).\n\n## Set up (30 seconds)\nOpen the collection's **Variables** tab and paste:\n- `apiKey`    — e.g. ic_sand_… (Merchant Portal → API Documentation)\n- `apiSecret` — shown once when you generate/regenerate a key\n- `accountId` — your account id\n\nThen press **Send**. That's it — no signing, no scripts.\n\n## Auth\nEvery request carries two headers:\n\n    X-Api-Key: {{apiKey}}\n    X-Api-Secret: {{apiSecret}}\n\n(You can send `Authorization: Bearer <secret>` instead of `X-Api-Secret` if you prefer.)\n\nHMAC request signing is also supported for higher-security integrations — see the Public API guide at https://merchants.instacompayzm.com/partners.\n\n## Rails\nOnly rails that are live in production are accepted — currently **AIRTEL**. Sandbox rejects anything production would reject, so if it works here it works when you go live.\n\n## Refunds\nThere is no reverse/void call. To refund a customer send a **disbursement** for what they actually paid (`amount + charge` if they covered the fee) — see the \"Refund a customer\" request.\n\n## Money\nAll amounts are **integer ngwee, as strings**: K1.50 = \"150\", K50.00 = \"5000\". Never decimals.\n\n## Sandbox\nStart with a sandbox key (`ic_sand_…`). Sandbox simulates and settles instantly — no real money, no float used — so you can test the full PROCESSING → SUCCESS lifecycle.\n\n`Idempotency-Key` is set automatically to a fresh GUID on every write; reuse the same value to safely retry a request.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "52de82fa-02b2-4005-95a6-c9a3c144f902"
   },
@@ -143,6 +143,50 @@
       }
     },
     {
+      "name": "Refund a customer (disbursement)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Api-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "X-Api-Secret",
+            "value": "{{apiSecret}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/disbursements",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "disbursements"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"processor\": \"AIRTEL\",\n  \"amount\": \"103\",\n  \"msisdn\": \"{{msisdn}}\",\n  \"collectionReference\": \"refund-of-order-1001\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "There is no reverse/void call — a refund is a real transfer back to the customer.\n\n**Amount:** refund what the customer actually PAID. If they covered the fee that is `amount + charge` (K1.00 + K0.03 = \"103\"), not the `net_amount` you received.\n\n**Reconciliation:** put the original order in `collectionReference` so the refund ties back to it.\n\nIt returns its own transaction id — poll **Get transaction status** to confirm it landed."
+      }
+    },
+    {
       "name": "Get transaction status",
       "request": {
         "method": "GET",
@@ -168,52 +212,6 @@
           ]
         },
         "description": "Status of any transaction — collection or disbursement. txnId is auto-filled from the last create call. Re-enquires the rail on read.\n\nPROCESSING → SUCCESS | FAILED."
-      }
-    },
-    {
-      "name": "Reverse transaction",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "X-Api-Key",
-            "value": "{{apiKey}}"
-          },
-          {
-            "key": "X-Api-Secret",
-            "value": "{{apiSecret}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "Idempotency-Key",
-            "value": "{{$guid}}"
-          }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/v1/transactions/{{txnId}}/reverse",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "v1",
-            "transactions",
-            "{{txnId}}",
-            "reverse"
-          ]
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"reason\": \"customer refund\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "description": "Reverse a transaction that is in **SUCCESS**.\n\n⚠️ **This is a bookkeeping reversal — it does NOT refund the customer.** It adjusts float and marks the transaction REVERSED; no money is sent back to their wallet. To actually refund a customer, create a **disbursement** to their number for the amount they paid. (Reversing a *production* collection is rejected for this reason.)\n\nOnly SUCCESS can be reversed — a PROCESSING transaction is rejected until the customer completes it, and FAILED has nothing to reverse."
       }
     },
     {

@@ -21,7 +21,6 @@ import { ApiAuthHeaders, ApiIdempotencyHeader } from './swagger';
 import {
   AuthedRequest,
   CurrentCredential,
-  getClientIp,
   requireIdempotencyKey,
 } from './request-context';
 import { environmentToMode } from '../credentials/crypto';
@@ -29,7 +28,6 @@ import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
 import { MtnDispatchService } from '../mtn/mtn-dispatch.service';
 import { CollectionDto } from './dto/collection.dto';
 import { DisbursementDto } from './dto/disbursement.dto';
-import { ReverseDto } from './dto/reverse.dto';
 import type { CredentialContext } from '../credentials/credential.service';
 
 // Every /v1 controller is gated by rate limiting (SEC-API6) then auth
@@ -172,33 +170,6 @@ export class TransactionsController {
     return serializeTransaction(record);
   }
 
-  @Post(':id/reverse')
-  @HttpCode(200)
-  @ApiIdempotencyHeader()
-  @ApiOperation({
-    summary: 'Reverse a successful transaction (bookkeeping — does NOT refund the customer)',
-    description:
-      'Only a transaction in SUCCESS can be reversed; PROCESSING/FAILED are rejected. ' +
-      'Reversal adjusts float and marks the transaction REVERSED — it does NOT send money back ' +
-      'to the customer. To actually refund a customer, create a disbursement to their number. ' +
-      'Reversing a production collection is therefore rejected.',
-  })
-  async reverse(
-    @CurrentCredential() cred: CredentialContext,
-    @Param('id') id: string,
-    @Body() dto: ReverseDto,
-    @Req() req: AuthedRequest,
-  ): Promise<TransactionResponse> {
-    requireIdempotencyKey(req); // IDEM-1
-    const record = await this.txns.reverseTransaction({
-      transactionId: id,
-      accountId: cred.accountId,
-      actorId: cred.credentialId,
-      reason: dto.reason ?? null,
-      ipAddress: getClientIp(req),
-    });
-    return serializeTransaction(record);
-  }
 }
 
 @ApiTags('accounts')

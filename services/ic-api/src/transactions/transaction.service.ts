@@ -13,6 +13,7 @@ import {
   ConfigurationError,
   DuplicateRequestError,
   NotFoundError,
+  ValidationError,
 } from '../money/errors';
 import { parsePercentToScaled } from '../money/money';
 import type {
@@ -388,6 +389,19 @@ export class TransactionService {
         throw new NotFoundError(`transaction not found: ${input.transactionId}`); // scope (NN-6)
       }
       assertTransition(current.status, 'REVERSED'); // only SUCCESS -> REVERSED
+
+      // SAFETY (REV-1): reversal is bookkeeping only — it adjusts float and the
+      // status, but it does NOT push money back to the customer's wallet. For a
+      // real production collection that means the customer is left out of pocket
+      // while the API reports success, so refuse rather than lie. Refunding a
+      // customer needs an actual outbound transfer; use /v1/disbursements.
+      if (current.environment === 'PRODUCTION' && current.type === 'COLLECTION') {
+        throw new ValidationError(
+          'Reversing a production collection does NOT refund the customer — no money would be sent back to ' +
+            `${current.msisdn ?? 'their wallet'}. To refund them, create a disbursement to that number for the ` +
+            'amount they paid. (Reversal is available for sandbox collections and for disbursements.)',
+        );
+      }
 
       // SANDBOX never touched the ledger, so a reversal has no float to move.
       // Direction mirrors what the success did: a reversed COLLECTION refunds

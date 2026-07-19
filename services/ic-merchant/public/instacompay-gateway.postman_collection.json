@@ -213,7 +213,7 @@
             }
           }
         },
-        "description": "Reverse a SUCCESS transaction."
+        "description": "Reverse a transaction that is in **SUCCESS**.\n\n⚠️ **This is a bookkeeping reversal — it does NOT refund the customer.** It adjusts float and marks the transaction REVERSED; no money is sent back to their wallet. To actually refund a customer, create a **disbursement** to their number for the amount they paid. (Reversing a *production* collection is rejected for this reason.)\n\nOnly SUCCESS can be reversed — a PROCESSING transaction is rejected until the customer completes it, and FAILED has nothing to reverse."
       }
     },
     {

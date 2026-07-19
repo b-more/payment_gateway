@@ -21,9 +21,25 @@ export class AccountNotLiveError extends Error {
 export class IllegalTransitionError extends Error {
   readonly code = 'ILLEGAL_TRANSITION';
   constructor(from: TransactionStatus, to: TransactionStatus) {
-    super(`illegal transaction transition: ${from} -> ${to}`);
+    super(explainTransition(from, to));
     this.name = 'IllegalTransitionError';
   }
+}
+
+/** Tell an integrator what is actually wrong and what to do instead. */
+function explainTransition(from: TransactionStatus, to: TransactionStatus): string {
+  if (to === 'REVERSED') {
+    if (from === 'PROCESSING') {
+      return 'only a SUCCESS transaction can be reversed — this one is still PROCESSING (the customer has not completed it yet). Poll GET /v1/transactions/{id} until it is SUCCESS, then reverse.';
+    }
+    if (from === 'FAILED' || from === 'EXPIRED') {
+      return `only a SUCCESS transaction can be reversed — this one is ${from}, so no money moved and there is nothing to reverse.`;
+    }
+    if (from === 'REVERSED') {
+      return 'this transaction has already been reversed.';
+    }
+  }
+  return `illegal transaction transition: ${from} -> ${to}`;
 }
 
 export class DualControlError extends Error {

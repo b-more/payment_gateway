@@ -175,7 +175,14 @@ export class TransactionsController {
   @Post(':id/reverse')
   @HttpCode(200)
   @ApiIdempotencyHeader()
-  @ApiOperation({ summary: 'Reverse a successful transaction' })
+  @ApiOperation({
+    summary: 'Reverse a successful transaction (bookkeeping — does NOT refund the customer)',
+    description:
+      'Only a transaction in SUCCESS can be reversed; PROCESSING/FAILED are rejected. ' +
+      'Reversal adjusts float and marks the transaction REVERSED — it does NOT send money back ' +
+      'to the customer. To actually refund a customer, create a disbursement to their number. ' +
+      'Reversing a production collection is therefore rejected.',
+  })
   async reverse(
     @CurrentCredential() cred: CredentialContext,
     @Param('id') id: string,

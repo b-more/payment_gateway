@@ -47,7 +47,7 @@ export class CollectionsController {
   @Post()
   @HttpCode(200)
   @ApiIdempotencyHeader()
-  @ApiOperation({ summary: 'Initiate a collection (customer → merchant)' })
+  @ApiOperation({ summary: 'Initiate a collection, charging a customer' })
   async create(
     @CurrentCredential() cred: CredentialContext,
     @Body() dto: CollectionDto,
@@ -108,7 +108,7 @@ export class DisbursementsController {
   @Post()
   @HttpCode(200)
   @ApiIdempotencyHeader()
-  @ApiOperation({ summary: 'Initiate a disbursement (merchant → customer)' })
+  @ApiOperation({ summary: 'Initiate a disbursement, paying out to a customer' })
   async create(
     @CurrentCredential() cred: CredentialContext,
     @Body() dto: DisbursementDto,

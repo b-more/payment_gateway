@@ -29,7 +29,7 @@ export interface PdfSummaryItem { label: string; value: string }
 
 /** Integer ngwee string → grouped major.minor (no currency prefix). */
 export function formatZmw(ngwee: string | null | undefined): string {
-  if (ngwee === null || ngwee === undefined || ngwee === '') return '—';
+  if (ngwee === null || ngwee === undefined || ngwee === '') return '-';
   const raw = String(ngwee);
   const neg = raw.startsWith('-');
   const digits = (neg ? raw.slice(1) : raw).padStart(3, '0');

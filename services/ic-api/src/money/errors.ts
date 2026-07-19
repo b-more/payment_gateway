@@ -30,16 +30,16 @@ export class IllegalTransitionError extends Error {
 function explainTransition(from: TransactionStatus, to: TransactionStatus): string {
   if (to === 'REVERSED') {
     if (from === 'PROCESSING') {
-      return 'only a SUCCESS transaction can be reversed — this one is still PROCESSING (the customer has not completed it yet). Poll GET /v1/transactions/{id} until it is SUCCESS, then reverse.';
+      return 'Only a SUCCESS transaction can be reversed. This one is still PROCESSING, meaning the customer has not completed it yet. Poll GET /v1/transactions/{id} until it is SUCCESS, then reverse.';
     }
     if (from === 'FAILED' || from === 'EXPIRED') {
-      return `only a SUCCESS transaction can be reversed — this one is ${from}, so no money moved and there is nothing to reverse.`;
+      return `Only a SUCCESS transaction can be reversed. This one is ${from}, so no money moved and there is nothing to reverse.`;
     }
     if (from === 'REVERSED') {
-      return 'this transaction has already been reversed.';
+      return 'This transaction has already been reversed.';
     }
   }
-  return `illegal transaction transition: ${from} -> ${to}`;
+  return `Illegal transaction transition: ${from} to ${to}.`;
 }
 
 export class DualControlError extends Error {

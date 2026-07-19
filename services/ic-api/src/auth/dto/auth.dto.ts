@@ -121,7 +121,7 @@ export class SettlementConfirmDto {
 }
 
 export class SettlementFailDto {
-  @ApiProperty({ example: 'Bank rejected the transfer — account details invalid.' })
+  @ApiProperty({ example: 'Bank rejected the transfer because the account details were invalid.' })
   @IsString()
   @MinLength(1)
   @MaxLength(300)

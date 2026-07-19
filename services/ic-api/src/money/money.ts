@@ -38,7 +38,7 @@ export function roundHalfUp(numerator: bigint, denominator: bigint): bigint {
 
 /**
  * Parse a `numeric(5,2)` percent value (PostgreSQL returns it as a string) into
- * an integer scaled by 100 — hundredths of a percent. e.g. "2.50" -> 250n.
+ * an integer scaled by 100, meaning hundredths of a percent. For example "2.50" becomes 250n.
  * Integer-safe; no float ever materialises.
  */
 export function parsePercentToScaled(numericText: string): bigint {

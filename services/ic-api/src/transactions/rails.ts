@@ -21,7 +21,7 @@ export function isRailReady(processor: string): boolean {
 export function assertRailReady(processor: string): void {
   if (!isRailReady(processor)) {
     throw new ValidationError(
-      `${processor} is not available right now — nothing was charged and no funds were debited.`,
+      `${processor} is not available right now. Nothing was charged and no funds were debited.`,
     );
   }
 }

@@ -62,7 +62,7 @@ function layout(opts: { preheader: string; heading: string; bodyHtml: string }):
             <strong style="color:${INK};">Instacom Payment Solutions Limited</strong><br>
             Lusaka, Zambia &middot; Settled in Zambian Kwacha (ZMW) &middot; Bank of Zambia licensed
           </div>
-          <div style="font-size:11px; color:#9aa7bd; margin-top:10px;">This is an automated message — please do not reply.</div>
+          <div style="font-size:11px; color:#9aa7bd; margin-top:10px;">This is an automated message. Please do not reply.</div>
         </td></tr>
 
       </table>

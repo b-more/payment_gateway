@@ -47,10 +47,10 @@ export class MerchantUserService {
   /** Assignable roles for the portal's role picker. */
   roles(): Array<{ name: string; description: string }> {
     return [
-      { name: 'MERCHANT_ADMIN', description: 'Owner — manage users and everything below' },
-      { name: 'MERCHANT_INITIATOR', description: 'Initiator — request payouts, run collections' },
-      { name: 'MERCHANT_APPROVER', description: 'Approver — approve or reject payout requests' },
-      { name: 'MERCHANT_VIEWER', description: 'Read-only access' },
+      { name: 'MERCHANT_ADMIN', description: 'Owner. Can manage users and do everything below.' },
+      { name: 'MERCHANT_INITIATOR', description: 'Initiator. Can request payouts and run collections.' },
+      { name: 'MERCHANT_APPROVER', description: 'Approver. Can approve or reject payout requests.' },
+      { name: 'MERCHANT_VIEWER', description: 'Read only access.' },
     ];
   }
 

@@ -48,7 +48,7 @@ async function provision(): Promise<void> {
 
       const exists = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role]);
       if (exists.rowCount === 0) {
-        throw new Error(`Role ${role} does not exist — run migrations first (0003).`);
+        throw new Error(`Role ${role} does not exist. Run migrations first (0003).`);
       }
 
       await client.query(`ALTER ROLE ${role} WITH LOGIN PASSWORD ${quoteLiteral(password)}`);

@@ -101,7 +101,7 @@ export class OnboardingService {
 
         const role = await client.query<RoleRow>("SELECT id FROM roles WHERE name = 'MERCHANT_ADMIN'");
         if (role.rowCount === 0) {
-          throw new Error('MERCHANT_ADMIN role missing — run migration 0006');
+          throw new Error('MERCHANT_ADMIN role missing. Run migration 0006.');
         }
         await client.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [
           user.rows[0].id, role.rows[0].id,

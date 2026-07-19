@@ -3,27 +3,27 @@ import { ApiHeader } from '@nestjs/swagger';
 
 /**
  * Auth headers for every /v1 call. Two modes:
- *   SIMPLE — X-Api-Key + X-Api-Secret (SEC-API2b)
- *   SIGNED — X-Api-Key + X-Timestamp + X-Signature (SEC-API2/3)
+ *   SIMPLE: X-Api-Key plus X-Api-Secret (SEC-API2b)
+ *   SIGNED: X-Api-Key plus X-Timestamp and X-Signature (SEC-API2/3)
  */
 export function ApiAuthHeaders(): ReturnType<typeof applyDecorators> {
   return applyDecorators(
-    ApiHeader({ name: 'X-Api-Key', required: true, description: 'Public api_key, e.g. ic_live_…' }),
+    ApiHeader({ name: 'X-Api-Key', required: true, description: 'Your public api_key, for example ic_live_...' }),
     ApiHeader({
       name: 'X-Api-Secret',
       required: false,
-      description: 'SIMPLE auth: your api secret (or send `Authorization: Bearer <secret>`).',
+      description: 'Simple auth. Your api secret, or send Authorization: Bearer <secret> instead.',
     }),
     ApiHeader({
       name: 'X-Timestamp',
       required: false,
-      description: 'SIGNED auth only: Unix epoch seconds (±5m window)',
+      description: 'Signed auth only. Unix epoch seconds, within a 5 minute window.',
     }),
     ApiHeader({
       name: 'X-Signature',
       required: false,
       description:
-        'SIGNED auth only: HMAC-SHA256(signingKey, `${ts}.${METHOD}.${path}.${rawBody}`) as hex. Sending this selects signed mode.',
+        'Signed auth only. HMAC-SHA256(signingKey, `${ts}.${METHOD}.${path}.${rawBody}`) as hex. Sending this header selects signed mode.',
     }),
   );
 }

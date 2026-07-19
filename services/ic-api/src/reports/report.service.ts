@@ -40,7 +40,7 @@ function sumBig(rows: DataRow[], key: string): string {
   return total.toString();
 }
 function shortId(id: string | null): string {
-  if (!id) return '—';
+  if (!id) return '-';
   return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
 }
 function nowStamp(): string {

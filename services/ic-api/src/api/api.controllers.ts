@@ -69,14 +69,17 @@ export class CollectionsController {
       actorId: cred.credentialId,
     };
 
+    // The rail check runs in BOTH environments: sandbox must not accept a rail
+    // that production would reject, or an integrator certifies against a rail
+    // that fails the day they go live.
+    assertRailReady(dto.processor);
+
     // SANDBOX simulates and settles, so integrators can exercise the full
     // lifecycle (PROCESSING -> SUCCESS) without a live rail or any float.
     if (environment === 'SANDBOX') {
       return serializeTransaction(await this.txns.processAndSettle(input));
     }
 
-    // PRODUCTION: refuse before any float is debited if the rail can't dispatch.
-    assertRailReady(dto.processor);
     if (!dto.msisdn) throw new ValidationError('msisdn is required for a production collection');
 
     const record = await this.txns.processTransaction(input);
@@ -127,12 +130,13 @@ export class DisbursementsController {
       actorId: cred.credentialId,
     };
 
+    // Checked in both environments so sandbox can't certify a rail that
+    // production would reject (see the collections handler).
+    assertRailReady(dto.processor);
+
     if (environment === 'SANDBOX') {
       return serializeTransaction(await this.txns.processAndSettle(input));
     }
-
-    // PRODUCTION: refuse before any float is debited if the rail can't dispatch.
-    assertRailReady(dto.processor);
 
     const record = await this.txns.processTransaction(input);
     // Actually push the money out. Without this the transaction sat PROCESSING

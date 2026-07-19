@@ -24,17 +24,24 @@ const txns = new TransactionService(pool, ledger, audit, processor, webhooks);
 const floatSvc = (threshold: bigint): FloatService =>
   new FloatService(pool, ledger, audit, { dualControlThreshold: threshold });
 
+// Every float credit requires a proof of payment (FLOAT-3); a tiny valid PDF.
+const PROOF = {
+  fileName: 'slip.pdf',
+  contentType: 'application/pdf',
+  dataBase64: Buffer.from('%PDF-1.4 test proof').toString('base64'),
+};
+
 after(async () => {
   await pool.end();
 });
 
-async function seedAccount(): Promise<string> {
+async function seedAccount(mode: 'SANDBOX' | 'PRODUCTION' = 'SANDBOX'): Promise<string> {
   const m = await pool.query<{ id: string }>(
     "INSERT INTO merchants (name, merchant_type, email) VALUES ('T', 'PRIVATE', 't@t.zm') RETURNING id",
   );
   const a = await pool.query<{ id: string }>(
-    "INSERT INTO accounts (merchant_id, account_type) VALUES ($1, 'COLLECTION') RETURNING id",
-    [m.rows[0].id],
+    "INSERT INTO accounts (merchant_id, account_type, operating_mode) VALUES ($1, 'COLLECTION', $2) RETURNING id",
+    [m.rows[0].id, mode],
   );
   return a.rows[0].id;
 }
@@ -64,10 +71,10 @@ async function balanceOf(accountId: string): Promise<bigint> {
 
 const HIGH = 1_000_000_000n; // threshold high enough to post credits directly
 
-test('collection: charge computed, float debited, PROCESSING then SUCCESS (TXN/CHG-2)', async () => {
-  const accountId = await seedAccount();
+test('collection: needs no float, CREDITS the merchant net on SUCCESS (TXN/CHG-2)', async () => {
+  const accountId = await seedAccount('PRODUCTION');
   await setCharge(accountId, 'MTN', 'PERCENTAGE', 'SOURCE', null, '2.50');
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID() });
+  // Deliberately NO float: collecting is how a merchant earns it.
 
   const txn = await txns.processTransaction({
     accountId,
@@ -76,13 +83,13 @@ test('collection: charge computed, float debited, PROCESSING then SUCCESS (TXN/C
     amount: 100_000n,
     msisdn: '260970000001',
     idempotencyKey: 'k-success',
-    environment: 'SANDBOX',
+    environment: 'PRODUCTION',
   });
 
   assert.equal(txn.status, 'PROCESSING');
   assert.equal(txn.charge, 2_500n); // 2.50% of 100000
   assert.equal(txn.netAmount, 100_000n); // SOURCE -> merchant nets full amount
-  assert.equal(await balanceOf(accountId), 897_500n); // 1_000_000 - (100000 + 2500)
+  assert.equal(await balanceOf(accountId), 0n); // nothing debited to collect
 
   const result = await processor.dispatch('SANDBOX', 'MTN', {
     msisdn: '260970000001',
@@ -91,45 +98,67 @@ test('collection: charge computed, float debited, PROCESSING then SUCCESS (TXN/C
   });
   const done = await txns.completeTransaction({ transactionId: txn.id, result });
   assert.equal(done.status, 'SUCCESS');
-  assert.equal(await balanceOf(accountId), 897_500n); // unchanged on success
+  assert.equal(await balanceOf(accountId), 100_000n); // credited the net on success
 });
 
-test('insufficient float -> FAILED, no debit (TXN-2)', async () => {
-  const accountId = await seedAccount();
+test('collection: a FAILED collection moves no float', async () => {
+  const accountId = await seedAccount('PRODUCTION');
   await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 500n, null);
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000n, actorId: randomUUID() });
 
   const txn = await txns.processTransaction({
-    accountId,
-    type: 'COLLECTION',
-    processor: 'MTN',
-    amount: 100_000n,
-    msisdn: '260970000001',
-    idempotencyKey: 'k-poor',
-    environment: 'SANDBOX',
+    accountId, type: 'COLLECTION', processor: 'MTN', amount: 100_000n,
+    msisdn: '260970000001', idempotencyKey: 'k-failcol', environment: 'PRODUCTION',
   });
-
-  assert.equal(txn.status, 'FAILED');
-  assert.equal(txn.failureReason, 'INSUFFICIENT_FLOAT');
-  assert.equal(await balanceOf(accountId), 1_000n); // untouched
+  await txns.completeTransaction({
+    transactionId: txn.id,
+    result: { status: 'FAILED', failureReason: 'PROCESSOR_DECLINED', reference: 'test-decline' },
+  });
+  assert.equal(await balanceOf(accountId), 0n); // never credited, nothing to refund
 });
 
-test('idempotency: repeated key returns original, debits once (IDEM-2)', async () => {
-  const accountId = await seedAccount();
+test('disbursement: DEBITS float up front; insufficient float -> FAILED, no debit (TXN-2)', async () => {
+  const accountId = await seedAccount('PRODUCTION');
+  await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 500n, null);
+  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000n, actorId: randomUUID(), proof: PROOF });
+
+  // Payouts spend float — this one can't be covered.
+  const poor = await txns.processTransaction({
+    accountId, type: 'DISBURSEMENT', processor: 'MTN', amount: 100_000n,
+    msisdn: '260970000001', idempotencyKey: 'k-poor', environment: 'PRODUCTION',
+  });
+  assert.equal(poor.status, 'FAILED');
+  assert.equal(poor.failureReason, 'INSUFFICIENT_FLOAT');
+  assert.equal(await balanceOf(accountId), 1_000n); // untouched
+
+  // An affordable payout reserves amount + charge immediately.
+  await floatSvc(HIGH).creditFloat({ accountId, amount: 99_000n, actorId: randomUUID(), proof: PROOF });
+  const ok = await txns.processTransaction({
+    accountId, type: 'DISBURSEMENT', processor: 'MTN', amount: 50_000n,
+    msisdn: '260970000001', idempotencyKey: 'k-payout', environment: 'PRODUCTION',
+  });
+  assert.equal(ok.status, 'PROCESSING');
+  assert.equal(await balanceOf(accountId), 49_500n); // 100_000 - (50_000 + 500)
+});
+
+test('idempotency: repeated key returns original, credits once (IDEM-2)', async () => {
+  const accountId = await seedAccount('PRODUCTION');
   await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 0n, null);
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID() });
 
   const first = await txns.processTransaction({
     accountId, type: 'COLLECTION', processor: 'MTN', amount: 50_000n,
-    msisdn: '260970000001', idempotencyKey: 'idem-1', environment: 'SANDBOX',
+    msisdn: '260970000001', idempotencyKey: 'idem-1', environment: 'PRODUCTION',
   });
   const second = await txns.processTransaction({
     accountId, type: 'COLLECTION', processor: 'MTN', amount: 50_000n,
-    msisdn: '260970000001', idempotencyKey: 'idem-1', environment: 'SANDBOX',
+    msisdn: '260970000001', idempotencyKey: 'idem-1', environment: 'PRODUCTION',
   });
-
   assert.equal(first.id, second.id);
-  assert.equal(await balanceOf(accountId), 950_000n); // debited exactly once
+
+  const result = await processor.dispatch('SANDBOX', 'MTN', { msisdn: '260970000001', amount: 50_000n, reference: first.id });
+  await txns.completeTransaction({ transactionId: first.id, result });
+  // Completing twice must not credit twice (idempotent completion).
+  await txns.completeTransaction({ transactionId: first.id, result });
+  assert.equal(await balanceOf(accountId), 50_000n); // credited exactly once
 });
 
 test('dual control: large credit parked, requires a distinct approver (FLOAT-3/SEC-Z4)', async () => {
@@ -137,7 +166,7 @@ test('dual control: large credit parked, requires a distinct approver (FLOAT-3/S
   const svc = floatSvc(100_000n); // threshold
   const requester = randomUUID();
 
-  const parked = await svc.creditFloat({ accountId, amount: 200_000n, actorId: requester });
+  const parked = await svc.creditFloat({ accountId, amount: 200_000n, actorId: requester, proof: PROOF });
   assert.equal(parked.posted, false);
   assert.equal(await balanceOf(accountId), 0n); // not posted yet
   const requestId = parked.posted === false ? parked.requestId : '';
@@ -152,27 +181,27 @@ test('dual control: large credit parked, requires a distinct approver (FLOAT-3/S
   assert.equal(await balanceOf(accountId), 200_000n);
 
   // below-threshold credit posts immediately
-  const direct = await svc.creditFloat({ accountId, amount: 50_000n, actorId: randomUUID() });
+  const direct = await svc.creditFloat({ accountId, amount: 50_000n, actorId: randomUUID(), proof: PROOF });
   assert.equal(direct.posted, true);
   assert.equal(await balanceOf(accountId), 250_000n);
 });
 
-test('reversal: SUCCESS -> REVERSED restores float; second reverse rejected (STATE-3)', async () => {
-  const accountId = await seedAccount();
+test('reversal: a reversed COLLECTION takes back the credited net; second reverse rejected (STATE-3)', async () => {
+  const accountId = await seedAccount('PRODUCTION');
   await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 500n, null);
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID() });
 
   const txn = await txns.processTransaction({
     accountId, type: 'COLLECTION', processor: 'MTN', amount: 100_000n,
-    msisdn: '260970000001', idempotencyKey: 'k-rev', environment: 'SANDBOX',
+    msisdn: '260970000001', idempotencyKey: 'k-rev', environment: 'PRODUCTION',
   });
   const result = await processor.dispatch('SANDBOX', 'MTN', { msisdn: '260970000001', amount: 100_000n, reference: txn.id });
   await txns.completeTransaction({ transactionId: txn.id, result });
-  assert.equal(await balanceOf(accountId), 899_500n);
+  assert.equal(await balanceOf(accountId), 100_000n); // earned
 
+  // Refunding the customer must take the money back off the merchant.
   const reversed = await txns.reverseTransaction({ transactionId: txn.id, accountId, actorId: randomUUID() });
   assert.equal(reversed.status, 'REVERSED');
-  assert.equal(await balanceOf(accountId), 1_000_000n); // fully restored
+  assert.equal(await balanceOf(accountId), 0n);
 
   await assert.rejects(
     txns.reverseTransaction({ transactionId: txn.id, accountId, actorId: randomUUID() }),
@@ -180,17 +209,17 @@ test('reversal: SUCCESS -> REVERSED restores float; second reverse rejected (STA
   );
 });
 
-test('processor decline refunds the debited float (PROCESSING -> FAILED)', async () => {
-  const accountId = await seedAccount();
+test('processor decline refunds a DISBURSEMENT’s reserved float (PROCESSING -> FAILED)', async () => {
+  const accountId = await seedAccount('PRODUCTION');
   await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 500n, null);
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID() });
+  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID(), proof: PROOF });
 
   const txn = await txns.processTransaction({
-    accountId, type: 'COLLECTION', processor: 'MTN', amount: 100_000n,
-    msisdn: '260971230000', idempotencyKey: 'k-decline', environment: 'SANDBOX', // MSISDN ends 0000 -> decline
+    accountId, type: 'DISBURSEMENT', processor: 'MTN', amount: 100_000n,
+    msisdn: '260971230000', idempotencyKey: 'k-decline', environment: 'PRODUCTION', // MSISDN ends 0000 -> decline
   });
   assert.equal(txn.status, 'PROCESSING');
-  assert.equal(await balanceOf(accountId), 899_500n);
+  assert.equal(await balanceOf(accountId), 899_500n); // reserved up front
 
   const result = await processor.dispatch('SANDBOX', 'MTN', { msisdn: '260971230000', amount: 100_000n, reference: txn.id });
   assert.equal(result.status, 'FAILED');
@@ -199,10 +228,29 @@ test('processor decline refunds the debited float (PROCESSING -> FAILED)', async
   assert.equal(await balanceOf(accountId), 1_000_000n); // refunded
 });
 
+test('SANDBOX is isolated from production float in both directions', async () => {
+  const accountId = await seedAccount('SANDBOX');
+  await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 500n, null);
+
+  const collected = await txns.processAndSettle({
+    accountId, type: 'COLLECTION', processor: 'MTN', amount: 100_000n,
+    msisdn: '260970000001', idempotencyKey: 'sbx-col', environment: 'SANDBOX',
+  });
+  assert.equal(collected.status, 'SUCCESS'); // sandbox settles so integrators can test
+  assert.equal(await balanceOf(accountId), 0n); // but never credits real float
+
+  const paid = await txns.processAndSettle({
+    accountId, type: 'DISBURSEMENT', processor: 'MTN', amount: 100_000n,
+    msisdn: '260970000001', idempotencyKey: 'sbx-pay', environment: 'SANDBOX',
+  });
+  assert.equal(paid.status, 'SUCCESS'); // and needs no float to run
+  assert.equal(await balanceOf(accountId), 0n);
+});
+
 test('TXN-6: PRODUCTION transaction on a SANDBOX account is rejected', async () => {
   const accountId = await seedAccount();
   await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 0n, null);
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID() });
+  await floatSvc(HIGH).creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID(), proof: PROOF });
 
   await assert.rejects(
     txns.processTransaction({
@@ -214,19 +262,20 @@ test('TXN-6: PRODUCTION transaction on a SANDBOX account is rejected', async () 
 });
 
 test('TXN-1/SEC-M3: row lock serializes concurrent spends — no double spend', async () => {
-  const accountId = await seedAccount();
+  const accountId = await seedAccount('PRODUCTION');
   await setCharge(accountId, 'MTN', 'FIXED', 'SOURCE', 0n, null);
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 100_000n, actorId: randomUUID() });
+  await floatSvc(HIGH).creditFloat({ accountId, amount: 100_000n, actorId: randomUUID(), proof: PROOF });
 
-  // Two concurrent collections of the full balance, distinct keys (not deduped).
+  // Payouts are what spend float — race two for the whole balance, distinct
+  // keys (so idempotency doesn't dedupe them).
   const [a, b] = await Promise.all([
     txns.processTransaction({
-      accountId, type: 'COLLECTION', processor: 'MTN', amount: 100_000n,
-      msisdn: '260970000001', idempotencyKey: 'cc-a', environment: 'SANDBOX',
+      accountId, type: 'DISBURSEMENT', processor: 'MTN', amount: 100_000n,
+      msisdn: '260970000001', idempotencyKey: 'cc-a', environment: 'PRODUCTION',
     }),
     txns.processTransaction({
-      accountId, type: 'COLLECTION', processor: 'MTN', amount: 100_000n,
-      msisdn: '260970000001', idempotencyKey: 'cc-b', environment: 'SANDBOX',
+      accountId, type: 'DISBURSEMENT', processor: 'MTN', amount: 100_000n,
+      msisdn: '260970000001', idempotencyKey: 'cc-b', environment: 'PRODUCTION',
     }),
   ]);
 
@@ -237,7 +286,7 @@ test('TXN-1/SEC-M3: row lock serializes concurrent spends — no double spend', 
 
 test('ledger never double-spends under insufficient balance (direct DEBIT guard)', async () => {
   const accountId = await seedAccount();
-  await floatSvc(HIGH).creditFloat({ accountId, amount: 100n, actorId: randomUUID() });
+  await floatSvc(HIGH).creditFloat({ accountId, amount: 100n, actorId: randomUUID(), proof: PROOF });
   await assert.rejects(
     pool.connect().then(async (c) => {
       try {

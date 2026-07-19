@@ -4,6 +4,7 @@ import { PG_POOL } from '../database/database.module';
 import { withTransaction } from '../database/tx';
 import { AuditService } from '../audit/audit.service';
 import { CredentialService, type GeneratedCredential } from '../credentials/credential.service';
+import { generateWebhookSecret } from '../credentials/crypto';
 import { ForbiddenError, NotFoundError, ValidationError } from '../money/errors';
 import { assertSafeWebhookUrl, UnsafeWebhookUrlError } from '../webhooks/ssrf-guard';
 
@@ -210,6 +211,48 @@ export class MerchantReadService {
   }
 
   /** NN-6: assert the account belongs to the merchant and return its mode. */
+  /**
+   * Reveal the account's webhook signing secret (WH-2). Merchants need this to
+   * verify the X-Instacompay-Signature on webhooks we send them — without it a
+   * receiver cannot tell a real callback from a forged one. It is a symmetric
+   * HMAC key (we hold it to sign), so revealing it to its owner is by design.
+   */
+  async webhookSecret(merchantId: string, accountId: string): Promise<{ webhookSecret: string }> {
+    await this.assertOwnedAccount(merchantId, accountId);
+    const res = await this.pool.query<{ webhook_signing_secret: string | null }>(
+      'SELECT webhook_signing_secret FROM account_settings WHERE account_id = $1',
+      [accountId],
+    );
+    const secret = res.rowCount === 0 ? null : res.rows[0].webhook_signing_secret;
+    if (!secret) throw new NotFoundError('no webhook signing secret is set for this account');
+    return { webhookSecret: secret };
+  }
+
+  /** Rotate the webhook signing secret. Old signatures stop verifying at once. */
+  async rotateWebhookSecret(
+    merchantId: string,
+    accountId: string,
+    actorId: string,
+  ): Promise<{ webhookSecret: string }> {
+    return withTransaction(this.pool, async (client) => {
+      await this.assertOwned(client, merchantId, accountId);
+      const next = generateWebhookSecret();
+      await client.query(
+        `INSERT INTO account_settings (account_id, webhook_signing_secret) VALUES ($1, $2)
+         ON CONFLICT (account_id) DO UPDATE SET webhook_signing_secret = EXCLUDED.webhook_signing_secret`,
+        [accountId, next],
+      );
+      await this.audit.write(client, {
+        actorId,
+        actorScope: 'MERCHANT',
+        action: 'WEBHOOK_SECRET_ROTATED',
+        target: accountId,
+        metadata: {},
+      });
+      return { webhookSecret: next };
+    });
+  }
+
   async assertOwnedAccount(
     merchantId: string,
     accountId: string,

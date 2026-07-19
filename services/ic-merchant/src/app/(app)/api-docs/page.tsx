@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useData } from '@/lib/useData';
-import { apiPost, apiPut, ApiError } from '@/lib/api';
+import { apiGet, apiPost, apiPut, ApiError } from '@/lib/api';
 import { PageHead } from '@/components/shell';
 import { Badge, Spinner, Empty } from '@/components/ui';
 import { shortId } from '@/lib/format';
@@ -65,6 +65,51 @@ async function call(method, path, body) {
 await call('POST', '/v1/collections', {
   processor: 'AIRTEL', amount: '5000', msisdn: '260970000001',
   collectionReference: 'order-1001',
+});`;
+
+const WEBHOOK_PAYLOAD = `POST <your callback url>
+X-Instacompay-Event:     transaction.success
+X-Instacompay-Signature: t=1752380000,v1=9f2c…
+
+{
+  "id": "<event id>",
+  "type": "transaction.success",
+  "created_at": "2026-07-16T10:32:00.000Z",
+  "data": {
+    "id": "<transaction id>",
+    "status": "SUCCESS",
+    "amount": "5000",
+    "charge": "125",
+    "net_amount": "5000",
+    "collection_reference": "order-1001"
+  }
+}`;
+
+const VERIFY_SNIPPET = `import crypto from 'node:crypto';
+
+const WEBHOOK_SECRET = 'whsec_...';   // reveal it per account below
+
+// IMPORTANT: verify against the RAW body bytes, before any JSON parsing.
+function verify(rawBody, signatureHeader) {
+  const parts = Object.fromEntries(
+    signatureHeader.split(',').map((p) => p.split('=')),
+  );
+  const expected = crypto
+    .createHmac('sha256', WEBHOOK_SECRET)
+    .update(\`\${parts.t}.\${rawBody}\`)
+    .digest('hex');
+
+  const a = Buffer.from(expected), b = Buffer.from(parts.v1 ?? '');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+app.post('/webhooks/instacompay', (req, res) => {
+  if (!verify(req.rawBody, req.get('X-Instacompay-Signature'))) {
+    return res.sendStatus(400);           // forged or tampered — reject
+  }
+  const event = JSON.parse(req.rawBody);
+  // ... mark the order paid (idempotently — we may retry)
+  res.sendStatus(200);                    // acknowledge
 });`;
 
 const SIGNED_SNIPPET = `// Optional hardened mode: sign each request instead of sending the secret.
@@ -192,6 +237,25 @@ export default function ApiDocsPage(): ReactNode {
         <pre className="code-block" style={{ margin: 0, maxHeight: 320 }}><code>{SIGNED_SNIPPET}</code></pre>
       </div>
 
+      {/* Webhooks */}
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Webhooks — how you learn a payment succeeded</div>
+          <Copy text={VERIFY_SNIPPET} label="Copy verifier" />
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          In production a collection returns <span className="mono">PROCESSING</span> and resolves once the
+          customer approves on their phone — so we <b>POST the outcome</b> to your callback URL (set it per
+          account below). We retry with backoff until you answer <span className="mono">2xx</span>.
+        </p>
+        <pre className="code-block" style={{ margin: '0 0 14px' }}><code>{WEBHOOK_PAYLOAD}</code></pre>
+        <p className="muted" style={{ marginTop: 0 }}>
+          <b>Always verify the signature</b> — otherwise anyone who learns your URL could post a fake
+          &ldquo;payment received&rdquo;. Reveal your secret (<span className="mono">whsec_…</span>) per account below.
+        </p>
+        <pre className="code-block" style={{ margin: 0, maxHeight: 300 }}><code>{VERIFY_SNIPPET}</code></pre>
+      </div>
+
       {/* Endpoints */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-pad" style={{ borderBottom: '1px solid var(--line)' }}>
@@ -266,9 +330,27 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
   const [callbackUrl, setCallbackUrl] = useState(account.callback_url ?? '');
   const [ipList, setIpList] = useState(account.ip_whitelist.join(', '));
   const [secret, setSecret] = useState<{ env: string; apiKey: string; secret: string; signingKey: string } | null>(null);
+  const [webhookSecret, setWebhookSecret] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+
+  async function revealWebhookSecret(rotate: boolean): Promise<void> {
+    setBusy(rotate ? 'rotate' : 'reveal');
+    setError('');
+    setMsg('');
+    try {
+      const r = rotate
+        ? await apiPost<{ webhookSecret: string }>(`/v1/merchant/accounts/${account.id}/webhook-secret/rotate`)
+        : await apiGet<{ webhookSecret: string }>(`/v1/merchant/accounts/${account.id}/webhook-secret`);
+      setWebhookSecret(r.webhookSecret);
+      if (rotate) setMsg('Webhook secret rotated — update your receiver now; old signatures no longer verify.');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load the webhook secret.');
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function saveSettings(e: FormEvent): Promise<void> {
     e.preventDefault();
@@ -332,6 +414,26 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
           </button>
         </div>
       </form>
+
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Webhook signing secret</div>
+        <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+          Use this to verify the <span className="mono">X-Instacompay-Signature</span> on webhooks we send you.
+        </p>
+        <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <button type="button" className="btn" disabled={busy === 'reveal'} onClick={() => void revealWebhookSecret(false)}>
+            {busy === 'reveal' ? 'Loading…' : 'Reveal secret'}
+          </button>
+          <button type="button" className="btn" disabled={busy === 'rotate'} onClick={() => void revealWebhookSecret(true)}>
+            {busy === 'rotate' ? 'Rotating…' : 'Rotate'}
+          </button>
+        </div>
+        {webhookSecret ? (
+          <div className="devhint mono" style={{ marginTop: 10, wordBreak: 'break-all', fontSize: 12 }}>
+            {webhookSecret}
+          </div>
+        ) : null}
+      </div>
 
       {secret ? (
         <div className="devhint" style={{ marginTop: 14, wordBreak: 'break-all' }}>

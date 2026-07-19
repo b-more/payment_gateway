@@ -31,7 +31,36 @@ async function seedAccount(): Promise<string> {
   return a.rows[0].id;
 }
 
-// Insert a final transaction directly to isolate settlement/recon from the engine.
+// Every float credit requires a proof of payment (FLOAT-3); a tiny valid PDF.
+const PROOF = {
+  fileName: 'slip.pdf',
+  contentType: 'application/pdf',
+  dataBase64: Buffer.from('%PDF-1.4 test proof').toString('base64'),
+};
+
+/** Credit float through the real ledger service (never raw SQL — it also keeps
+ *  the accounts.float_balance cache in step). */
+async function creditFloat(accountId: string, amount: bigint): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await ledger.append(client, {
+      accountId,
+      entryType: 'CREDIT',
+      amount,
+      counterparty: 'TEST',
+      reference: randomUUID(),
+    });
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+}
+
+// Insert a final transaction directly to isolate settlement/recon from the
+// engine. A SUCCESS collection also credits the merchant's net, exactly as
+// completeTransaction does — settleable is capped by what the account holds, so
+// the seeded state has to be consistent with the money model.
 async function insertTxn(
   accountId: string,
   status: string,
@@ -43,6 +72,7 @@ async function insertTxn(
      VALUES ($1,'COLLECTION',$2,$3,$3,$4,$5,'SANDBOX') RETURNING id`,
     [accountId, processor, netAmount.toString(), status, randomUUID()],
   );
+  if (status === 'SUCCESS') await creditFloat(accountId, netAmount);
   return t.rows[0].id;
 }
 
@@ -71,8 +101,8 @@ test('SET-1: settleable = sum of SUCCESS collection net; creates one PENDING set
 
 test('SET-2/3: confirm settles and writes a payout ledger DEBIT', async () => {
   const accountId = await seedAccount();
-  await floats.creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID() }); // fund payout
-  await insertTxn(accountId, 'SUCCESS', 250_000n);
+  await floats.creditFloat({ accountId, amount: 1_000_000n, actorId: randomUUID(), proof: PROOF }); // working capital
+  await insertTxn(accountId, 'SUCCESS', 250_000n); // + earns 250_000
   const run = await settlements.runForAccount(accountId, randomUUID());
   const settlementId = run.settlementId as string;
 
@@ -84,7 +114,8 @@ test('SET-2/3: confirm settles and writes a payout ledger DEBIT', async () => {
   );
   assert.equal(s.rows[0].status, 'SETTLED');
   assert.ok(s.rows[0].settled_at);
-  assert.equal(await balanceOf(accountId), 750_000n); // 1_000_000 - 250_000 (SET-3 ledger DEBIT)
+  // 1_000_000 capital + 250_000 earned − 250_000 settled out (SET-3 ledger DEBIT)
+  assert.equal(await balanceOf(accountId), 1_000_000n);
 
   const led = await pool.query(
     "SELECT 1 FROM float_ledger WHERE reference = $1 AND counterparty = 'BANK_SETTLEMENT' AND entry_type = 'DEBIT'",
@@ -115,6 +146,44 @@ test('SET-2: failed settlement retains funds → re-settleable next run', async 
   const second = await settlements.runForAccount(accountId, randomUUID());
   assert.equal(second.created, true);
   assert.equal(second.amount, 80_000n);
+});
+
+test('SET-1: admin-credited working capital is never settleable — only earnings are', async () => {
+  const accountId = await seedAccount();
+  // A merchant pre-funded with float for payouts, who has earned nothing yet.
+  await floats.creditFloat({ accountId, amount: 500_000n, actorId: randomUUID(), proof: PROOF });
+
+  const none = await settlements.runForAccount(accountId, randomUUID());
+  assert.equal(none.created, false); // their own capital must not be wired out
+
+  // Once they actually earn, only the earnings settle.
+  await insertTxn(accountId, 'SUCCESS', 30_000n);
+  const run = await settlements.runForAccount(accountId, randomUUID());
+  assert.equal(run.created, true);
+  assert.equal(run.amount, 30_000n);
+});
+
+test('SET-1: settleable is capped by what the account still holds', async () => {
+  const accountId = await seedAccount();
+  await insertTxn(accountId, 'SUCCESS', 100_000n); // earns 100_000
+
+  // The merchant spends most of it on a payout, leaving 20_000.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await ledger.append(client, {
+      accountId, entryType: 'DEBIT', amount: 80_000n,
+      counterparty: 'PROCESSOR_MTN', reference: randomUUID(),
+    });
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+
+  // Earned 100_000, but only 20_000 is actually left to pay out.
+  const run = await settlements.runForAccount(accountId, randomUUID());
+  assert.equal(run.created, true);
+  assert.equal(run.amount, 20_000n);
 });
 
 test('REC-2/3/4: matched, disputed (mismatch) and unmatched are bucketed and flagged', async () => {

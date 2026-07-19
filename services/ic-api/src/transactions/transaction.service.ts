@@ -151,21 +151,26 @@ export class TransactionService {
         const account = accountResult.rows[0];
         const balance = BigInt(account.float_balance);
 
-        // TXN-6: a PRODUCTION transaction needs a live account with non-zero float.
-        if (
-          input.environment === 'PRODUCTION' &&
-          (account.operating_mode !== 'PRODUCTION' || balance === 0n)
-        ) {
+        // TXN-6: a PRODUCTION transaction needs a live (PRODUCTION-mode) account.
+        // Liveness is NOT about money: collecting is how a merchant earns float,
+        // so requiring a balance here would lock out every new merchant. A payout
+        // that can't be covered is handled below as FAILED/INSUFFICIENT_FLOAT —
+        // a recorded outcome with a reason, rather than a thrown error.
+        if (input.environment === 'PRODUCTION' && account.operating_mode !== 'PRODUCTION') {
           throw new AccountNotLiveError();
         }
 
         const config = await this.loadChargeConfig(client, input.accountId, input.processor);
         const amounts = computeAmounts(config.charge, config.fulfiller, input.amount);
 
-        // TXN-2: insufficient float -> FAILED, no debit. Float is a PRODUCTION
-        // concept only — SANDBOX is fully isolated from the real ledger so test
-        // traffic never consumes (or requires) real float.
-        if (input.environment === 'PRODUCTION' && balance < amounts.required) {
+        // TXN-2: insufficient float -> FAILED, no debit. Only a DISBURSEMENT
+        // spends float; a collection brings money IN and needs none. Float is a
+        // PRODUCTION concept only — SANDBOX is isolated from the real ledger.
+        if (
+          input.environment === 'PRODUCTION' &&
+          input.type === 'DISBURSEMENT' &&
+          balance < amounts.required
+        ) {
           const failed = await this.insertTransaction(client, input, {
             charge: amounts.charge,
             netAmount: amounts.netAmount,
@@ -182,15 +187,17 @@ export class TransactionService {
           return { record: failed, created: true };
         }
 
-        // TXN-3: debit float via the ledger, then mark PROCESSING. SANDBOX skips
-        // the ledger entirely (isolated from production float).
+        // TXN-3: mark PROCESSING. A DISBURSEMENT reserves the money now by
+        // debiting float (refunded if it fails). A COLLECTION debits nothing —
+        // it CREDITS the merchant's net once it actually succeeds, in
+        // completeTransaction. SANDBOX skips the ledger entirely.
         const txn = await this.insertTransaction(client, input, {
           charge: amounts.charge,
           netAmount: amounts.netAmount,
           status: 'PROCESSING',
           failureReason: null,
         });
-        if (input.environment === 'PRODUCTION') {
+        if (input.environment === 'PRODUCTION' && input.type === 'DISBURSEMENT') {
           await this.ledger.append(client, {
             accountId: input.accountId,
             entryType: 'DEBIT',
@@ -290,17 +297,32 @@ export class TransactionService {
       const next: TransactionStatus = input.result.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
       assertTransition(current.status, next); // STATE-2
 
-      if (next === 'FAILED' && current.environment === 'PRODUCTION') {
-        // Refund the float we debited at PROCESSING (compensating CREDIT).
-        // SANDBOX never debited, so there is nothing to refund.
-        await this.ledger.append(client, {
-          accountId: current.accountId,
-          entryType: 'CREDIT',
-          amount: current.amount + current.charge,
-          counterparty: `PROCESSOR_${current.processor}`,
-          reference: `REFUND:${current.id}`,
-          createdBy: input.actorId ?? null,
-        });
+      // Float movements (PRODUCTION only — SANDBOX never touches the ledger).
+      if (current.environment === 'PRODUCTION') {
+        if (next === 'SUCCESS' && current.type === 'COLLECTION') {
+          // The customer paid: credit what the merchant nets after charges.
+          // This is the merchant's income — settlement is what pays it out.
+          await this.ledger.append(client, {
+            accountId: current.accountId,
+            entryType: 'CREDIT',
+            amount: current.netAmount,
+            counterparty: `PROCESSOR_${current.processor}`,
+            reference: `COLLECTION:${current.id}`,
+            createdBy: input.actorId ?? null,
+          });
+        }
+        if (next === 'FAILED' && current.type === 'DISBURSEMENT') {
+          // Refund the float the payout reserved at PROCESSING. A failed
+          // collection debited nothing, so there is nothing to refund.
+          await this.ledger.append(client, {
+            accountId: current.accountId,
+            entryType: 'CREDIT',
+            amount: current.amount + current.charge,
+            counterparty: `PROCESSOR_${current.processor}`,
+            reference: `REFUND:${current.id}`,
+            createdBy: input.actorId ?? null,
+          });
+        }
       }
 
       const updated = await this.updateStatus(
@@ -367,12 +389,18 @@ export class TransactionService {
       }
       assertTransition(current.status, 'REVERSED'); // only SUCCESS -> REVERSED
 
-      // SANDBOX never touched the ledger, so a reversal has no float to credit.
+      // SANDBOX never touched the ledger, so a reversal has no float to move.
+      // Direction mirrors what the success did: a reversed COLLECTION refunds
+      // the customer, so we take back the net we credited; a reversed
+      // DISBURSEMENT means the payout came back, so the float returns.
       if (current.environment === 'PRODUCTION') {
+        const reversal =
+          current.type === 'COLLECTION'
+            ? { entryType: 'DEBIT' as const, amount: current.netAmount }
+            : { entryType: 'CREDIT' as const, amount: current.amount + current.charge };
         await this.ledger.append(client, {
           accountId: current.accountId,
-          entryType: 'CREDIT',
-          amount: current.amount + current.charge,
+          ...reversal,
           counterparty: `PROCESSOR_${current.processor}`,
           reference: `REVERSAL:${current.id}`,
           createdBy: input.actorId,

@@ -64,8 +64,32 @@ async function bootstrap(): Promise<void> {
         'Poll `GET /v1/transactions/{id}` to check the status of **any** transaction — collection or disbursement.',
         'Statuses: `PROCESSING` → `SUCCESS` | `FAILED`.',
         '',
+        '## Webhooks',
+        'In production a collection returns `PROCESSING` and resolves later, so we POST the outcome to your callback URL (set it in the Merchant Portal → API Documentation).',
+        '',
+        '```',
+        'POST <your callback url>',
+        'X-Instacompay-Event: transaction.success',
+        'X-Instacompay-Signature: t=1752380000,v1=<hex>',
+        '',
+        '{ "id": "<event id>", "type": "transaction.success",',
+        '  "created_at": "…", "data": { "id": "<transaction id>", "status": "SUCCESS", … } }',
+        '```',
+        '',
+        '**Verify every webhook** — reject any request whose signature does not match:',
+        '',
+        '```js',
+        "const [t, v1] = header.split(',').map((p) => p.split('=')[1]);",
+        "const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)",
+        '  .update(`${t}.${rawBody}`).digest(\'hex\');   // rawBody = the exact bytes received',
+        'if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(v1))) reject();',
+        '```',
+        '',
+        'Get `WEBHOOK_SECRET` (`whsec_…`) from the Merchant Portal, or `GET /v1/merchant/accounts/{id}/webhook-secret`. Respond `2xx` to acknowledge; we retry with backoff otherwise.',
+        '',
         '## Sandbox',
         'Start with a sandbox key (`ic_sand_…`). Sandbox **simulates and settles instantly** — no real money and no float used — so you can exercise the full `PROCESSING → SUCCESS` lifecycle before going live.',
+        'Sandbox accepts only the rails that are actually live in production, so anything that works here will work when you switch keys.',
       ].join('\n'),
     )
     .build();
@@ -74,10 +98,15 @@ async function bootstrap(): Promise<void> {
 
   // Focused integration reference: expose only the core payment operations, not
   // the full internal surface (auth/onboarding/admin/portal/callbacks).
+  // Must stay in step with the Postman collection and the published guides —
+  // an integrator comparing them should never see a different set.
   const KEEP: Record<string, string[]> = {
     '/v1/collections': ['post'],
-    '/v1/transactions/{id}': ['get'],
     '/v1/disbursements': ['post'],
+    '/v1/transactions/{id}': ['get'],
+    '/v1/transactions/{id}/reverse': ['post'],
+    '/v1/accounts/{id}/balance': ['get'],
+    '/v1/settlements': ['get'],
   };
   const paths: typeof doc.paths = {};
   for (const [path, methods] of Object.entries(KEEP)) {

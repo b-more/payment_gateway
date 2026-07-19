@@ -287,6 +287,7 @@
     <a href="#journey">Request flow</a>
     <a href="#auth">Signing</a>
     <a href="#engine">Engine</a>
+    <a href="#webhooks">Webhooks</a>
     <a href="#endpoints">Endpoints</a>
     <a href="#environments">Sandbox</a>
   </nav>
@@ -389,7 +390,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
 
 <span class="c-dim">// K50.00 collection — amount is integer ngwee, as a string</span>
 <span class="c-key">await</span> <span class="c-fn">call</span>(<span class="c-str">'POST'</span>, <span class="c-str">'/v1/collections'</span>, {
-  processor: <span class="c-str">'MTN'</span>, amount: <span class="c-str">'5000'</span>, msisdn: <span class="c-str">'260970000001'</span>,
+  processor: <span class="c-str">'AIRTEL'</span>, amount: <span class="c-str">'5000'</span>, msisdn: <span class="c-str">'260970000001'</span>,
   collectionReference: <span class="c-str">'order-1001'</span>,
 });</code></pre>
     </div>
@@ -457,6 +458,61 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
     <div class="grid cols-2">
       <div class="card"><h4>Replays return the original</h4><p>Re-send the same key and you get the <strong>original</strong> transaction back — no second charge, no second webhook, no second dispatch.</p></div>
       <div class="card"><h4>Race-safe</h4><p>Two requests with the same key arriving at once resolve to a single transaction; the loser simply returns what the winner created.</p></div>
+    </div>
+  </section>
+
+  <!-- WEBHOOKS -->
+  <section id="webhooks">
+    <div class="sec-head"><span class="tag">Webhooks</span><h2>How you find out it succeeded</h2></div>
+    <p class="sec-sub">In production a collection returns <span class="mono">PROCESSING</span> and only resolves once the customer approves on their phone — so we POST the outcome to your callback URL. Set it per account in the Merchant Portal. We retry with backoff until you answer <span class="mono">2xx</span>.</p>
+
+    <div class="codeblock">
+      <div class="cap">what we send you</div>
+      <pre><code><span class="c-key">POST</span> &lt;your callback url&gt;
+<span class="c-key">X-Instacompay-Event</span>:     transaction.success
+<span class="c-key">X-Instacompay-Signature</span>: t=1752380000,v1=9f2c…
+
+{
+  <span class="c-str">"id"</span>: <span class="c-str">"&lt;event id&gt;"</span>,
+  <span class="c-str">"type"</span>: <span class="c-str">"transaction.success"</span>,
+  <span class="c-str">"created_at"</span>: <span class="c-str">"2026-07-16T10:32:00.000Z"</span>,
+  <span class="c-str">"data"</span>: {
+    <span class="c-str">"id"</span>: <span class="c-str">"&lt;transaction id&gt;"</span>,
+    <span class="c-str">"status"</span>: <span class="c-str">"SUCCESS"</span>,
+    <span class="c-str">"amount"</span>: <span class="c-str">"5000"</span>,
+    <span class="c-str">"charge"</span>: <span class="c-str">"125"</span>,
+    <span class="c-str">"net_amount"</span>: <span class="c-str">"5000"</span>,
+    <span class="c-str">"collection_reference"</span>: <span class="c-str">"order-1001"</span>
+  }
+}</code></pre>
+    </div>
+
+    <div class="callout" style="margin-top:22px"><span class="ic">🔐</span>
+      <p><b>Always verify the signature.</b> Without it, anyone who learns your callback URL could POST a fake &ldquo;payment received&rdquo;. Reveal your secret (<code>whsec_…</code>) in the Merchant Portal → API Documentation, or via <span class="mono">GET /v1/merchant/accounts/{id}/webhook-secret</span>.</p>
+    </div>
+
+    <div class="codeblock" style="margin-top:22px">
+      <div class="cap">verifying a webhook (Node)</div>
+      <pre><code><span class="c-key">import</span> crypto <span class="c-key">from</span> <span class="c-str">'node:crypto'</span>;
+
+<span class="c-key">const</span> WEBHOOK_SECRET = <span class="c-str">'whsec_…'</span>;
+
+<span class="c-dim">// Verify against the RAW body bytes, before any JSON parsing.</span>
+<span class="c-key">function</span> <span class="c-fn">verify</span>(rawBody, header) {
+  <span class="c-key">const</span> p = <span class="c-var">Object</span>.fromEntries(header.split(<span class="c-str">','</span>).map((x) =&gt; x.split(<span class="c-str">'='</span>)));
+  <span class="c-key">const</span> expected = crypto.createHmac(<span class="c-str">'sha256'</span>, WEBHOOK_SECRET)
+    .update(<span class="c-str">`${p.t}.${rawBody}`</span>).digest(<span class="c-str">'hex'</span>);
+  <span class="c-key">const</span> a = <span class="c-var">Buffer</span>.from(expected), b = <span class="c-var">Buffer</span>.from(p.v1 ?? <span class="c-str">''</span>);
+  <span class="c-key">return</span> a.length === b.length &amp;&amp; crypto.timingSafeEqual(a, b);
+}
+
+app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
+  <span class="c-key">if</span> (!<span class="c-fn">verify</span>(req.rawBody, req.get(<span class="c-str">'X-Instacompay-Signature'</span>))) {
+    <span class="c-key">return</span> res.sendStatus(<span class="c-str">400</span>);        <span class="c-dim">// forged or tampered</span>
+  }
+  <span class="c-dim">// mark the order paid — idempotently, we may retry</span>
+  res.sendStatus(<span class="c-str">200</span>);
+});</code></pre>
     </div>
   </section>
 

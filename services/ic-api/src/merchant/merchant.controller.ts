@@ -354,6 +354,27 @@ export class MerchantController {
     );
   }
 
+  @Get('accounts/:id/webhook-secret')
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Reveal the webhook signing secret (to verify X-Instacompay-Signature)' })
+  webhookSecret(
+    @CurrentPrincipal() p: Principal,
+    @Param('id') accountId: string,
+  ): Promise<{ webhookSecret: string }> {
+    return this.read.webhookSecret(this.merchantId(p), accountId);
+  }
+
+  @Post('accounts/:id/webhook-secret/rotate')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Rotate the webhook signing secret (old signatures stop verifying)' })
+  rotateWebhookSecret(
+    @CurrentPrincipal() p: Principal,
+    @Param('id') accountId: string,
+  ): Promise<{ webhookSecret: string }> {
+    return this.read.rotateWebhookSecret(this.merchantId(p), accountId, p.userId);
+  }
+
   @Post('accounts/:id/credentials/:env/regenerate')
   @HttpCode(201)
   @Roles('MERCHANT_ADMIN')

@@ -110,9 +110,9 @@ export default function SettlementsPage(): ReactNode {
       <div className="callout-warn">
         <span>⚠️</span>
         <p>
-          <b>Confirm moves money in the ledger.</b> The collection-vs-settlement netting policy is still
-          unresolved — collections already debit float, and a settlement debits again. Confirm a real
-          settlement only once that policy is agreed, or an account may be double-debited.
+          <b>Confirm moves money in the ledger.</b> Only confirm once the bank transfer has actually left —
+          it debits the merchant&apos;s float and is recorded as the payout. Settling is capped at what the
+          merchant has <b>earned</b> from collections, so pre-funded working capital is never wired out.
         </p>
       </div>
 

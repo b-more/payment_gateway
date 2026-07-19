@@ -26,18 +26,20 @@ interface SettlementRow {
 /**
  * Settlements (§5.8).
  *
- * SET-1: settleable = Σ net_amount(SUCCESS collections) − Σ amount(settlements
- *        already PENDING or SETTLED). net_amount already nets the charge per
- *        fulfiller (CHG-4/5), so it is the right figure for "collections − charges".
+ * MONEY MODEL: a successful collection CREDITS the merchant's float with its
+ * net_amount (their income); a settlement is the only thing that pays that money
+ * out to their bank, as a DEBIT. Disbursements also debit float.
+ *
+ * SET-1: settleable = min(earned, available), where
+ *          earned    = Σ net_amount(SUCCESS collections) − Σ settlements(PENDING|SETTLED)
+ *          available = float_balance − Σ settlements(PENDING)
+ *        `earned` is what the merchant has actually made and not yet been paid.
+ *        Capping by `available` matters for two reasons: a merchant who spent
+ *        collections on payouts has less left to settle, and admin-credited float
+ *        (working capital for disbursements) must never be wired to their bank.
  * SET-2: PENDING → SETTLED (bank confirmed) or → FAILED (funds retained = the row
  *        no longer counts as already-settled, so it returns to settleable).
- * SET-3: a SETTLED settlement writes a float_ledger entry (the payout).
- *
- * NETTING NOTE (flagged for the business): the §5.3 flow debits float on a
- * collection (TXN-3) and this records the payout as another DEBIT. The exact
- * collection-vs-settlement netting is a policy decision; this implementation
- * keeps float_ledger the single balance source of truth (NN-2) and treats a
- * settlement as a payout DEBIT against the account.
+ * SET-3: a SETTLED settlement writes a float_ledger DEBIT (the payout).
  */
 @Injectable()
 export class SettlementService {
@@ -50,8 +52,12 @@ export class SettlementService {
   /** SET-1: compute and (if positive) create a PENDING settlement for one account. */
   async runForAccount(accountId: string, actorId?: string | null): Promise<SettlementRunResult> {
     return withTransaction(this.pool, async (client) => {
-      // Serialize settlement runs for the account.
-      await client.query('SELECT 1 FROM accounts WHERE id = $1 FOR UPDATE', [accountId]);
+      // Serialize settlement runs for the account and read its balance.
+      const acct = await client.query<{ float_balance: string }>(
+        'SELECT float_balance FROM accounts WHERE id = $1 FOR UPDATE',
+        [accountId],
+      );
+      if (acct.rowCount === 0) throw new NotFoundError(`account not found: ${accountId}`);
 
       const collected = await client.query<TotalRow>(
         `SELECT COALESCE(SUM(net_amount), 0)::text AS total FROM transactions
@@ -63,7 +69,18 @@ export class SettlementService {
            WHERE account_id = $1 AND status IN ('PENDING', 'SETTLED')`,
         [accountId],
       );
-      const settleable = BigInt(collected.rows[0].total) - BigInt(reserved.rows[0].total);
+      const pending = await client.query<TotalRow>(
+        `SELECT COALESCE(SUM(amount), 0)::text AS total FROM settlements
+           WHERE account_id = $1 AND status = 'PENDING'`,
+        [accountId],
+      );
+
+      // What they've earned and not been paid for…
+      const earned = BigInt(collected.rows[0].total) - BigInt(reserved.rows[0].total);
+      // …capped by what the account actually still holds (a PENDING settlement
+      // is a claim that hasn't debited float yet, so it doesn't count as held).
+      const available = BigInt(acct.rows[0].float_balance) - BigInt(pending.rows[0].total);
+      const settleable = earned < available ? earned : available;
       if (settleable <= 0n) {
         return { created: false, settlementId: null, amount: 0n };
       }

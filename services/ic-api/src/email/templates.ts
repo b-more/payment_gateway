@@ -2,11 +2,11 @@
 //
 // Email-safe HTML only: layout tables + inline styles, web-safe fonts, no
 // flexbox/grid, and a solid background-color fallback under every gradient
-// (Outlook drops gradients). The instac•m wordmark is rendered as live text —
-// not an image — so the branding survives even when a client blocks remote
+// (Outlook drops gradients). The instac•m wordmark is rendered as live text
+// rather than an image, so the branding survives when a client blocks remote
 // images. Every template also carries a plain-text part for non-HTML clients.
 
-const BRAND = '#1144bb'; // cobalt — sampled from the instac•m mark
+const BRAND = '#1144bb'; // cobalt, sampled from the instac•m mark
 const BRAND_DEEP = '#0a2275';
 const ACCENT = '#1e5fe0';
 const RED = '#e11d2a'; // the signature dot in instac•m
@@ -102,14 +102,14 @@ export function otpEmail(code: string): RenderedEmail {
       `Your Instacom verification code is ${code}.\n\n` +
       `It expires in 5 minutes and can be used once. ` +
       `If you didn't try to sign in, you can ignore this email.\n\n` +
-      `— Instacom Payment Solutions Limited`,
+      `Instacom Payment Solutions Limited`,
     html: layout({
-      preheader: `Your verification code is ${code} — expires in 5 minutes.`,
+      preheader: `Your verification code is ${code}. It expires in 5 minutes.`,
       heading: 'Verify your sign-in',
       bodyHtml:
         paragraph('Use this one-time code to finish signing in to your Instacom account:') +
         codeBox(code, { spaced: true }) +
-        note('This code expires in <strong>5 minutes</strong> and can be used once. If you didn’t try to sign in, you can safely ignore this email.'),
+        note('This code expires in <strong>5 minutes</strong> and can be used once. If you did not try to sign in, you can safely ignore this email.'),
     }),
   };
 }
@@ -121,42 +121,42 @@ export function passwordResetEmail(code: string): RenderedEmail {
     text:
       `Your Instacom password reset code is ${code}.\n\n` +
       `Enter it in the portal to set a new password. It expires in 15 minutes and can be used once. ` +
-      `If you didn't request a reset, you can ignore this email — your password is unchanged.\n\n` +
-      `— Instacom Payment Solutions Limited`,
+      `If you didn't request a reset, you can ignore this email. Your password is unchanged.\n\n` +
+      `Instacom Payment Solutions Limited`,
     html: layout({
-      preheader: `Your password reset code is ${code} — expires in 15 minutes.`,
+      preheader: `Your password reset code is ${code}. It expires in 15 minutes.`,
       heading: 'Reset your password',
       bodyHtml:
         paragraph('Enter this code in the portal to set a new password:') +
         codeBox(code, { spaced: true }) +
-        note('This code expires in <strong>15 minutes</strong> and can be used once. If you didn’t request a reset, ignore this email — your password stays unchanged.'),
+        note('This code expires in <strong>15 minutes</strong> and can be used once. If you did not request a reset, ignore this email. Your password stays unchanged.'),
     }),
   };
 }
 
-/** Onboarding application acknowledgement (ONB-1) — sent the moment a merchant
+/** Onboarding application acknowledgement (ONB-1). Sent the moment a merchant
  *  applies, so the entered email always gets a confirmation. Carries no secrets. */
 export function applicationReceivedEmail(merchantName: string): RenderedEmail {
   return {
-    subject: 'We’ve received your Instacom application',
+    subject: 'We have received your Instacom application',
     text:
       `Hello ${merchantName},\n\n` +
-      `Thanks for applying for an Instacom merchant account. We’ve received your ` +
+      `Thanks for applying for an Instacom merchant account. We have received your ` +
       `application and our compliance team will review it and get back to you within ` +
-      `24–48 hours.\n\n` +
-      `There’s nothing you need to do right now — we’ll email you as soon as your ` +
+      `24 to 48 hours.\n\n` +
+      `There is nothing you need to do right now. We will email you as soon as your ` +
       `account is approved and ready to set up.\n\n` +
-      `— Instacom Payment Solutions Limited`,
+      `Instacom Payment Solutions Limited`,
     html: layout({
-      preheader: 'We’ve received your merchant application — review takes 24–48 hours.',
-      heading: `Thanks, ${merchantName} — we’ve got your application.`,
+      preheader: 'We have received your merchant application. Review takes 24 to 48 hours.',
+      heading: `Thanks, ${merchantName}. We have your application.`,
       bodyHtml:
         paragraph(
           'Your Instacom merchant application has been received. Our compliance team will ' +
-            'review your details and KYC documents and get back to you within <strong>24–48 hours</strong>.',
+            'review your details and KYC documents and get back to you within <strong>24 to 48 hours</strong>.',
         ) +
         note(
-          'There’s nothing you need to do right now — we’ll email you the moment your account ' +
+          'There is nothing you need to do right now. We will email you the moment your account ' +
             'is approved and ready to set up.',
         ),
     }),
@@ -167,49 +167,49 @@ export function applicationReceivedEmail(merchantName: string): RenderedEmail {
  *  an admin provisions the account. */
 export function applicationApprovedEmail(merchantName: string): RenderedEmail {
   return {
-    subject: 'Your Instacom application is approved 🎉',
+    subject: 'Your Instacom application is approved',
     text:
       `Good news, ${merchantName}!\n\n` +
       `Your Instacom merchant account has been approved. Our team is setting up your ` +
-      `account now — you’ll receive a separate email with your dashboard access and ` +
+      `account now. You will receive a separate email with your dashboard access and ` +
       `sandbox API key shortly.\n\n` +
       `Welcome aboard.\n\n` +
-      `— Instacom Payment Solutions Limited`,
+      `Instacom Payment Solutions Limited`,
     html: layout({
       preheader: 'Your Instacom merchant account has been approved.',
-      heading: `Good news, ${merchantName} — you’re approved.`,
+      heading: `Good news, ${merchantName}. You are approved.`,
       bodyHtml:
         paragraph(
-          'Your Instacom merchant account has been <strong>approved</strong>. Welcome aboard — ' +
-            'you’re one step away from collecting and settling in Kwacha across every Zambian rail.',
+          'Your Instacom merchant account has been <strong>approved</strong>. Welcome aboard. ' +
+            'you are one step away from collecting and settling in Kwacha across every Zambian rail.',
         ) +
         note(
-          'Our team is finishing your account setup. You’ll receive a separate email with your ' +
-            'dashboard access and sandbox API key shortly — no action needed from you right now.',
+          'Our team is finishing your account setup. You will receive a separate email with your ' +
+            'dashboard access and sandbox API key shortly. No action is needed from you right now.',
         ),
     }),
   };
 }
 
-/** Application declined (ONB-3). Carries the reviewer’s reason. */
+/** Application declined (ONB-3). Carries the reviewer reason. */
 export function applicationRejectedEmail(merchantName: string, reason: string): RenderedEmail {
   return {
     subject: 'Update on your Instacom application',
     text:
       `Hello ${merchantName},\n\n` +
-      `Thank you for your interest in Instacom. After reviewing your application, we’re ` +
+      `Thank you for your interest in Instacom. After reviewing your application, we are ` +
       `unable to approve your merchant account at this time.\n\n` +
       `Reason: ${reason}\n\n` +
       `If you believe this was a mistake or can provide more information, reply to this ` +
       `email and our team will be glad to help.\n\n` +
-      `— Instacom Payment Solutions Limited`,
+      `Instacom Payment Solutions Limited`,
     html: layout({
       preheader: 'An update on your Instacom merchant application.',
       heading: 'Update on your application',
       bodyHtml:
         paragraph(
           `Thank you for your interest in Instacom, ${merchantName}. After reviewing your ` +
-            'application, we’re unable to approve your merchant account at this time.',
+            'application, we are unable to approve your merchant account at this time.',
         ) +
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#fff6f6; border:1px solid #f3d0d3; border-left:4px solid ${RED}; border-radius:8px; padding:14px 16px; margin:0 0 18px;">
           <div style="font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:${RED}; margin-bottom:4px;">Reason</div>
@@ -228,7 +228,7 @@ export interface PortalCredentialsInput {
   tempPassword: string;
 }
 
-/** Portal login details (§7.1) — issued when a merchant's account is first
+/** Portal login details (§7.1). Issued when a merchant's account is first
  *  provisioned, so the admin user can actually sign in. Sign-in still requires
  *  an emailed OTP, and the user is told to change the temporary password. */
 export function portalCredentialsEmail(input: PortalCredentialsInput): RenderedEmail {
@@ -242,9 +242,9 @@ export function portalCredentialsEmail(input: PortalCredentialsInput): RenderedE
       `Portal:   ${MERCHANT_PORTAL_URL}/login\n` +
       `Email:    ${input.loginEmail}\n` +
       `Password: ${input.tempPassword}\n\n` +
-      `At sign-in you’ll be asked for a one-time verification code that we email you. ` +
+      `At sign-in you will be asked for a one-time verification code that we email you. ` +
       `For your security, please change this temporary password after your first login.\n\n` +
-      `— Instacom Payment Solutions Limited`,
+      `Instacom Payment Solutions Limited`,
     html: layout({
       preheader: 'Your merchant portal login details are inside.',
       heading: 'Your portal access is ready',
@@ -257,7 +257,7 @@ export function portalCredentialsEmail(input: PortalCredentialsInput): RenderedE
         </table>` +
         button(`${MERCHANT_PORTAL_URL}/login`, 'Sign in to the portal') +
         note(
-          'At sign-in you’ll be asked for a one-time verification code that we email you. ' +
+          'At sign-in you will be asked for a one-time verification code that we email you. ' +
             'For your security, please <strong>change this temporary password</strong> after your first login.',
         ),
     }),
@@ -270,7 +270,7 @@ export interface WelcomeEmailInput {
   sandboxApiKey: string;
 }
 
-/** Onboarding welcome (ONB-7). Carries the public api_key only — never a secret. */
+/** Onboarding welcome (ONB-7). Carries the public api_key only, never a secret. */
 export function welcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   return {
     subject: 'Welcome to Instacom',
@@ -279,8 +279,8 @@ export function welcomeEmail(input: WelcomeEmailInput): RenderedEmail {
       `Your account ${input.accountId} is ready. ` +
       `Sandbox API key: ${input.sandboxApiKey}.\n\n` +
       `Sign in to the merchant portal to view your dashboard: ${MERCHANT_PORTAL_URL}\n` +
-      `Your secret and signing keys are shown once in the portal — store them securely.\n\n` +
-      `— Instacom Payment Solutions Limited`,
+      `Your secret and signing keys are shown once in the portal, so store them securely.\n\n` +
+      `Instacom Payment Solutions Limited`,
     html: layout({
       preheader: `Your Instacom account ${input.accountId} is ready.`,
       heading: `Welcome, ${input.merchantName}.`,
@@ -288,7 +288,7 @@ export function welcomeEmail(input: WelcomeEmailInput): RenderedEmail {
         paragraph(`Your account <strong style="color:${INK};">${input.accountId}</strong> is ready. Here is your sandbox API key to start integrating:`) +
         codeBox(input.sandboxApiKey) +
         button(`${MERCHANT_PORTAL_URL}/dashboard`, 'Open your dashboard') +
-        note('Your secret and signing keys are shown <strong>once</strong> in the portal — store them somewhere safe. Collect, disburse and settle across MTN, Airtel, Zamtel, Zed Mobile and Visa, all in Kwacha.'),
+        note('Your secret and signing keys are shown <strong>once</strong> in the portal, so store them somewhere safe. Collect, disburse and settle across MTN, Airtel, Zamtel, Zed Mobile and Visa, all in Kwacha.'),
     }),
   };
 }

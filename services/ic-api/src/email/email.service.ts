@@ -15,7 +15,7 @@ export interface WelcomeEmail {
   to: string;
   merchantName: string;
   accountId: string;
-  sandboxApiKey: string; // public api_key only — never a secret (ONB-5)
+  sandboxApiKey: string; // public api_key only, never a secret (ONB-5)
 }
 
 /**
@@ -43,7 +43,7 @@ export class EmailService {
     this.logger.debug(`OTP email dispatched to ${otp.to}`);
   }
 
-  /** Portal login credentials (§7.1) — emailed when an account is first provisioned. */
+  /** Portal login credentials (§7.1). Emailed when an account is first provisioned. */
   async sendPortalCredentials(input: {
     to: string;
     loginEmail: string;
@@ -57,7 +57,7 @@ export class EmailService {
     this.logger.debug(`Portal credentials email dispatched to ${input.to}`);
   }
 
-  /** Onboarding application acknowledgement (ONB-1) — sent on application submit. */
+  /** Onboarding application acknowledgement (ONB-1). Sent on application submit. */
   async sendApplicationReceived(input: { to: string | string[]; merchantName: string }): Promise<void> {
     const mail = applicationReceivedEmail(input.merchantName);
     await this.send({ to: input.to, subject: mail.subject, text: mail.text, html: mail.html });

@@ -112,29 +112,6 @@ app.post('/webhooks/instacompay', (req, res) => {
   res.sendStatus(200);                    // acknowledge
 });`;
 
-const SIGNED_SNIPPET = `// Optional: sign each request instead of sending the secret.
-// Adds replay protection and body integrity. Send X-Signature and the
-// API switches to signed mode automatically.
-const SIGNING_KEY = '...';   // shown once alongside the secret
-
-const body = JSON.stringify({ processor: 'AIRTEL', amount: '5000', msisdn: '260970000001' });
-const ts = Math.floor(Date.now() / 1000).toString();
-
-// sign "timestamp.METHOD.path.rawBody"
-const signature = crypto.createHmac('sha256', SIGNING_KEY)
-  .update(\`\${ts}.POST./v1/collections.\${body}\`).digest('hex');
-
-await fetch(API_BASE + '/v1/collections', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Api-Key': API_KEY,
-    'X-Timestamp': ts,          // must be within 5 minutes of server time
-    'X-Signature': signature,
-    'Idempotency-Key': crypto.randomUUID(),
-  },
-  body,
-});`;
 
 /**
  * Copy to clipboard. Only reports success once the write actually resolves.
@@ -257,27 +234,6 @@ export default function ApiDocsPage(): ReactNode {
           <b>All amounts are integer ngwee, sent as strings.</b> K1.50 is <span className="mono">&quot;150&quot;</span> and
           K50.00 is <span className="mono">&quot;5000&quot;</span>. Do not send decimals or JSON numbers.
         </p>
-      </div>
-
-      {/* Authentication: signed requests */}
-      <div className="card card-pad" style={{ marginBottom: 16 }}>
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Authentication: signed requests (optional)</div>
-          <Copy text={SIGNED_SNIPPET} label="Copy example" />
-        </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          If you would rather not send your secret on every call, sign the request instead. The signature is an
-          HMAC-SHA256 of <span className="mono">{'`${timestamp}.${METHOD}.${path}.${rawBody}`'}</span> using your{' '}
-          <b>signing key</b>. This adds replay protection and body integrity. Send an{' '}
-          <span className="mono">X-Signature</span> header and the API uses signed mode automatically.
-        </p>
-        <table className="table" style={{ marginBottom: 14 }}>
-          <tbody>
-            <tr><td className="mono" style={{ width: 160 }}>X-Timestamp</td><td className="muted">Unix epoch seconds. Must be within 5 minutes of server time.</td></tr>
-            <tr><td className="mono">X-Signature</td><td className="muted">HMAC-SHA256(signingKey, <span className="mono">ts.METHOD.path.body</span>), hex.</td></tr>
-          </tbody>
-        </table>
-        <pre className="code-block" style={{ margin: 0, maxHeight: 320 }}><code>{SIGNED_SNIPPET}</code></pre>
       </div>
 
       {/* Webhooks */}
@@ -502,13 +458,12 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
               </div>
             </div>
             <Copy
-              text={`apiKey=${secret.apiKey}\napiSecret=${secret.secret}\nsigningKey=${secret.signingKey}`}
+              text={`apiKey=${secret.apiKey}\napiSecret=${secret.secret}`}
               label="Copy all"
             />
           </div>
           <div className="cred-row"><span>apiKey</span><code>{secret.apiKey}</code><Copy text={secret.apiKey} label="Copy" /></div>
           <div className="cred-row"><span>apiSecret</span><code>{secret.secret}</code><Copy text={secret.secret} label="Copy" /></div>
-          <div className="cred-row"><span>signingKey</span><code>{secret.signingKey}</code><Copy text={secret.signingKey} label="Copy" /></div>
           <button className="btn sm" style={{ marginTop: 10 }} onClick={() => setSecret(null)}>
             I have saved them, hide
           </button>

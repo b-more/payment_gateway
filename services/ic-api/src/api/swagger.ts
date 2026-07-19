@@ -2,9 +2,13 @@ import { applyDecorators } from '@nestjs/common';
 import { ApiHeader } from '@nestjs/swagger';
 
 /**
- * Auth headers for every /v1 call. Two modes:
- *   SIMPLE: X-Api-Key plus X-Api-Secret (SEC-API2b)
- *   SIGNED: X-Api-Key plus X-Timestamp and X-Signature (SEC-API2/3)
+ * Auth headers for every /v1 call: X-Api-Key plus X-Api-Secret (SEC-API2b).
+ *
+ * Signed mode (X-Timestamp + X-Signature, SEC-API2/3) is still fully supported
+ * by ApiAuthGuard and every credential is still issued a signing key. It is
+ * deliberately not advertised here: offering two ways to authenticate raised
+ * more integrator questions than the extra hardening was worth. Document it
+ * directly for any merchant who asks for it.
  */
 export function ApiAuthHeaders(): ReturnType<typeof applyDecorators> {
   return applyDecorators(
@@ -13,17 +17,6 @@ export function ApiAuthHeaders(): ReturnType<typeof applyDecorators> {
       name: 'X-Api-Secret',
       required: false,
       description: 'Simple auth. Your api secret, or send Authorization: Bearer <secret> instead.',
-    }),
-    ApiHeader({
-      name: 'X-Timestamp',
-      required: false,
-      description: 'Signed auth only. Unix epoch seconds, within a 5 minute window.',
-    }),
-    ApiHeader({
-      name: 'X-Signature',
-      required: false,
-      description:
-        'Signed auth only. HMAC-SHA256(signingKey, `${ts}.${METHOD}.${path}.${rawBody}`) as hex. Sending this header selects signed mode.',
     }),
   );
 }

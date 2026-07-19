@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="How the Instacompay Gateway API works: request signing, the transaction engine, endpoints, and sandbox vs production.">
+<meta name="description" content="How the Instacompay Gateway API works: authentication, the transaction engine, endpoints, and sandbox vs production.">
 <title>Instacompay Gateway API Guide</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E$%3C/text%3E%3C/svg%3E">
 </head>
@@ -302,7 +302,7 @@
   <div class="brand"><span class="mark">i</span> Instacompay&nbsp;Gateway</div>
   <nav>
     <a href="#journey">Request flow</a>
-    <a href="#auth">Signing</a>
+    <a href="#auth">Authentication</a>
     <a href="#engine">Engine</a>
     <a href="#refunds">Refunds</a>
     <a href="#webhooks">Webhooks</a>
@@ -343,10 +343,7 @@
 
 <span class="c-dim"># writes also take an idempotency key. send it again to safely retry</span>
 <span class="c-key">Idempotency-Key</span>  <span class="c-str">"any-unique-string"</span>
-
-<span class="c-dim"># prefer not to send the secret? sign instead (hardened, optional):</span>
-message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
-<span class="c-key">X-Signature</span> = <span class="c-fn">HMAC-SHA256</span>(signingKey, message)  <span class="c-dim">// + X-Timestamp</span></code></pre>
+</code></pre>
     </div>
   </div>
 </div>
@@ -361,7 +358,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
       <li><h4>nginx → API</h4><p>TLS terminates at the edge; the request is proxied to the service with its <span class="mono">path</span> and body preserved byte-for-byte.</p></li>
       <li><h4>Raw-body capture</h4><p>The exact bytes of the body are kept as <span class="mono">rawBody</span>. The signature is computed over these bytes. Re-serialised JSON would differ and break verification.</p></li>
       <li><h4>Rate limit</h4><p>Per-credential throttling rejects abusive callers before any lookup work is done.</p></li>
-      <li><h4>Authenticate</h4><p>The signed request is verified (see below). On success a <span class="mono">CredentialContext</span> holding the key, account and environment is attached to the request.</p></li>
+      <li><h4>Authenticate</h4><p>The key and secret are verified (see below). On success a <span class="mono">CredentialContext</span> holding the key, account and environment is attached to the request.</p></li>
       <li><h4>Validate</h4><p>The body is validated against a strict schema. Unknown fields are rejected outright, not ignored.</p></li>
       <li><h4>Handle</h4><p>The controller does the work, always scoped to the authenticated key's own account. A key can never see another merchant's data.</p></li>
       <li><h4>Serialize &amp; return</h4><p>Domain errors map to a clean <span class="mono">{ error: { code, message } }</span> envelope; money serialises as integer-ngwee strings.</p></li>
@@ -371,25 +368,14 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
   <!-- AUTH -->
   <section id="auth">
     <div class="sec-head"><span class="tag">Auth</span><h2>Two ways to authenticate</h2></div>
-    <p class="sec-sub">Authentication is per-request, not per-session: nothing to expire or refresh. Start with key + secret; move to signing if you want the extra hardening.</p>
+    <p class="sec-sub">Authentication is per-request, not per-session: there is nothing to expire or refresh. Send your key and secret on every call.</p>
 
-    <div class="grid cols-2" style="margin-bottom:24px">
-      <div class="card">
-        <h4>Simple: key and secret <span class="mono" style="font-size:11px;color:var(--get)">recommended</span></h4>
-        <p>Send <code>X-Api-Key</code> + <code>X-Api-Secret</code> (or <code>Authorization: Bearer &lt;secret&gt;</code>) on every call. This is the familiar key and secret over TLS model, and you can be live in minutes.</p>
-      </div>
-      <div class="card">
-        <h4>Signed: HMAC <span class="mono" style="font-size:11px;color:var(--faint)">hardened</span></h4>
-        <p>Do not send the secret at all. Prove each call with a signature instead. Adds <strong>replay protection</strong> and <strong>body integrity</strong>. Send <code>X-Signature</code> and the API switches automatically.</p>
-      </div>
-    </div>
-
-    <p class="wide"><strong>How the server verifies a signed request.</strong> A fixed sequence:</p>
+    <p class="wide"><strong>How the server verifies a call.</strong> A fixed sequence:</p>
     <ol class="steps">
-      <li><h4>Resolve the key</h4><p>Look up the credential by <span class="mono">X-Api-Key</span>; reject immediately if it's missing or not active.</p></li>
-      <li><h4>Check the window</h4><p>Reject timestamps more than 5 minutes old, so a captured request cannot be replayed later.</p></li>
-      <li><h4>Recompute &amp; compare</h4><p>Decrypt the signing key (stored encrypted, never plaintext), recompute the HMAC, and compare in <strong>constant time</strong>.</p></li>
-      <li><h4>Enforce IP allowlist</h4><p>For <strong>live</strong> keys only, the request IP must be on the account's allowlist, in <em>both</em> auth modes. Sandbox keys skip this.</p></li>
+      <li><h4>Resolve the key</h4><p>Look up the credential by <span class="mono">X-Api-Key</span>; reject immediately if it is missing or not active.</p></li>
+      <li><h4>Check the secret</h4><p>The secret is compared against an argon2id hash in constant time. We never store it in plaintext.</p></li>
+      <li><h4>Enforce IP allowlist</h4><p>For <strong>live</strong> keys only, the request IP must be on the account's allowlist, checked against the real client address.</p></li>
+      <li><h4>Apply the rate limit</h4><p>Per-key limits are applied before any business logic runs.</p></li>
     </ol>
 
     <div class="codeblock" style="margin-top:26px">

@@ -12,7 +12,6 @@ export const NAVLINKS: Array<[string, string]> = [
   ['Product', '/product'],
   ['How it works', '/how-it-works'],
   ['Developers', '/developers'],
-  ['Pricing', '/pricing'],
   ['Contact', '/contact'],
 ];
 
@@ -43,23 +42,23 @@ export const I = {
 export const RAILS = ['MTN', 'Airtel', 'Zamtel', 'Zed Mobile', 'Visa'];
 
 export const FEATURES: Array<{ icon: string; title: string; body: string }> = [
-  { icon: I.bolt, title: 'Fast transactions', body: 'Collections and payouts clear in seconds on every major Zambian rail.' },
-  { icon: I.shield, title: 'Secure payments', body: 'Encrypted in transit and at rest, with signed requests and an append-only record of every kwacha that moves.' },
-  { icon: I.swap, title: 'Payouts to any wallet', body: 'Send money to any mobile wallet or card from one balance, with float controls and full reconciliation.' },
-  { icon: I.zero, title: 'Zero integration cost', body: 'Onboarding and integration are free. No setup fee, no monthly minimum. You pay only when you transact.' },
-  { icon: I.pulse, title: 'Real-time monitoring', body: 'Track every transaction, settlement and balance change as it happens from your dashboard.' },
-  { icon: I.code, title: 'Developer-ready API', body: 'A REST API with key and secret auth, idempotency keys and signed webhooks. Most teams integrate in a day.' },
+  { icon: I.bolt, title: 'Fast transactions', body: 'Collections and payouts move in seconds across every major Zambian rail. No waiting, no friction.' },
+  { icon: I.shield, title: 'Secure payments', body: 'Bank-grade encryption, signed requests and an append-only audit trail behind every kwacha that moves.' },
+  { icon: I.swap, title: 'Seamless transfers', body: 'Disburse to any wallet or card from one balance, with float controls and full reconciliation.' },
+  { icon: I.zero, title: 'Zero integration cost', body: 'Onboard your business and go live for free. No setup fees, no lock-in. You only pay as you transact.' },
+  { icon: I.pulse, title: 'Real-time monitoring', body: 'Watch every transaction, settlement and balance update live from your merchant dashboard.' },
+  { icon: I.code, title: 'Developer-ready API', body: 'A clean REST API with HMAC signing, idempotency keys and signed webhooks. Integrate in an afternoon.' },
 ];
 
 /* ── Bank of Zambia licensing (LEGAL-1, now authorised) ── */
 export const BOZ = {
-  eyebrow: 'Licensed and regulated',
+  eyebrow: 'Licensed & Regulated',
   title: 'Licensed by the Bank of Zambia.',
   body:
     'Instacom Payment Solutions Limited operates as a regulated payment service provider supervised by the Bank of Zambia. Every kwacha you collect, hold and settle is handled to national regulatory standard, not a workaround.',
   points: [
     'Regulated payment service provider, supervised by the Bank of Zambia',
-    'Customer and merchant funds handled to Bank of Zambia standards',
+    'Customer & merchant funds handled to BoZ standards',
     'Append-only audit trail on every transaction (full traceability)',
     'Built, hosted and operated in Zambia, settled 100% in ZMW',
   ],
@@ -68,9 +67,9 @@ export const BOZ = {
 /* ── Animated proof stats ── */
 export const STATS: Array<{ n?: number; decimals?: number; suffix?: string; text?: string; label: string }> = [
   { n: 99.9, decimals: 1, suffix: '%', label: 'Platform uptime' },
-  { n: 5, label: 'Payment rails, one API' },
-  { text: 'Seconds', label: 'To collect and settle' },
-  { text: 'Bank-grade', label: 'Encryption and audit trail' },
+  { n: 5, label: 'Payment rails · one API' },
+  { text: 'Seconds', label: 'To collect & settle' },
+  { text: 'Bank-grade', label: 'Encryption & audit trail' },
 ];
 
 /* ── Full-bleed use-case bands (campaign photography, headline = the message) ── */
@@ -103,38 +102,9 @@ export const BANDS: Array<{ img: string; eyebrow: string; title: string; body: s
 
 /* ── Segment showcase (portrait campaign posters) ── */
 export const SEGMENTS: Array<{ img: string; label: string }> = [
-  { img: '/campaign/1.jpg', label: 'Corporates and enterprise' },
+  { img: '/campaign/1.jpg', label: 'Corporates & enterprise' },
   { img: '/campaign/2.jpg', label: 'SMEs, free onboarding' },
-  { img: '/campaign/4.jpg', label: 'Schools and campuses' },
-  { img: '/campaign/3.jpg', label: 'Personal and everyday' },
-  { img: '/campaign/7.jpg', label: 'Everyday transactions' },
-];
-
-/* ── How money moves. A real sequence, which is why these steps are numbered. ── */
-export const FLOW: Array<{ t: string; b: string }> = [
-  { t: 'Your customer pays', b: 'They approve the payment on the wallet or card they already use. Nothing to download.' },
-  { t: 'Instacom collects', b: 'We route the request to MTN, Airtel, Zamtel, Zed Mobile or Visa and confirm the result.' },
-  { t: 'Your system is told', b: 'We send a signed webhook the moment the payment succeeds, so you can release the goods.' },
-  { t: 'Funds settle in Kwacha', b: 'Your balance is credited and settled to your bank on your schedule, reconciled to the ngwee.' },
-];
-
-/* ── Social proof. Placeholder slots sized like the real thing so adding a
-      logo or a quote later cannot shift the layout (CLS). ── */
-export const PROOF_LOGOS: string[] = [
-  'Retail group', 'School network', 'Logistics firm', 'Insurance broker', 'Utility biller',
-];
-
-export const TESTIMONIALS: Array<{ quote: string; who: string; role: string }> = [
-  {
-    quote:
-      'We collect school fees from parents on four different networks. Instacom put all of them behind one integration, and the reconciliation report matches our books to the ngwee.',
-    who: 'Finance lead',
-    role: 'School network, Lusaka',
-  },
-  {
-    quote:
-      'Our developers had the sandbox working the same afternoon. Going live took one call, and payouts now run on a schedule instead of by hand.',
-    who: 'Operations manager',
-    role: 'Retail group, Copperbelt',
-  },
+  { img: '/campaign/4.jpg', label: 'Schools & campuses' },
+  { img: '/campaign/3.jpg', label: 'Personal & everyday' },
+  { img: '/campaign/7.jpg', label: 'Seamless transactions' },
 ];

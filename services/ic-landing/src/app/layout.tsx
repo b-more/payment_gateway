@@ -1,12 +1,10 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 // Self-hosted fonts (served from 'self', CSP-safe; no build-time CDN fetch).
-// One family does the whole page: IBM Plex Sans, an institutional grotesque that
-// suits a regulated payment provider. IBM Plex Mono is the same superfamily and
-// is reserved for money figures and code, so amounts line up on the decimal.
-import '@fontsource-variable/ibm-plex-sans';
-import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/500.css';
+// Display: Plus Jakarta Sans. Rounded, confident, echoes the Instacom wordmark.
+// Body: Inter. Neutral, legible. A deliberate, non-default fintech pairing.
+import '@fontsource-variable/plus-jakarta-sans';
+import '@fontsource-variable/inter';
 import './globals.css';
 import { SiteNav } from '@/components/site-nav';
 import { SiteFooter } from '@/components/site-footer';

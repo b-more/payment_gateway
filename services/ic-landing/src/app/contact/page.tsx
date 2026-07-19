@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 const CHANNELS: Array<{ ic: string; t: string; b: string; cta: string; href: string }> = [
-  { ic: I.bolt, t: 'Onboarding and sales', b: 'Apply to onboard your business and go live. Our team reviews every application within 24 to 48 hours.', cta: 'Apply now', href: `${MERCHANT}/getting-started` },
+  { ic: I.bolt, t: 'Onboarding & sales', b: 'Apply to onboard your business and go live. Our team reviews every application within 24 to 48 hours.', cta: 'Apply now', href: `${MERCHANT}/getting-started` },
   { ic: I.code, t: 'Developer support', b: 'API keys, sandbox credentials, request signing and webhooks, everything you need to integrate in an afternoon.', cta: 'Read the docs', href: `${MERCHANT}/developers` },
   { ic: I.phone, t: 'General enquiries', b: 'Questions about Instacom, your account or a payment? Our Lusaka team is happy to help.', cta: PHONE, href: PHONE_HREF },
 ];

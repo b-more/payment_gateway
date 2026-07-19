@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="How the Instacompay Gateway API works: request signing, the transaction engine, endpoints, and sandbox vs production.">
-<title>Instacompay Gateway — API Implementation Guide</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔐%3C/text%3E%3C/svg%3E">
+<title>Instacompay Gateway API Guide</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E$%3C/text%3E%3C/svg%3E">
 </head>
 <body>
 <style>
@@ -313,7 +313,7 @@
 
 <div class="wrap">
   <div class="hero">
-    <div class="eyebrow">Integration Reference · v1</div>
+    <div class="eyebrow">Integration Reference | v1</div>
     <h1>How the gateway API is built</h1>
     <p class="lede">
       A field guide for partner engineers integrating <b>collections</b> and <b>disbursements</b> over
@@ -321,7 +321,7 @@
       transaction runs the same locked state machine. Here is exactly how it fits together.
     </p>
     <div class="chips">
-      <a class="chip cta" href="/postman" download>⬇ Download Postman collection</a>
+      <a class="chip cta" href="/postman" download>Download Postman collection</a>
       <span class="chip"><span class="k">base</span> https://api.instacompayzm.com</span>
       <span class="chip"><span class="k">reference</span> <a href="https://api.instacompayzm.com/docs">/docs</a></span>
       <span class="chip live">Airtel rails live</span>
@@ -336,12 +336,12 @@
     </div>
 
     <div class="thesis" aria-label="Authentication">
-      <div class="cap"><span>authenticating — two headers, that's the whole thing</span><span class="dots"><i></i><i></i><i></i></span></div>
+      <div class="cap"><span>authenticating: two headers</span><span class="dots"><i></i><i></i><i></i></span></div>
       <pre><code><span class="c-dim"># every /v1 call carries your key + secret</span>
-<span class="c-key">X-Api-Key</span>     ic_live_…      <span class="c-dim">// which key + account</span>
-<span class="c-key">X-Api-Secret</span>  sk_…           <span class="c-dim">// or: Authorization: Bearer sk_…</span>
+<span class="c-key">X-Api-Key</span>     ic_live_...      <span class="c-dim">// which key + account</span>
+<span class="c-key">X-Api-Secret</span>  sk_...           <span class="c-dim">// or: Authorization: Bearer sk_...</span>
 
-<span class="c-dim"># writes also take an idempotency key — re-send it to safely retry</span>
+<span class="c-dim"># writes also take an idempotency key. send it again to safely retry</span>
 <span class="c-key">Idempotency-Key</span>  <span class="c-str">"any-unique-string"</span>
 
 <span class="c-dim"># prefer not to send the secret? sign instead (hardened, optional):</span>
@@ -356,48 +356,48 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
   <!-- REQUEST JOURNEY -->
   <section id="journey">
     <div class="sec-head"><span class="tag">Flow</span><h2>A request's journey</h2></div>
-    <p class="sec-sub">Every <code>/v1</code> call passes the same ordered pipeline before it reaches any business logic. This sequence is the contract — get through it and you're talking to the engine.</p>
+    <p class="sec-sub">Every <code>/v1</code> call passes the same ordered pipeline before it reaches any business logic. This sequence is the contract. Get through it and you are talking to the engine.</p>
     <ol class="steps">
       <li><h4>nginx → API</h4><p>TLS terminates at the edge; the request is proxied to the service with its <span class="mono">path</span> and body preserved byte-for-byte.</p></li>
-      <li><h4>Raw-body capture</h4><p>The exact bytes of the body are kept as <span class="mono">rawBody</span>. The signature is computed over these bytes — re-serialised JSON would differ and break verification.</p></li>
+      <li><h4>Raw-body capture</h4><p>The exact bytes of the body are kept as <span class="mono">rawBody</span>. The signature is computed over these bytes. Re-serialised JSON would differ and break verification.</p></li>
       <li><h4>Rate limit</h4><p>Per-credential throttling rejects abusive callers before any lookup work is done.</p></li>
-      <li><h4>Authenticate</h4><p>The signed request is verified (see below). On success a <span class="mono">CredentialContext</span> — key, account, environment — is attached to the request.</p></li>
+      <li><h4>Authenticate</h4><p>The signed request is verified (see below). On success a <span class="mono">CredentialContext</span> holding the key, account and environment is attached to the request.</p></li>
       <li><h4>Validate</h4><p>The body is validated against a strict schema. Unknown fields are rejected outright, not ignored.</p></li>
-      <li><h4>Handle</h4><p>The controller does the work, always scoped to the authenticated key's own account — a key can never see another merchant's data.</p></li>
+      <li><h4>Handle</h4><p>The controller does the work, always scoped to the authenticated key's own account. A key can never see another merchant's data.</p></li>
       <li><h4>Serialize &amp; return</h4><p>Domain errors map to a clean <span class="mono">{ error: { code, message } }</span> envelope; money serialises as integer-ngwee strings.</p></li>
     </ol>
   </section>
 
   <!-- AUTH -->
   <section id="auth">
-    <div class="sec-head"><span class="tag">Auth</span><h2>Two ways in — pick your level</h2></div>
+    <div class="sec-head"><span class="tag">Auth</span><h2>Two ways to authenticate</h2></div>
     <p class="sec-sub">Authentication is per-request, not per-session: nothing to expire or refresh. Start with key + secret; move to signing if you want the extra hardening.</p>
 
     <div class="grid cols-2" style="margin-bottom:24px">
       <div class="card">
-        <h4>✅ Simple — key + secret <span class="mono" style="font-size:11px;color:var(--get)">recommended</span></h4>
-        <p>Send <code>X-Api-Key</code> + <code>X-Api-Secret</code> (or <code>Authorization: Bearer &lt;secret&gt;</code>) on every call. The familiar key-and-secret-over-TLS model — you can be live in minutes.</p>
+        <h4>Simple: key and secret <span class="mono" style="font-size:11px;color:var(--get)">recommended</span></h4>
+        <p>Send <code>X-Api-Key</code> + <code>X-Api-Secret</code> (or <code>Authorization: Bearer &lt;secret&gt;</code>) on every call. This is the familiar key and secret over TLS model, and you can be live in minutes.</p>
       </div>
       <div class="card">
-        <h4>🔐 Signed — HMAC <span class="mono" style="font-size:11px;color:var(--faint)">hardened</span></h4>
-        <p>Don't send the secret at all — prove each call with a signature. Adds <strong>replay protection</strong> and <strong>body integrity</strong>. Send <code>X-Signature</code> and the API switches automatically.</p>
+        <h4>Signed: HMAC <span class="mono" style="font-size:11px;color:var(--faint)">hardened</span></h4>
+        <p>Do not send the secret at all. Prove each call with a signature instead. Adds <strong>replay protection</strong> and <strong>body integrity</strong>. Send <code>X-Signature</code> and the API switches automatically.</p>
       </div>
     </div>
 
-    <p class="wide"><strong>How the server verifies a signed request —</strong> a fixed sequence:</p>
+    <p class="wide"><strong>How the server verifies a signed request.</strong> A fixed sequence:</p>
     <ol class="steps">
       <li><h4>Resolve the key</h4><p>Look up the credential by <span class="mono">X-Api-Key</span>; reject immediately if it's missing or not active.</p></li>
-      <li><h4>Check the window</h4><p>Reject timestamps outside ±5 minutes — a captured request can't be replayed later.</p></li>
+      <li><h4>Check the window</h4><p>Reject timestamps more than 5 minutes old, so a captured request cannot be replayed later.</p></li>
       <li><h4>Recompute &amp; compare</h4><p>Decrypt the signing key (stored encrypted, never plaintext), recompute the HMAC, and compare in <strong>constant time</strong>.</p></li>
-      <li><h4>Enforce IP allowlist</h4><p>For <strong>live</strong> keys only, the request IP must be on the account's allowlist — in <em>both</em> auth modes. Sandbox keys skip this.</p></li>
+      <li><h4>Enforce IP allowlist</h4><p>For <strong>live</strong> keys only, the request IP must be on the account's allowlist, in <em>both</em> auth modes. Sandbox keys skip this.</p></li>
     </ol>
 
     <div class="codeblock" style="margin-top:26px">
-      <div class="cap">reference client — key + secret (Node)</div>
+      <div class="cap">reference client: key and secret (Node)</div>
       <pre><code><span class="c-key">import</span> crypto <span class="c-key">from</span> <span class="c-str">'node:crypto'</span>;
 
 <span class="c-key">const</span> API_BASE = <span class="c-str">'https://api.instacompayzm.com'</span>;
-<span class="c-key">const</span> API_KEY = <span class="c-str">'ic_live_…'</span>, API_SECRET = <span class="c-str">'sk_…'</span>;
+<span class="c-key">const</span> API_KEY = <span class="c-str">'ic_live_...'</span>, API_SECRET = <span class="c-str">'sk_...'</span>;
 
 <span class="c-key">async function</span> <span class="c-fn">call</span>(method, path, body) {
   <span class="c-key">const</span> headers = {
@@ -405,7 +405,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
     <span class="c-str">'X-Api-Key'</span>: API_KEY,
     <span class="c-str">'X-Api-Secret'</span>: API_SECRET,
   };
-  <span class="c-dim">// any unique string — re-send the same one to safely retry</span>
+  <span class="c-dim">// any unique string. send the same one again to safely retry</span>
   <span class="c-key">if</span> (method !== <span class="c-str">'GET'</span>) headers[<span class="c-str">'Idempotency-Key'</span>] = crypto.randomUUID();
 
   <span class="c-key">const</span> res = <span class="c-key">await</span> fetch(API_BASE + path, {
@@ -414,7 +414,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
   <span class="c-key">return</span> res.json();
 }
 
-<span class="c-dim">// K50.00 collection — amount is integer ngwee, as a string</span>
+<span class="c-dim">// K50.00 collection. amount is integer ngwee, as a string</span>
 <span class="c-key">await</span> <span class="c-fn">call</span>(<span class="c-str">'POST'</span>, <span class="c-str">'/v1/collections'</span>, {
   processor: <span class="c-str">'AIRTEL'</span>, amount: <span class="c-str">'5000'</span>, msisdn: <span class="c-str">'260970000001'</span>,
   collectionReference: <span class="c-str">'order-1001'</span>,
@@ -429,7 +429,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
     <div class="grid cols-3">
       <div class="card"><h4>Unit</h4><p>1 Kwacha = 100 ngwee. <strong>K1.50</strong> is sent as <code>"150"</code>; <strong>K50.00</strong> as <code>"5000"</code>.</p></div>
       <div class="card"><h4>Type</h4><p>Strings on the wire, <span class="mono">bigint</span> internally. A float can't silently round a customer's money.</p></div>
-      <div class="card"><h4>Enforced</h4><p>Validated on input, stored as integers, and re-serialised to strings on output — end to end.</p></div>
+      <div class="card"><h4>Enforced</h4><p>Validated on input, stored as integers, and re-serialised to strings on output, end to end.</p></div>
     </div>
   </section>
 
@@ -458,21 +458,20 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
       <div class="card"><h4>Debit, then dispatch</h4><p>On a production transaction the engine loads the charge config, checks float, appends a <strong>DEBIT</strong> to the append-only float ledger, marks the transaction <span class="mono">PROCESSING</span>, then hands off to the rail.</p></div>
       <div class="card"><h4>Idempotent completion</h4><p>A callback and a status-poll can both try to resolve the same transaction. The <strong>first wins</strong>; the rest are no-ops. A FAILED result appends a compensating refund so the ledger always balances.</p></div>
       <div class="card"><h4>Insufficient float</h4><p>If the balance can't cover amount + charge, the transaction is written <span class="mono">FAILED</span> with <code>INSUFFICIENT_FLOAT</code> and <strong>nothing is debited</strong>.</p></div>
-      <div class="card"><h4>Append-only ledger</h4><p>Float entries are never updated or deleted — only appended. The ledger is a forensic record you can always reconcile against.</p></div>
+      <div class="card"><h4>Append-only ledger</h4><p>Float entries are never updated or deleted, only appended. The ledger is a forensic record you can always reconcile against.</p></div>
     </div>
   </section>
 
   <!-- DISPATCH + RESOLUTION -->
   <section id="resolution">
     <div class="sec-head"><span class="tag">Rails</span><h2>Dispatch, then three ways to resolve</h2></div>
-    <p class="sec-sub">Once a transaction is <span class="mono">PROCESSING</span>, the gateway pushes it to the mobile-money rail (Airtel / MTN), recording a per-attempt trail. It then settles by whichever of these fires first — all idempotent, so they never double-count.</p>
+    <p class="sec-sub">Once a transaction is <span class="mono">PROCESSING</span>, the gateway pushes it to the mobile-money rail (Airtel / MTN), recording a per-attempt trail. It then settles by whichever of these fires first. All are idempotent, so they never double-count.</p>
     <div class="grid cols-3">
       <div class="card"><h4>① Rail callback</h4><p>The processor calls a signed webhook endpoint the moment the customer approves or the transfer lands.</p></div>
       <div class="card"><h4>② Resolve-on-read</h4><p><span class="mono">GET /v1/transactions/{id}</span> re-enquires the rail live, so polling reflects the true state in real time.</p></div>
-      <div class="card"><h4>③ Reconcile sweep</h4><p>A guarded cron sweeps anything still in flight every few minutes — the backstop that guarantees eventual settlement.</p></div>
+      <div class="card"><h4>③ Reconcile sweep</h4><p>A guarded cron sweeps anything still in flight every few minutes. This is the backstop that guarantees eventual settlement.</p></div>
     </div>
     <div class="callout">
-      <span class="ic">↺</span>
       <p>Because completion is idempotent, <b>you can safely poll and rely on webhooks at the same time.</b> Whichever arrives first settles the transaction; the other becomes a harmless no-op.</p>
     </div>
   </section>
@@ -482,7 +481,7 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
     <div class="sec-head"><span class="tag">Safety</span><h2>Idempotency on every write</h2></div>
     <p class="sec-sub">Every mutating call carries an <code>Idempotency-Key</code>. It's what makes retries safe over flaky mobile networks.</p>
     <div class="grid cols-2">
-      <div class="card"><h4>Replays return the original</h4><p>Re-send the same key and you get the <strong>original</strong> transaction back — no second charge, no second webhook, no second dispatch.</p></div>
+      <div class="card"><h4>Replays return the original</h4><p>Re-send the same key and you get the <strong>original</strong> transaction back, with no second charge, no second webhook, no second dispatch.</p></div>
       <div class="card"><h4>Race-safe</h4><p>Two requests with the same key arriving at once resolve to a single transaction; the loser simply returns what the winner created.</p></div>
     </div>
   </section>
@@ -490,13 +489,13 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
   <!-- WEBHOOKS -->
   <section id="webhooks">
     <div class="sec-head"><span class="tag">Webhooks</span><h2>How you find out it succeeded</h2></div>
-    <p class="sec-sub">In production a collection returns <span class="mono">PROCESSING</span> and only resolves once the customer approves on their phone — so we POST the outcome to your callback URL. Set it per account in the Merchant Portal. We retry with backoff until you answer <span class="mono">2xx</span>.</p>
+    <p class="sec-sub">In production a collection returns <span class="mono">PROCESSING</span> and only resolves once the customer approves on their phone. We then POST the outcome to your callback URL. Set it per account in the Merchant Portal. We retry with backoff until you answer <span class="mono">2xx</span>.</p>
 
     <div class="codeblock">
       <div class="cap">what we send you</div>
       <pre><code><span class="c-key">POST</span> &lt;your callback url&gt;
 <span class="c-key">X-Instacompay-Event</span>:     transaction.success
-<span class="c-key">X-Instacompay-Signature</span>: t=1752380000,v1=9f2c…
+<span class="c-key">X-Instacompay-Signature</span>: t=1752380000,v1=9f2c...
 
 {
   <span class="c-str">"id"</span>: <span class="c-str">"&lt;event id&gt;"</span>,
@@ -513,15 +512,14 @@ message   = <span class="c-str">`${ts}.${METHOD}.${path}.${rawBody}`</span>
 }</code></pre>
     </div>
 
-    <div class="callout" style="margin-top:22px"><span class="ic">🔐</span>
-      <p><b>Always verify the signature.</b> Without it, anyone who learns your callback URL could POST a fake &ldquo;payment received&rdquo;. Reveal your secret (<code>whsec_…</code>) in the Merchant Portal → API Documentation, or via <span class="mono">GET /v1/merchant/accounts/{id}/webhook-secret</span>.</p>
+    <div class="callout" style="margin-top:22px"><p><b>Always verify the signature.</b> Without it, anyone who learns your callback URL could POST a fake &ldquo;payment received&rdquo;. Reveal your secret (<code>whsec_...</code>) in the Merchant Portal → API Documentation, or via <span class="mono">GET /v1/merchant/accounts/{id}/webhook-secret</span>.</p>
     </div>
 
     <div class="codeblock" style="margin-top:22px">
       <div class="cap">verifying a webhook (Node)</div>
       <pre><code><span class="c-key">import</span> crypto <span class="c-key">from</span> <span class="c-str">'node:crypto'</span>;
 
-<span class="c-key">const</span> WEBHOOK_SECRET = <span class="c-str">'whsec_…'</span>;
+<span class="c-key">const</span> WEBHOOK_SECRET = <span class="c-str">'whsec_...'</span>;
 
 <span class="c-dim">// Verify against the RAW body bytes, before any JSON parsing.</span>
 <span class="c-key">function</span> <span class="c-fn">verify</span>(rawBody, header) {
@@ -536,7 +534,7 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
   <span class="c-key">if</span> (!<span class="c-fn">verify</span>(req.rawBody, req.get(<span class="c-str">'X-Instacompay-Signature'</span>))) {
     <span class="c-key">return</span> res.sendStatus(<span class="c-str">400</span>);        <span class="c-dim">// forged or tampered</span>
   }
-  <span class="c-dim">// mark the order paid — idempotently, we may retry</span>
+  <span class="c-dim">// mark the order paid. do this idempotently, we may retry</span>
   res.sendStatus(<span class="c-str">200</span>);
 });</code></pre>
     </div>
@@ -545,7 +543,7 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
   <!-- REFUNDS -->
   <section id="refunds">
     <div class="sec-head"><span class="tag">Refunds</span><h2>How to refund a customer</h2></div>
-    <p class="sec-sub">There is no reverse or void call — and that is deliberate. Marking a payment "reversed" would only move numbers in our ledger; the customer's wallet would never actually receive anything. A refund has to be a <b>real transfer back</b>, so you send a disbursement.</p>
+    <p class="sec-sub">There is no reverse or void call, and that is deliberate. Marking a payment "reversed" would only move numbers in our ledger; the customer's wallet would never actually receive anything. A refund has to be a <b>real transfer back</b>, so you send a disbursement.</p>
 
     <div class="codeblock">
       <div class="cap">refunding a K1.03 payment</div>
@@ -562,16 +560,15 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
     <div class="grid cols-2" style="margin-top:22px">
       <div class="card">
         <h4>Refund the amount they paid</h4>
-        <p>If the customer covered the fee, they paid <span class="mono">amount + charge</span> — K1.00 + K0.03 = <b>K1.03</b> — not the <span class="mono">net_amount</span> you received. Refunding only the net leaves them short.</p>
+        <p>If the customer covered the fee, they paid <span class="mono">amount + charge</span>, which is K1.00 + K0.03 = <b>K1.03</b>, not the <span class="mono">net_amount</span> you received. Refunding only the net leaves them short.</p>
       </div>
       <div class="card">
         <h4>Tie it back for reconciliation</h4>
-        <p>Put the original order in <span class="mono">collectionReference</span>. The refund is its own transaction with its own id and status — poll it like any other.</p>
+        <p>Put the original order in <span class="mono">collectionReference</span>. The refund is its own transaction with its own id and status, so poll it like any other.</p>
       </div>
     </div>
 
-    <div class="callout" style="margin-top:22px"><span class="ic">💡</span>
-      <p><b>You need float to refund.</b> A refund pays money out, so the account must hold enough. If you have already settled the money to your bank, top the account up first.</p>
+    <div class="callout" style="margin-top:22px"><p><b>You need float to refund.</b> A refund pays money out, so the account must hold enough. If you have already settled the money to your bank, top the account up first.</p>
     </div>
   </section>
 
@@ -585,7 +582,7 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
         <tbody>
           <tr><td><span class="method post">POST</span></td><td class="path">/v1/collections</td><td>Charge a customer's wallet (money in)</td></tr>
           <tr><td><span class="method post">POST</span></td><td class="path">/v1/disbursements</td><td>Pay a customer's wallet (money out)</td></tr>
-          <tr><td><span class="method get">GET</span></td><td class="path">/v1/transactions/{id}</td><td>Check status — re-enquires the rail on read</td></tr>
+          <tr><td><span class="method get">GET</span></td><td class="path">/v1/transactions/{id}</td><td>Check status. Re-enquires the rail on read</td></tr>
           <tr><td><span class="method get">GET</span></td><td class="path">/v1/accounts/{id}/balance</td><td>Float / balance enquiry</td></tr>
           <tr><td><span class="method get">GET</span></td><td class="path">/v1/settlements</td><td>Settlement history</td></tr>
         </tbody>
@@ -599,17 +596,16 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
     <p class="sec-sub">The same code path, branched on the key's environment. Build and test against sandbox with zero risk, then swap one key to go live.</p>
     <div class="grid cols-2">
       <div class="card">
-        <h4>🧪 Sandbox &nbsp;<code>ic_sand_…</code></h4>
-        <p>Sandbox <strong>simulates and settles instantly</strong>, so you can exercise the real <span class="mono">PROCESSING → SUCCESS</span> lifecycle. Nothing touches a live rail, and it's <strong>fully isolated from production float</strong> — test all day without spending a ngwee.</p>
+        <h4>Sandbox &nbsp;<code>ic_sand_...</code></h4>
+        <p>Sandbox <strong>simulates and settles instantly</strong>, so you can exercise the real <span class="mono">PROCESSING</span> to <span class="mono">SUCCESS</span> lifecycle. Nothing touches a live rail, and it is <strong>fully isolated from production float</strong>, so you can test all day without spending a ngwee.</p>
       </div>
       <div class="card">
-        <h4>🔟 Production &nbsp;<code>ic_live_…</code></h4>
+        <h4>Production &nbsp;<code>ic_live_...</code></h4>
         <p>Real rails, real float, real settlement. Live keys additionally enforce your IP allowlist. Money moves the moment the customer approves.</p>
       </div>
     </div>
     <div class="callout">
-      <span class="ic">⚑</span>
-      <p><b>Start in sandbox.</b> It resolves to <code>SUCCESS</code> immediately, so you can prove your whole integration — create, poll, handle the result — before switching a single key to live.</p>
+      <p><b>Start in sandbox.</b> It resolves to <code>SUCCESS</code> immediately, so you can prove your whole integration (create, poll, handle the result) before switching a single key to live.</p>
     </div>
   </section>
 
@@ -629,8 +625,8 @@ app.post(<span class="c-str">'/webhooks/instacompay'</span>, (req, res) =&gt; {
 
 <footer>
   <div class="wrap">
-    <span>Instacompay Payment Solutions Limited · Lusaka, Zambia</span>
-    <span class="mono">api.instacompayzm.com/docs · v1</span>
+    <span>Instacompay Payment Solutions Limited | Lusaka, Zambia</span>
+    <span class="mono">api.instacompayzm.com/docs | v1</span>
   </div>
 </footer>
 </body>

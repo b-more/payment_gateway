@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Merchant Portal API: session login, collections, transaction status, and maker-checker payouts.">
-<title>Instacompay — Merchant Portal API</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🛍️%3C/text%3E%3C/svg%3E">
+<title>Instacompay Merchant Portal API</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E$%3C/text%3E%3C/svg%3E">
 </head>
 <body>
 <style>
@@ -159,7 +159,7 @@
 </style>
 
 <header class="topbar">
-  <div class="brand"><span class="mark">i</span> Instacompay&nbsp;·&nbsp;Merchant&nbsp;Portal API</div>
+  <div class="brand"><span class="mark">i</span> Instacompay Merchant Portal API</div>
   <nav>
     <a href="#auth">Sign in</a>
     <a href="#collect">Collect</a>
@@ -171,30 +171,30 @@
 
 <div class="wrap">
   <div class="hero">
-    <div class="eyebrow">Merchant Portal API · v1</div>
+    <div class="eyebrow">Merchant Portal API | v1</div>
     <h1>The merchant portal, as an API</h1>
     <p class="lede">
-      The endpoints behind <b>merchants.instacompayzm.com</b> — sign in with email + one-time code, then
+      The endpoints behind <b>merchants.instacompayzm.com</b>. Sign in with an email one-time code, then
       <b>collect</b>, track status, and run <b>maker-checker payouts</b> against your own accounts. This is the
-      flow proven live end-to-end: a K1 Airtel collection went <b>PROCESSING → SUCCESS</b> on the first try.
+      flow proven live end-to-end: a K1 Airtel collection went <b>PROCESSING to SUCCESS</b> on the first try.
     </p>
     <div class="chips">
       <span class="chip"><span class="k">base</span> https://api.instacompayzm.com</span>
       <span class="chip"><span class="k">auth</span> session cookie</span>
       <span class="chip live">Airtel collections live</span>
-      <a class="chip" href="/postman" download>⬇ Postman collection</a>
+      <a class="chip" href="/postman" download>Postman collection</a>
       <a class="chip" href="/partners"><span class="k">also</span> Public API (server-to-server) →</a>
     </div>
 
     <div class="thesis" aria-label="Sign-in flow">
-      <div class="cap"><span>how you sign in — two steps, then a session cookie</span><span class="dots"><i></i><i></i><i></i></span></div>
-      <pre><code><span class="c-dim"># 1 — password login issues an emailed one-time code</span>
+      <div class="cap"><span>how you sign in: two steps, then a session cookie</span><span class="dots"><i></i><i></i><i></i></span></div>
+      <pre><code><span class="c-dim"># 1. password login issues an emailed one-time code</span>
 <span class="c-key">POST</span> /v1/auth/merchant/login      <span class="c-str">{ "email", "password" }</span>  → <span class="c-str">{ "challengeId" }</span>
 
-<span class="c-dim"># 2 — verify the code; the response sets an httpOnly session cookie</span>
+<span class="c-dim"># 2. verify the code. the response sets an httpOnly session cookie</span>
 <span class="c-key">POST</span> /v1/auth/merchant/verify-otp <span class="c-str">{ "challengeId", "code" }</span>  → <span class="c-str">{ "user" }</span>
 
-<span class="c-dim"># 3 — every later call just carries that cookie</span>
+<span class="c-dim"># 3. every later call carries that cookie</span>
 fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'include'</span> })   <span class="c-dim">// no signing, no tokens to manage</span></code></pre>
     </div>
   </div>
@@ -205,22 +205,22 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
   <!-- AUTH -->
   <section id="auth">
     <div class="sec-head"><span class="tag">Sign in</span><h2>Session authentication</h2></div>
-    <p class="sec-sub">Unlike the public integration API (which signs every request), the portal uses an email one-time-code login and an httpOnly session cookie — the same login a person uses in the browser.</p>
+    <p class="sec-sub">Unlike the public integration API (which signs every request), the portal uses an email one-time-code login and an httpOnly session cookie, the same login a person uses in the browser.</p>
     <ol class="steps">
-      <li><h4>Log in with email + password</h4><p><span class="mono">POST /v1/auth/merchant/login</span> — verifies the password and emails a 6-digit code. Returns a <span class="mono">challengeId</span>.</p></li>
+      <li><h4>Log in with email + password</h4><p><span class="mono">POST /v1/auth/merchant/login</span> verifies the password and emails a 6-digit code. Returns a <span class="mono">challengeId</span>.</p></li>
       <li><h4>Verify the code</h4><p><span class="mono">POST /v1/auth/merchant/verify-otp</span> with the <span class="mono">challengeId</span> and the emailed <span class="mono">code</span>. On success the response sets httpOnly session cookies and returns your <span class="mono">user</span> (id, email, roles).</p></li>
-      <li><h4>Call with the cookie</h4><p>Send the cookie on every request (<span class="mono">credentials: 'include'</span> in the browser). <span class="mono">GET /v1/auth/merchant/me</span> returns the current session; <span class="mono">POST …/refresh</span> rotates it; <span class="mono">POST …/logout</span> ends it.</p></li>
+      <li><h4>Call with the cookie</h4><p>Send the cookie on every request (<span class="mono">credentials: 'include'</span> in the browser). <span class="mono">GET /v1/auth/merchant/me</span> returns the current session; <span class="mono">POST .../refresh</span> rotates it; <span class="mono">POST .../logout</span> ends it.</p></li>
     </ol>
-    <div class="callout"><span class="ic">🔒</span><p>The session is <b>scoped to your merchant</b>. Every endpoint below only ever sees your own accounts, transactions, and users — there is no way to reach another merchant's data.</p></div>
+    <div class="callout"><p>The session is <b>scoped to your merchant</b>. Every endpoint below only ever sees your own accounts, transactions and users. There is no way to reach another merchant's data.</p></div>
   </section>
 
   <!-- COLLECT -->
   <section id="collect">
     <div class="sec-head"><span class="tag">Collect</span><h2>Take a payment</h2></div>
-    <p class="sec-sub">Charge a customer's mobile-money wallet from one of your accounts. Amount is integer ngwee as a string — <strong>K1.00 = <code>"100"</code></strong>. A production collection sends a real prompt to the customer's phone.</p>
+    <p class="sec-sub">Charge a customer's mobile-money wallet from one of your accounts. Amount is integer ngwee as a string. <strong>K1.00 = <code>"100"</code></strong>. A production collection sends a real prompt to the customer's phone.</p>
 
     <div class="endpoint">
-      <div class="head"><span class="method post">POST</span><span class="path">/v1/merchant/accounts/{accountId}/collect</span><span class="desc">customer → you</span></div>
+      <div class="head"><span class="method post">POST</span><span class="path">/v1/merchant/accounts/{accountId}/collect</span><span class="desc">customer to you</span></div>
       <div class="io">
         <div><div class="lbl">Request body</div><pre><code>{
   "processor": "AIRTEL",
@@ -228,8 +228,8 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
   "msisdn": "260970000001",
   "reference": "order-1001"
 }</code></pre></div>
-        <div><div class="lbl">Response · 200</div><pre><code>{
-  "id": "9893373a-…",
+        <div><div class="lbl">Response | 200</div><pre><code>{
+  "id": "9893373a-...",
   "type": "COLLECTION",
   "processor": "AIRTEL",
   "amount": "100",
@@ -239,7 +239,7 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
 }</code></pre></div>
       </div>
     </div>
-    <div class="callout"><span class="ic">📲</span><p><b>Production</b> returns <code>PROCESSING</code> and prompts the customer — poll the status endpoint until it turns <code>SUCCESS</code> once they enter their PIN. <b>Sandbox</b> accounts simulate and settle instantly, so you can build without moving money.</p></div>
+    <div class="callout"><p><b>Production</b> returns <code>PROCESSING</code> and prompts the customer. Poll the status endpoint until it turns <code>SUCCESS</code> once they enter their PIN. <b>Sandbox</b> accounts simulate and settle instantly, so you can build without moving money.</p></div>
   </section>
 
   <!-- STATUS -->
@@ -248,14 +248,14 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
     <p class="sec-sub">Poll this for any collection or payout. It re-enquires the rail on read, so the status reflects reality in real time.</p>
     <div class="endpoint">
       <div class="head"><span class="method get">GET</span><span class="path">/v1/merchant/accounts/{accountId}/transactions/{txnId}/status</span></div>
-      <pre><code><span class="c-dim">// PROCESSING → SUCCESS | FAILED   (proven live: HighTouch K1 Airtel collection)</span>
-{ "id": "9893373a-…", "status": "SUCCESS", "charge": "3", "net_amount": "100" }</code></pre>
+      <pre><code><span class="c-dim">// PROCESSING to SUCCESS | FAILED   (proven live: HighTouch K1 Airtel collection)</span>
+{ "id": "9893373a-...", "status": "SUCCESS", "charge": "3", "net_amount": "100" }</code></pre>
     </div>
   </section>
 
   <!-- PAYOUTS -->
   <section id="payouts">
-    <div class="sec-head"><span class="tag">Payouts</span><h2>Disburse — with maker-checker</h2></div>
+    <div class="sec-head"><span class="tag">Payouts</span><h2>Disbursements with maker-checker approval</h2></div>
     <p class="sec-sub">Paying money out is two-person by design (SEC-Z4). An <strong>initiator</strong> requests the payout; a <strong>different</strong> admin approves it before a single ngwee moves. No one can approve their own request.</p>
 
     <div class="machine">
@@ -273,14 +273,14 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
     <div class="endpoint">
       <div class="head"><span class="method post">POST</span><span class="path">/v1/merchant/accounts/{accountId}/disburse</span><span class="desc"><span class="role-pill">ADMIN / INITIATOR</span></span></div>
       <div class="io">
-        <div><div class="lbl">Request — parks a payout</div><pre><code>{
+        <div><div class="lbl">Request. Parks a payout</div><pre><code>{
   "processor": "AIRTEL",
   "amount": "100",
   "msisdn": "260970000001",
   "reference": "payout-2001"
 }</code></pre></div>
-        <div><div class="lbl">Response · 200 — no funds moved yet</div><pre><code>{
-  "id": "2b970dd7-…",
+        <div><div class="lbl">Response 200. No funds moved yet</div><pre><code>{
+  "id": "2b970dd7-...",
   "status": "PENDING_APPROVAL"
 }</code></pre></div>
       </div>
@@ -290,9 +290,9 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
       <div class="head"><span class="method get">GET</span><span class="path">/v1/merchant/payout-requests?status=pending</span><span class="desc">the approval queue</span></div>
     </div>
     <div class="endpoint">
-      <div class="head"><span class="method post">POST</span><span class="path">/v1/merchant/payout-requests/{id}/approve</span><span class="desc"><span class="role-pill">ADMIN / APPROVER</span> · ≠ requester</span></div>
+      <div class="head"><span class="method post">POST</span><span class="path">/v1/merchant/payout-requests/{id}/approve</span><span class="desc"><span class="role-pill">ADMIN / APPROVER</span> | ≠ requester</span></div>
       <pre><code><span class="c-dim">// creates + dispatches the disbursement; returns the transaction</span>
-{ "id": "ec86caf9-…", "type": "DISBURSEMENT", "status": "PROCESSING" }</code></pre>
+{ "id": "ec86caf9-...", "type": "DISBURSEMENT", "status": "PROCESSING" }</code></pre>
     </div>
     <div class="endpoint">
       <div class="head"><span class="method post">POST</span><span class="path">/v1/merchant/payout-requests/{id}/reject</span><span class="desc">body <code>{ "reason" }</code></span></div>
@@ -301,7 +301,7 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
       <div class="head"><span class="method post">POST</span><span class="path">/v1/merchant/payout-requests/{id}/cancel</span><span class="desc">the initiator withdraws their own request</span></div>
     </div>
 
-    <div class="callout"><span class="ic">🛡️</span><p>Approving <b>blocks unless the rail can actually dispatch</b> — if a processor is offline, approval is refused and <b>no float is debited</b>, so a payout can never get stuck half-sent. Manage who can initiate vs. approve under <b>User Management</b> (roles: Admin, Initiator, Approver, Viewer).</p></div>
+    <div class="callout"><p>Approving <b>blocks unless the rail can actually dispatch</b>. If a processor is offline, approval is refused and <b>no float is debited</b>, so a payout can never get stuck half-sent. Manage who can initiate vs. approve under <b>User Management</b> (roles: Admin, Initiator, Approver, Viewer).</p></div>
   </section>
 
   <!-- ENDPOINTS -->
@@ -312,8 +312,8 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
       <table>
         <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Role</th></tr></thead>
         <tbody>
-          <tr><td><span class="method post">POST</span></td><td class="path">/v1/auth/merchant/login</td><td>Password login → emailed code</td><td>—</td></tr>
-          <tr><td><span class="method post">POST</span></td><td class="path">/v1/auth/merchant/verify-otp</td><td>Verify code → session cookie</td><td>—</td></tr>
+          <tr><td><span class="method post">POST</span></td><td class="path">/v1/auth/merchant/login</td><td>Password login, returns an emailed code</td><td>None</td></tr>
+          <tr><td><span class="method post">POST</span></td><td class="path">/v1/auth/merchant/verify-otp</td><td>Verify the code and start a session</td><td>None</td></tr>
           <tr><td><span class="method get">GET</span></td><td class="path">/v1/auth/merchant/me</td><td>Current session</td><td>any</td></tr>
           <tr><td><span class="method post">POST</span></td><td class="path">/v1/auth/merchant/logout</td><td>End the session</td><td>any</td></tr>
           <tr><td><span class="method get">GET</span></td><td class="path">/v1/merchant/dashboard</td><td>Totals & recent activity</td><td>any</td></tr>
@@ -338,7 +338,7 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
     <div class="model">
       <div class="line">
         <b>login</b> → <b>verify code</b> (session cookie) → <b>list accounts</b> →
-        <b>collect</b> (poll to SUCCESS) &nbsp;·&nbsp; or &nbsp;<b>request payout</b> →
+        <b>collect</b> (poll to SUCCESS), or <b>request payout</b> then
         a <b>second admin approves</b> → dispatched. Money is always <b>integer ngwee strings</b>.
       </div>
     </div>
@@ -347,8 +347,8 @@ fetch(url, { <span class="c-key">credentials</span>: <span class="c-str">'includ
 
 <footer>
   <div class="wrap">
-    <span>Instacompay Payment Solutions Limited · Lusaka, Zambia</span>
-    <span class="mono">merchants.instacompayzm.com · API v1</span>
+    <span>Instacompay Payment Solutions Limited | Lusaka, Zambia</span>
+    <span class="mono">merchants.instacompayzm.com | API v1</span>
   </div>
 </footer>
 </body>

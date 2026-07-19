@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Instacompay Gateway API (v1)",
-    "description": "**Import → fill in 3 variables → Send.** No signing, no scripts, no setup.\n\n1. Open the collection's **Variables** tab\n2. Paste your `apiKey`, `apiSecret` and `accountId` (Merchant Portal → API Documentation → regenerate a SANDBOX key to reveal them)\n3. Hit **Send** on any request\n\nStart with a sandbox key (`ic_sand_…`) — it simulates and settles instantly, so no real money moves and no float is used.\n\n---\n\nInstacompay Gateway — collections & disbursements over Zambian mobile money (ZMW).\n\n## Set up (30 seconds)\nOpen the collection's **Variables** tab and paste:\n- `apiKey`    — e.g. ic_sand_… (Merchant Portal → API Documentation)\n- `apiSecret` — shown once when you generate/regenerate a key\n- `accountId` — your account id\n\nThen press **Send**. That's it — no signing, no scripts.\n\n## Auth\nEvery request carries two headers:\n\n    X-Api-Key: {{apiKey}}\n    X-Api-Secret: {{apiSecret}}\n\n(You can send `Authorization: Bearer <secret>` instead of `X-Api-Secret` if you prefer.)\n\nHMAC request signing is also supported for higher-security integrations — see the Public API guide at https://merchants.instacompayzm.com/partners.\n\n## Rails\nOnly rails that are live in production are accepted — currently **AIRTEL**. Sandbox rejects anything production would reject, so if it works here it works when you go live.\n\n## Refunds\nThere is no reverse/void call. To refund a customer send a **disbursement** for what they actually paid (`amount + charge` if they covered the fee) — see the \"Refund a customer\" request.\n\n## Money\nAll amounts are **integer ngwee, as strings**: K1.50 = \"150\", K50.00 = \"5000\". Never decimals.\n\n## Sandbox\nStart with a sandbox key (`ic_sand_…`). Sandbox simulates and settles instantly — no real money, no float used — so you can test the full PROCESSING → SUCCESS lifecycle.\n\n`Idempotency-Key` is set automatically to a fresh GUID on every write; reuse the same value to safely retry a request.",
+    "description": "Import this collection, fill in three variables, and send a request. There is no signing and no scripts to configure.\n\n## Setup\n1. Open the collection's **Variables** tab.\n2. Paste your `apiKey`, `apiSecret` and `accountId`. You get these from the Merchant Portal under API Documentation. Regenerating a sandbox key reveals them once.\n3. Press **Send** on any request.\n\n## Authentication\nEvery request carries two headers:\n\n    X-Api-Key: {{apiKey}}\n    X-Api-Secret: {{apiSecret}}\n\nYou can send `Authorization: Bearer <secret>` instead of `X-Api-Secret` if you prefer. HMAC request signing is also supported for higher security integrations. See the API guide at https://merchants.instacompayzm.com/partners\n\n## Rails\nOnly rails that are live in production are accepted, which currently means AIRTEL. Sandbox rejects anything production would reject, so if a request works here it will work when you go live.\n\n## Amounts\nAll amounts are integer ngwee, sent as strings. K1.50 is \"150\" and K50.00 is \"5000\". Do not send decimals.\n\n## Refunds\nThere is no reverse or void call. To refund a customer, send a disbursement for the amount they actually paid. If they covered the fee that is the amount plus the charge. See the \"Refund a customer\" request.\n\n## Sandbox\nStart with a sandbox key (`ic_sand_`). Sandbox simulates and settles immediately, so no real money moves and no float is used, and you can test the full PROCESSING to SUCCESS lifecycle.\n\nAn `Idempotency-Key` is set automatically on every write. Send the same value again to safely retry a request.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "52de82fa-02b2-4005-95a6-c9a3c144f902"
   },
@@ -11,12 +11,12 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// Remember the last transaction id so the status / reverse requests",
-          "// work with no copy-paste.",
+          "// Remember the last transaction id so the status request works",
+          "// without copying and pasting it.",
           "try {",
           "  var b = pm.response.json();",
           "  if (b && b.id) { pm.collectionVariables.set('txnId', b.id); }",
-          "} catch (e) { /* non-JSON response */ }"
+          "} catch (e) { /* response was not JSON */ }"
         ]
       }
     }
@@ -55,7 +55,7 @@
   ],
   "item": [
     {
-      "name": "Create collection (customer → you)",
+      "name": "Create a collection",
       "request": {
         "method": "POST",
         "header": [
@@ -95,11 +95,11 @@
             }
           }
         },
-        "description": "Charge a customer's mobile-money wallet. amount is ngwee (\"5000\" = K50.00). processor: currently AIRTEL (MTN is not yet enabled in production — sending it returns a clear 400).\n\nProduction prompts the customer's phone and returns PROCESSING — poll the status endpoint until SUCCESS. Sandbox settles instantly."
+        "description": "Charge a customer's mobile money wallet. The amount is in ngwee, so \"5000\" is K50.00. The processor is currently AIRTEL. MTN is not yet enabled in production and returns a clear 400.\n\nIn production this prompts the customer's phone and returns PROCESSING. Poll the status request until it returns SUCCESS. Sandbox settles immediately."
       }
     },
     {
-      "name": "Create disbursement (you → customer)",
+      "name": "Create a disbursement",
       "request": {
         "method": "POST",
         "header": [
@@ -139,11 +139,11 @@
             }
           }
         },
-        "description": "Send money to a customer's wallet. msisdn is required (12-digit, e.g. 260970000001). Dispatches to the rail immediately."
+        "description": "Send money to a customer's wallet. The msisdn is required and must be 12 digits, for example 260970000001. This dispatches to the rail immediately."
       }
     },
     {
-      "name": "Refund a customer (disbursement)",
+      "name": "Refund a customer",
       "request": {
         "method": "POST",
         "header": [
@@ -183,7 +183,7 @@
             }
           }
         },
-        "description": "There is no reverse/void call — a refund is a real transfer back to the customer.\n\n**Amount:** refund what the customer actually PAID. If they covered the fee that is `amount + charge` (K1.00 + K0.03 = \"103\"), not the `net_amount` you received.\n\n**Reconciliation:** put the original order in `collectionReference` so the refund ties back to it.\n\nIt returns its own transaction id — poll **Get transaction status** to confirm it landed."
+        "description": "There is no reverse or void call. A refund is a real transfer back to the customer.\n\nAmount: refund what the customer actually paid. If they covered the fee, that is the amount plus the charge (K1.00 + K0.03 = \"103\"), not the net_amount you received.\n\nReconciliation: put the original order in collectionReference so the refund ties back to it.\n\nThis returns its own transaction id. Poll the status request to confirm it landed."
       }
     },
     {
@@ -211,7 +211,7 @@
             "{{txnId}}"
           ]
         },
-        "description": "Status of any transaction — collection or disbursement. txnId is auto-filled from the last create call. Re-enquires the rail on read.\n\nPROCESSING → SUCCESS | FAILED."
+        "description": "Status of any transaction, whether a collection or a disbursement. The txnId is filled in automatically from the last create request. This re-enquires the rail on read.\n\nStatuses are PROCESSING, then SUCCESS or FAILED."
       }
     },
     {
@@ -240,7 +240,7 @@
             "balance"
           ]
         },
-        "description": "Float / balance enquiry for your account. Balance is ngwee."
+        "description": "Balance enquiry for your account. The balance is in ngwee."
       }
     },
     {
@@ -267,7 +267,7 @@
             "settlements"
           ]
         },
-        "description": "Settlements for the account behind the api key."
+        "description": "Settlements for the account behind the API key."
       }
     }
   ]

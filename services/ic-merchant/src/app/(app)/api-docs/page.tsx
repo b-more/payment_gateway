@@ -372,6 +372,14 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
   }
 
   async function regenerate(env: 'SANDBOX' | 'LIVE'): Promise<void> {
+    // Regenerating REVOKES the current key immediately, and the new secret is
+    // shown exactly once — so make the consequence explicit before doing it.
+    const warning =
+      env === 'LIVE'
+        ? 'This immediately REVOKES your current live key — any running integration using it will stop working.\n\nThe new secret is shown only once. Have somewhere ready to paste it.\n\nContinue?'
+        : 'This revokes your current sandbox key. The new secret is shown only once.\n\nContinue?';
+    if (!window.confirm(warning)) return;
+
     setBusy(env);
     setError('');
     try {
@@ -379,6 +387,9 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
         `/v1/merchant/accounts/${account.id}/credentials/${env}/regenerate`,
       );
       setSecret({ env, ...r });
+      // NOTE: deliberately NOT reloading the account list here — a reload used to
+      // unmount this panel and destroy the credentials above before they could be
+      // copied. Only the key table needs refreshing.
       onChange();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not regenerate.');
@@ -436,13 +447,48 @@ function AccountConfig({ account, onChange }: { account: Account; onChange: () =
       </div>
 
       {secret ? (
-        <div className="devhint" style={{ marginTop: 14, wordBreak: 'break-all' }}>
-          <b>{secret.env} key</b> — copy the signing key now, it is shown only once. Previous {secret.env} keys are revoked.
-          <div className="mono" style={{ marginTop: 8, fontSize: 12 }}>apiKey: {secret.apiKey}</div>
-          <div className="mono" style={{ fontSize: 12 }}>signingKey: {secret.signingKey}</div>
-          <div className="mono" style={{ fontSize: 12 }}>secret: {secret.secret}</div>
+        <div className="cred-reveal">
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <b>⚠️ Your new {secret.env} credentials — shown once</b>
+              <div style={{ fontSize: 13, marginTop: 2 }}>
+                Copy them now. We store only a hash, so they can <b>never</b> be shown again.
+                Previous {secret.env} keys are revoked.
+              </div>
+            </div>
+            <Copy
+              text={`apiKey=${secret.apiKey}\napiSecret=${secret.secret}\nsigningKey=${secret.signingKey}`}
+              label="Copy all"
+            />
+          </div>
+          <div className="cred-row"><span>apiKey</span><code>{secret.apiKey}</code><Copy text={secret.apiKey} label="Copy" /></div>
+          <div className="cred-row"><span>apiSecret</span><code>{secret.secret}</code><Copy text={secret.secret} label="Copy" /></div>
+          <div className="cred-row"><span>signingKey</span><code>{secret.signingKey}</code><Copy text={secret.signingKey} label="Copy" /></div>
+          <button className="btn sm" style={{ marginTop: 10 }} onClick={() => setSecret(null)}>
+            I&apos;ve saved them — hide
+          </button>
         </div>
       ) : null}
+
+      <style jsx>{`
+        .cred-reveal {
+          margin-top: 14px; padding: 16px; border-radius: 12px;
+          background: #fbf0d8; border: 1px solid #ecd6a3; color: #4a3c17;
+        }
+        .cred-row {
+          display: flex; align-items: center; gap: 10px; margin-top: 10px;
+          flex-wrap: wrap;
+        }
+        .cred-row span {
+          font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+          letter-spacing: .06em; opacity: .75; min-width: 82px;
+        }
+        .cred-row code {
+          font-family: var(--mono); font-size: 12.5px; word-break: break-all;
+          background: #fff; border: 1px solid #e3d3a8; border-radius: 6px;
+          padding: 5px 8px; flex: 1; min-width: 220px;
+        }
+      `}</style>
     </div>
   );
 }

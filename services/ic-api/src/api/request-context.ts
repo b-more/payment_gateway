@@ -15,13 +15,20 @@ export function getHeader(req: Request, name: string): string | undefined {
 }
 
 export function getClientIp(req: Request): string | null {
-  // Behind the Cloudflare proxy, the true client IP is CF-Connecting-IP (DNS-2);
-  // the edge Nginx also forwards it into X-Forwarded-For.
-  const cf = getHeader(req, 'cf-connecting-ip');
-  if (cf) return cf.trim();
-  const forwarded = getHeader(req, 'x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return req.ip ?? null;
+  // SECURITY (SEC-API4): use ONLY the value our own Nginx computed, never a
+  // header the caller can set. Nginx resolves $remote_addr via the real_ip
+  // module — it honours CF-Connecting-IP solely when the peer is genuinely a
+  // Cloudflare address, so a forged header on a direct-to-origin connection is
+  // ignored — and then *sets* (not appends) X-Real-IP from it.
+  //
+  // Reading cf-connecting-ip / x-forwarded-for straight off the request used to
+  // let anyone bypass the live-key IP allowlist with one spoofed header, because
+  // Nginx passed CF-Connecting-IP through untouched and $proxy_add_x_forwarded_for
+  // *appends* to whatever the client sent (leaving the attacker's value first).
+  const realIp = getHeader(req, 'x-real-ip');
+  if (realIp) return realIp.trim();
+  // No proxy in front (local/dev): fall back to the socket peer, which cannot be forged.
+  return req.socket?.remoteAddress ?? req.ip ?? null;
 }
 
 /** Mutating endpoints require an Idempotency-Key (IDEM-1). */

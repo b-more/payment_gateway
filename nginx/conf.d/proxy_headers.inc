@@ -4,7 +4,15 @@
 proxy_http_version 1.1;
 proxy_set_header Host              $host;
 proxy_set_header X-Real-IP         $remote_addr;
-proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+# SECURITY: SET these rather than pass through / append, so a caller cannot
+# spoof its source IP and defeat the live-key allowlist (SEC-API4).
+# $remote_addr is already the true client: the real_ip module rewrites it from
+# CF-Connecting-IP ONLY when the peer is a Cloudflare address, so a forged
+# header on a direct-to-origin connection is ignored.
+# ($proxy_add_x_forwarded_for would APPEND to the client's value, leaving the
+#  attacker-controlled entry first; an untouched CF-Connecting-IP was trusted.)
+proxy_set_header X-Forwarded-For   $remote_addr;
+proxy_set_header CF-Connecting-IP  $remote_addr;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header Upgrade           $http_upgrade;
 proxy_set_header Connection        $connection_upgrade;

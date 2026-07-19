@@ -119,6 +119,27 @@ class DocumentDto {
 }
 
 export class ApplicationDto {
+  /**
+   * Who bears the transaction fee on collections. The merchant picks this once,
+   * for the whole account, at application time. They choose who pays, never how
+   * much: the rate stays admin-set.
+   *
+   * Defaults to MERCHANT because that can never surprise an end customer with a
+   * price higher than the merchant advertised.
+   */
+  @ApiProperty({
+    enum: ['SOURCE', 'MERCHANT'],
+    required: false,
+    default: 'MERCHANT',
+    description:
+      'MERCHANT: you absorb the fee and receive amount minus the fee. ' +
+      'SOURCE: your customer pays the fee on top and you receive the full amount. ' +
+      'Applies to collections; disbursement fees are always merchant-borne.',
+  })
+  @IsOptional()
+  @IsIn(['SOURCE', 'MERCHANT'])
+  chargeFulfiller?: 'SOURCE' | 'MERCHANT';
+
   @ApiProperty({ type: MerchantInfoDto })
   @ValidateNested()
   @Type(() => MerchantInfoDto)

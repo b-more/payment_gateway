@@ -10,6 +10,7 @@ export interface TransactionResponse {
   amount: string;
   charge: string;
   net_amount: string;
+  total_amount: string;
   status: string;
   failure_reason: string | null;
   idempotency_key: string;
@@ -26,6 +27,9 @@ export function serializeTransaction(t: TransactionRecord): TransactionResponse 
     amount: t.amount.toString(),
     charge: t.charge.toString(),
     net_amount: t.netAmount.toString(),
+    // What the payer is actually debited. Show this figure to the customer:
+    // under SOURCE it is amount + charge, under MERCHANT it equals amount.
+    total_amount: t.totalAmount.toString(),
     status: t.status,
     failure_reason: t.failureReason,
     idempotency_key: t.idempotencyKey,

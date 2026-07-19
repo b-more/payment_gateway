@@ -8,7 +8,28 @@ import { CredentialService } from '../credentials/credential.service';
 import { generateWebhookSecret, hashSecret } from '../credentials/crypto';
 import { EmailService } from '../email/email.service';
 import { ConflictError, NotFoundError } from '../money/errors';
-import type { AccountType } from '../money/types';
+import type { AccountType, ChargeFulfiller, Processor } from '../money/types';
+
+// Standard rate card applied when an account is provisioned. Rates are ours to
+// set; the merchant chooses only who BEARS them (charge_fulfiller), which they
+// picked on their application. An admin can change any of this afterwards on
+// the account's Configurations screen.
+//
+// Seeding matters: before this existed a freshly provisioned account had no
+// charge_configs row at all, so the merchant's first live transaction died with
+// "no charge config for <processor>".
+const DEFAULT_RATES: ReadonlyArray<{
+  processor: Processor;
+  chargeType: 'FIXED' | 'PERCENTAGE';
+  fixedValue: string | null;
+  percentValue: string | null;
+}> = [
+  { processor: 'MTN', chargeType: 'PERCENTAGE', fixedValue: null, percentValue: '2.50' },
+  { processor: 'AIRTEL', chargeType: 'PERCENTAGE', fixedValue: null, percentValue: '2.50' },
+  { processor: 'ZAMTEL', chargeType: 'PERCENTAGE', fixedValue: null, percentValue: '2.50' },
+  { processor: 'ZED_MOBILE', chargeType: 'PERCENTAGE', fixedValue: null, percentValue: '2.50' },
+  { processor: 'VISA', chargeType: 'PERCENTAGE', fixedValue: null, percentValue: '3.00' },
+];
 
 /** A readable, strong one-time portal password (12 url-safe chars). */
 function generateTempPassword(): string {
@@ -31,6 +52,7 @@ interface MerchantRow {
   status: string;
   name: string;
   email: string;
+  charge_fulfiller: ChargeFulfiller;
 }
 interface ModeRow {
   operating_mode: string;
@@ -59,7 +81,7 @@ export class AccountProvisioningService {
   }): Promise<ProvisionResult> {
     const result = await withTransaction(this.pool, async (client) => {
       const merchant = await client.query<MerchantRow>(
-        'SELECT status, name, email FROM merchants WHERE id = $1 FOR UPDATE',
+        'SELECT status, name, email, charge_fulfiller FROM merchants WHERE id = $1 FOR UPDATE',
         [input.merchantId],
       );
       if (merchant.rowCount === 0) {
@@ -83,6 +105,19 @@ export class AccountProvisioningService {
         [accountId, generateWebhookSecret()], // sign outgoing webhooks (WH-2)
       );
 
+      // Seed the rate card, honouring the fee-bearer the merchant chose when
+      // they applied. Without this the account cannot transact at all.
+      const fulfiller = merchant.rows[0].charge_fulfiller;
+      for (const rate of DEFAULT_RATES) {
+        await client.query(
+          `INSERT INTO charge_configs
+             (account_id, processor, charge_fulfiller, charge_type, fixed_value, percent_value)
+           VALUES ($1, $2, $3, $4, $5::bigint, $6::numeric)
+           ON CONFLICT (account_id, processor) DO NOTHING`,
+          [accountId, rate.processor, fulfiller, rate.chargeType, rate.fixedValue, rate.percentValue],
+        );
+      }
+
       // ONB-4: auto-generate a SANDBOX and a LIVE credential pair, atomically.
       const sandbox = await this.credentials.generate({ accountId, environment: 'SANDBOX' }, client);
       const live = await this.credentials.generate({ accountId, environment: 'LIVE' }, client);
@@ -92,7 +127,11 @@ export class AccountProvisioningService {
         actorScope: 'SYSTEM',
         action: 'ACCOUNT_CREATED',
         target: accountId,
-        metadata: { merchantId: input.merchantId, accountType: input.accountType },
+        metadata: {
+          merchantId: input.merchantId,
+          accountType: input.accountType,
+          chargeFulfiller: merchant.rows[0].charge_fulfiller,
+        },
       });
       for (const cred of [sandbox, live]) {
         await this.audit.write(client, {

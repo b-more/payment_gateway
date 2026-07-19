@@ -26,6 +26,7 @@ export default function GettingStarted(): ReactNode {
     name: '', tradingName: '', merchantType: 'PRIVATE', email: '', phone: '',
     registrationNumber: '', tpin: '', address: '', city: '', website: '', description: '',
     adminName: '', adminEmail: '', adminPhone: '',
+    chargeFulfiller: 'MERCHANT',
   });
   const [docs, setDocs] = useState<Record<string, UploadedDoc>>({});
   const [message, setMessage] = useState('');
@@ -82,6 +83,7 @@ export default function GettingStarted(): ReactNode {
           description: form.description || undefined,
         },
         admin: { name: form.adminName, email: form.adminEmail, phone: form.adminPhone || undefined },
+        chargeFulfiller: form.chargeFulfiller,
         documents: Object.values(docs),
       });
       setMessage(r.message);
@@ -183,6 +185,53 @@ export default function GettingStarted(): ReactNode {
                   <input value={form.adminPhone} onChange={set('adminPhone')} placeholder="+260…" />
                 </div>
               </div>
+
+              <div className="form-section">Transaction fees</div>
+              <fieldset className="feechoice">
+                <legend>Who pays the transaction fee?</legend>
+                <p className="feehint">
+                  We charge a fee on every payment you collect. You choose whether that comes out of
+                  your money or is added to what your customer pays. You can change this later by
+                  contacting us.
+                </p>
+
+                <label className={form.chargeFulfiller === 'MERCHANT' ? 'feeopt sel' : 'feeopt'}>
+                  <input
+                    type="radio"
+                    name="chargeFulfiller"
+                    value="MERCHANT"
+                    checked={form.chargeFulfiller === 'MERCHANT'}
+                    onChange={set('chargeFulfiller')}
+                  />
+                  <span className="feebody">
+                    <b>I pay the fee</b>
+                    <span className="feeeg">
+                      On a K50.00 sale your customer pays K50.00 and you receive K48.75.
+                    </span>
+                  </span>
+                </label>
+
+                <label className={form.chargeFulfiller === 'SOURCE' ? 'feeopt sel' : 'feeopt'}>
+                  <input
+                    type="radio"
+                    name="chargeFulfiller"
+                    value="SOURCE"
+                    checked={form.chargeFulfiller === 'SOURCE'}
+                    onChange={set('chargeFulfiller')}
+                  />
+                  <span className="feebody">
+                    <b>My customer pays the fee</b>
+                    <span className="feeeg">
+                      On a K50.00 sale your customer pays K51.25 and you receive the full K50.00.
+                    </span>
+                  </span>
+                </label>
+
+                <p className="feehint">
+                  Examples use a 2.5% fee. Your actual rate is confirmed before you go live. Payouts
+                  you send are always charged to your account.
+                </p>
+              </fieldset>
 
               <div className="form-section">KYC documents <span className="opt">(PDF/JPG/PNG, max 5MB each)</span></div>
               {DOCS.map((d) => (

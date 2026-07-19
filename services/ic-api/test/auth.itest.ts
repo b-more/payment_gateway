@@ -280,7 +280,7 @@ test('§6.1.5: create a report and download it as CSV', async () => {
   const m = await pool.query<{ id: string }>("INSERT INTO merchants (name,merchant_type,email) VALUES ('Rep','PRIVATE',$1) RETURNING id", [`rep-${randomUUID()}@x.zm`]);
   const a = await pool.query<{ id: string }>("INSERT INTO accounts (merchant_id,account_type) VALUES ($1,'COLLECTION') RETURNING id", [m.rows[0].id]);
   await pool.query(
-    `INSERT INTO transactions (account_id,type,processor,amount,net_amount,status,idempotency_key,environment) VALUES ($1,'COLLECTION','MTN',12345,12345,'SUCCESS',$2,'SANDBOX')`,
+    `INSERT INTO transactions (account_id,type,processor,amount,net_amount,total_amount,status,idempotency_key,environment) VALUES ($1,'COLLECTION','MTN',12345,12345,12345,'SUCCESS',$2,'SANDBOX')`,
     [a.rows[0].id, randomUUID()],
   );
 
@@ -315,8 +315,8 @@ test('§6.1.8: notifications surface derived alerts', async () => {
   );
   const accountId = a.rows[0].id;
   const t = await pool.query<{ id: string }>(
-    `INSERT INTO transactions (account_id, type, processor, amount, net_amount, status, idempotency_key, environment)
-     VALUES ($1,'COLLECTION','MTN',1000,1000,'SUCCESS',$2,'SANDBOX') RETURNING id`,
+    `INSERT INTO transactions (account_id, type, processor, amount, net_amount, total_amount, status, idempotency_key, environment)
+     VALUES ($1,'COLLECTION','MTN',1000,1000,1000,'SUCCESS',$2,'SANDBOX') RETURNING id`,
     [accountId, randomUUID()],
   );
   await pool.query(
@@ -474,8 +474,8 @@ test('admin authorized reversal (§6.1.3)', async () => {
     [m.rows[0].id],
   );
   const t = await pool.query<{ id: string }>(
-    `INSERT INTO transactions (account_id, type, processor, amount, charge, net_amount, status, idempotency_key, environment)
-     VALUES ($1,'COLLECTION','MTN',100000,500,100000,'SUCCESS',$2,'SANDBOX') RETURNING id`,
+    `INSERT INTO transactions (account_id, type, processor, amount, charge, net_amount, total_amount, status, idempotency_key, environment)
+     VALUES ($1,'COLLECTION','MTN',100000,500,100000,100500,'SUCCESS',$2,'SANDBOX') RETURNING id`,
     [a.rows[0].id, randomUUID()],
   );
 

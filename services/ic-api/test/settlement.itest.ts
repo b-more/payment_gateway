@@ -68,8 +68,8 @@ async function insertTxn(
   processor = 'MTN',
 ): Promise<string> {
   const t = await pool.query<{ id: string }>(
-    `INSERT INTO transactions (account_id, type, processor, amount, net_amount, status, idempotency_key, environment)
-     VALUES ($1,'COLLECTION',$2,$3,$3,$4,$5,'SANDBOX') RETURNING id`,
+    `INSERT INTO transactions (account_id, type, processor, amount, net_amount, total_amount, status, idempotency_key, environment)
+     VALUES ($1,'COLLECTION',$2,$3,$3,$3,$4,$5,'SANDBOX') RETURNING id`,
     [accountId, processor, netAmount.toString(), status, randomUUID()],
   );
   if (status === 'SUCCESS') await creditFloat(accountId, netAmount);

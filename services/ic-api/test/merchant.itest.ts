@@ -70,8 +70,8 @@ async function seedMerchant(roles: string[]): Promise<Merchant> {
     [accountId, 'whsec_x'],
   );
   const t = await pool.query<{ id: string }>(
-    `INSERT INTO transactions (account_id, type, processor, msisdn, amount, charge, net_amount, status, idempotency_key, environment)
-     VALUES ($1,'COLLECTION','MTN','260970000001',100000,500,100000,'SUCCESS',$2,'SANDBOX') RETURNING id`,
+    `INSERT INTO transactions (account_id, type, processor, msisdn, amount, charge, net_amount, total_amount, status, idempotency_key, environment)
+     VALUES ($1,'COLLECTION','MTN','260970000001',100000,500,100000,100500,'SUCCESS',$2,'SANDBOX') RETURNING id`,
     [accountId, randomUUID()],
   );
   const u = await pool.query<{ id: string }>(

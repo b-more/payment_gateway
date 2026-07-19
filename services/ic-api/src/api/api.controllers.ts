@@ -83,10 +83,15 @@ export class CollectionsController {
     const record = await this.txns.processTransaction(input);
     if (record.status === 'PROCESSING') {
       const reference = dto.collectionReference ?? record.id;
+      // Debit the payer the GROSS, not the principal. Under SOURCE the customer
+      // owes amount + charge; sending `amount` here is what previously let the
+      // fee vanish, because the merchant was then credited the full amount and
+      // nothing was left over for Instacom. Under MERCHANT the two are equal.
+      const payerOwes = record.totalAmount;
       if (dto.processor === 'AIRTEL') {
-        await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, reference });
+        await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, reference });
       } else {
-        await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, externalId: reference });
+        await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, externalId: reference });
       }
       return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
     }

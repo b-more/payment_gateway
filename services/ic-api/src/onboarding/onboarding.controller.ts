@@ -37,6 +37,7 @@ export class OnboardingController {
         phone: dto.admin.phone ?? null,
       },
       documents: dto.documents ?? [],
+      chargeFulfiller: dto.chargeFulfiller ?? 'MERCHANT',
     });
     return { merchant_id: merchantId, message: ONBOARDING_RECEIVED_MESSAGE };
   }

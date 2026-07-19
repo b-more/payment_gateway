@@ -61,8 +61,8 @@ async function seedFinalTransaction(secret: string | null): Promise<string> {
     [accountId, hookUrl, secret],
   );
   const t = await pool.query<{ id: string }>(
-    `INSERT INTO transactions (account_id, type, processor, amount, net_amount, status, idempotency_key, environment)
-     VALUES ($1,'COLLECTION','MTN',100000,100000,'SUCCESS',$2,'SANDBOX') RETURNING id`,
+    `INSERT INTO transactions (account_id, type, processor, amount, net_amount, total_amount, status, idempotency_key, environment)
+     VALUES ($1,'COLLECTION','MTN',100000,100000,100000,'SUCCESS',$2,'SANDBOX') RETURNING id`,
     [accountId, randomUUID()],
   );
   return t.rows[0].id;

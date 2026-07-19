@@ -1358,3 +1358,63 @@ h3 {
   font-size: 40px; font-weight: 700; color: var(--redm); margin: 6px 0 18px; letter-spacing: 0.02em;
 }
 .idle-actions { display: flex; gap: 10px; justify-content: center; }
+
+/* Fee-bearer choice on the application form. A commercial decision, so each
+   option carries a worked example rather than only a label. */
+.feechoice {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.feechoice legend {
+  padding: 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.feehint {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 6px 0 12px;
+}
+.feeopt {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  margin-bottom: 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.feeopt:hover {
+  border-color: var(--sky);
+}
+.feeopt.sel {
+  border-color: var(--sky);
+  background: var(--cloud, #eef5fb);
+}
+.feeopt input {
+  margin-top: 3px;
+  flex: none;
+  accent-color: var(--sky-deep);
+}
+.feeopt:focus-within {
+  outline: 2px solid var(--sky);
+  outline-offset: 2px;
+}
+.feebody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.feebody b {
+  font-size: 14px;
+  color: var(--text);
+}
+.feeeg {
+  font-size: 13px;
+  color: var(--muted);
+}

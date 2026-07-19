@@ -44,6 +44,8 @@ export interface TransactionRecord {
   amount: bigint;
   charge: bigint;
   netAmount: bigint;
+  /** Gross debited from the payer. SOURCE: amount + charge. MERCHANT: amount. */
+  totalAmount: bigint;
   status: TransactionStatus;
   failureReason: string | null;
   idempotencyKey: string;
@@ -60,6 +62,7 @@ interface TxnRow {
   amount: string;
   charge: string;
   net_amount: string;
+  total_amount: string;
   status: TransactionStatus;
   failure_reason: string | null;
   idempotency_key: string;
@@ -88,6 +91,7 @@ function mapTxn(row: TxnRow): TransactionRecord {
     amount: BigInt(row.amount),
     charge: BigInt(row.charge),
     netAmount: BigInt(row.net_amount),
+    totalAmount: BigInt(row.total_amount),
     status: row.status,
     failureReason: row.failure_reason,
     idempotencyKey: row.idempotency_key,
@@ -161,7 +165,7 @@ export class TransactionService {
         }
 
         const config = await this.loadChargeConfig(client, input.accountId, input.processor);
-        const amounts = computeAmounts(config.charge, config.fulfiller, input.amount);
+        const amounts = computeAmounts(config.charge, config.fulfiller, input.amount, input.type);
 
         // TXN-2: insufficient float -> FAILED, no debit. Only a DISBURSEMENT
         // spends float; a collection brings money IN and needs none. Float is a
@@ -174,6 +178,7 @@ export class TransactionService {
           const failed = await this.insertTransaction(client, input, {
             charge: amounts.charge,
             netAmount: amounts.netAmount,
+            totalAmount: amounts.totalAmount,
             status: 'FAILED',
             failureReason: 'INSUFFICIENT_FLOAT',
           });
@@ -194,6 +199,7 @@ export class TransactionService {
         const txn = await this.insertTransaction(client, input, {
           charge: amounts.charge,
           netAmount: amounts.netAmount,
+          totalAmount: amounts.totalAmount,
           status: 'PROCESSING',
           failureReason: null,
         });
@@ -397,9 +403,16 @@ export class TransactionService {
       // know a separate disbursement is required to actually refund someone.
 
       // SANDBOX never touched the ledger, so a reversal has no float to move.
-      // Direction mirrors what the success did: a reversed COLLECTION refunds
-      // the customer, so we take back the net we credited; a reversed
-      // DISBURSEMENT means the payout came back, so the float returns.
+      // Direction mirrors what the success did: a reversed COLLECTION takes
+      // back the net we credited; a reversed DISBURSEMENT means the payout
+      // came back, so the float returns.
+      //
+      // Note the merchant returns `netAmount`, not `totalAmount`. That is
+      // deliberate: netAmount is exactly what this account was credited, and
+      // the fee never entered its ledger. Under SOURCE the customer paid
+      // netAmount + charge, so the operator refunding them must disburse
+      // `total_amount` (netAmount from the merchant, charge from Instacom).
+      // Refunding `amount` would short a SOURCE customer by the fee.
       if (current.environment === 'PRODUCTION') {
         const reversal =
           current.type === 'COLLECTION'
@@ -478,15 +491,16 @@ export class TransactionService {
     derived: {
       charge: bigint;
       netAmount: bigint;
+      totalAmount: bigint;
       status: TransactionStatus;
       failureReason: string | null;
     },
   ): Promise<TransactionRecord> {
     const result = await client.query<TxnRow>(
       `INSERT INTO transactions
-         (account_id, type, processor, msisdn, amount, charge, net_amount, status,
-          failure_reason, idempotency_key, collection_reference, environment)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         (account_id, type, processor, msisdn, amount, charge, net_amount, total_amount,
+          status, failure_reason, idempotency_key, collection_reference, environment)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
       [
         input.accountId,
@@ -496,6 +510,7 @@ export class TransactionService {
         input.amount.toString(),
         derived.charge.toString(),
         derived.netAmount.toString(),
+        derived.totalAmount.toString(),
         derived.status,
         derived.failureReason,
         input.idempotencyKey,

@@ -5,9 +5,10 @@ import { withTransaction, isUniqueViolation } from '../database/tx';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
 import { ConflictError, NotFoundError, ValidationError } from '../money/errors';
+import type { ChargeFulfiller } from '../money/types';
 
 export const ONBOARDING_RECEIVED_MESSAGE =
-  'We have received your merchant onboarding application. Our team will review your application and contact you within 24–48 hours.';
+  'We have received your merchant onboarding application. Our team will review your application and contact you within 24 to 48 hours.';
 
 const ALLOWED_DOC_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_DOC_BYTES = 5 * 1024 * 1024; // 5 MB per document
@@ -36,6 +37,8 @@ export interface ApplicationInput {
   };
   admin: { name: string; email: string; phone?: string | null };
   documents?: ApplicationDocument[];
+  /** Who bears the collection fee. Seeds charge_configs at provisioning. */
+  chargeFulfiller?: ChargeFulfiller;
 }
 
 export type ReviewDecision = 'APPROVED' | 'REJECTED';
@@ -82,13 +85,15 @@ export class OnboardingService {
         const merchant = await client.query<{ id: string }>(
           `INSERT INTO merchants
              (name, merchant_type, email, phone, status, kyc_status,
-              trading_name, registration_number, tpin, address, city, website, description)
-           VALUES ($1,$2,$3,$4,'PENDING','UNVERIFIED',$5,$6,$7,$8,$9,$10,$11)
+              trading_name, registration_number, tpin, address, city, website, description,
+              charge_fulfiller)
+           VALUES ($1,$2,$3,$4,'PENDING','UNVERIFIED',$5,$6,$7,$8,$9,$10,$11,$12)
            RETURNING id`,
           [
             m.name, m.merchantType, m.email, m.phone ?? null,
             m.tradingName ?? null, m.registrationNumber ?? null, m.tpin ?? null,
             m.address ?? null, m.city ?? null, m.website ?? null, m.description ?? null,
+            input.chargeFulfiller ?? 'MERCHANT',
           ],
         );
         const merchantId = merchant.rows[0].id;

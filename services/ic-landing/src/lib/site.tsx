@@ -2,6 +2,8 @@ import type { ReactNode, SVGProps } from 'react';
 
 // External portal URL (build-time). Prod points at the merchant portal hostname.
 export const MERCHANT = process.env.NEXT_PUBLIC_MERCHANT_URL ?? 'http://localhost:8020';
+// Public API origin, for links to the OpenAPI reference at /docs.
+export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 export const PHONE = '+260 765 121 134';
 export const PHONE_HREF = 'tel:+260765121134';
 export const ADDRESS = '6755 Elasah House, Along Chainama Road, Olympia Extension, Lusaka, Zambia';

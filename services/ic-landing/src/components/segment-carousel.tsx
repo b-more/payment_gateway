@@ -51,7 +51,7 @@ export function SegmentCarousel(): ReactNode {
             <img
               src={s.img}
               alt={s.label}
-              loading={i === 0 ? 'eager' : 'lazy'}
+              loading="lazy"
               decoding="async"
               draggable={false}
             />

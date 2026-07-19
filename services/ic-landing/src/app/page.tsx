@@ -1,88 +1,65 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Icon, I, MERCHANT, RAILS, FEATURES, BOZ, STATS, BANDS } from '@/lib/site';
+import { Icon, I, MERCHANT, FEATURES, BOZ, STATS, BANDS, FLOW, PROOF_LOGOS, TESTIMONIALS } from '@/lib/site';
 import { CtaBand } from '@/components/cta-band';
 import { StatNum } from '@/components/stat-counter';
 import { SegmentCarousel } from '@/components/segment-carousel';
+import { RailLogos } from '@/components/rail-logos';
+import { CodePanel } from '@/components/code-panel';
+import { PayCard } from '@/components/pay-card';
+import { Reveal } from '@/components/reveal';
 
 export default function Home(): ReactNode {
   return (
     <>
-      {/* ── Hero: full-bleed campaign photo (campaign/7.jpg) ── */}
+      {/* ── Hero: copy paired with one real transaction, not a stock photo ── */}
       <div className="hero" id="top">
-        <img className="hero-photo" src="/campaign/7.jpg" alt="Instacom, seamless payments for Zambian business" />
-        <div className="hero-scrim" aria-hidden />
         <div className="wrap">
-          <div className="reveal">
-            <span className="eyebrow"><span className="dot" /> Payment solutions · Zambia</span>
-            <h1>
-              Business payments,<br />made <span className="sky">simple.</span>
-            </h1>
-            <p className="lede">
-              Instacom unifies MTN, Airtel, Zamtel, Zed Mobile and Visa into one integration, so your
-              business can collect, disburse and settle in Kwacha. Fast. Secure. Reliable.
-            </p>
-            <div className="actions">
-              <a className="btn btn-primary" href={`${MERCHANT}/getting-started`}>Get started for free</a>
-              <Link className="btn btn-light" href="/developers">Explore the API</Link>
+          <div className="hero-grid">
+            <div className="reveal">
+              <span className="eyebrow"><span className="dot" /> Payment solutions, Zambia</span>
+              <h1>
+                Business payments,<br />made <span className="sky">simple.</span>
+              </h1>
+              <p className="lede">
+                Instacom connects MTN, Airtel, Zamtel, Zed Mobile and Visa to one integration, so your
+                business can collect, pay out and settle in Kwacha.
+              </p>
+              <div className="actions">
+                <a className="btn btn-primary" href={`${MERCHANT}/getting-started`}>Get started for free</a>
+                <Link className="btn btn-light" href="/developers">Explore the API</Link>
+              </div>
+              <div className="reassure">
+                <span className="tag key"><Icon d={I.shield} width={15} height={15} /> Bank of Zambia licensed</span>
+                <span className="tag"><Icon d={I.check} width={15} height={15} /> Free onboarding</span>
+                <span className="tag"><Icon d={I.check} width={15} height={15} /> Zero integration cost</span>
+              </div>
             </div>
-            <div className="reassure">
-              <span className="tag key"><Icon d={I.shield} width={15} height={15} /> Bank of Zambia licensed</span>
-              <span className="tag"><Icon d={I.check} width={15} height={15} /> Free onboarding</span>
-              <span className="tag"><Icon d={I.check} width={15} height={15} /> Zero integration cost</span>
-            </div>
+            <PayCard />
           </div>
         </div>
       </div>
 
-      {/* ── Rails ── */}
+      {/* ── Processor row ── */}
       <div className="rails">
         <div className="wrap">
           <span className="label">One integration, every rail</span>
-          <div className="set">
-            {RAILS.map((r) => <span className="rail" key={r}>{r}</span>)}
-          </div>
+          <RailLogos />
         </div>
       </div>
 
-      {/* ── Bank of Zambia trust section (LEGAL-1) ── */}
-      <section className="trust tint">
+      {/* ── Stats. Real values ship in the HTML, then count up on view. ── */}
+      <section>
         <div className="wrap">
-          <div className="inner">
-            <div className="figure">
-              <img src="/campaign/6.jpg" alt="Instacom, Bank of Zambia licensed payment platform for Zambian businesses" loading="lazy" decoding="async" />
+          <Reveal>
+            <div className="section-head">
+              <span className="eyebrow"><span className="dot" /> Built to move money at scale</span>
+              <h2>Reliable, regulated, always on.</h2>
             </div>
-            <div>
-              <span className="eyebrow"><span className="dot" /> {BOZ.eyebrow}</span>
-              <h2>{BOZ.title}</h2>
-              <p className="lede-2">{BOZ.body}</p>
-              <div className="lic">
-                <span className="ic"><Icon d={I.shield} /></span>
-                <span className="txt">
-                  <span className="k">Bank of Zambia Licensed</span>
-                </span>
-              </div>
-              <ul className="points">
-                {BOZ.points.map((p) => (
-                  <li key={p}><span className="tick"><Icon d={I.check} width={16} height={16} /></span>{p}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats band ── */}
-      <section className="band">
-        <img className="bg" src="/campaign/8.jpg" alt="" loading="lazy" decoding="async" />
-        <div className="scrim">
-          <div className="wrap">
-            <span className="eyebrow"><span className="dot" /> Built to move money at scale</span>
-            <h2>Reliable, regulatory-compliant, always on.</h2>
             <div className="stats">
               {STATS.map((s) => (
                 <div className="stat" key={s.label}>
-                  <span className="n">
+                  <span className={typeof s.n === 'number' ? 'n' : 'n txt'}>
                     {typeof s.n === 'number'
                       ? <StatNum to={s.n} decimals={s.decimals ?? 0} suffix={s.suffix ?? ''} />
                       : s.text}
@@ -91,35 +68,153 @@ export default function Home(): ReactNode {
                 </div>
               ))}
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
-      {/* ── Why Instacom: all features ── */}
+      {/* ── How money moves. Numbered because it is a real sequence. ── */}
+      <section className="tint">
+        <div className="wrap">
+          <Reveal>
+            <div className="section-head">
+              <span className="eyebrow"><span className="dot" /> How money moves</span>
+              <h2>From your customer to your bank, in four steps.</h2>
+              <p>Every payment follows the same path, and you can see where it is at each stage.</p>
+            </div>
+            <ol className="flow">
+              {FLOW.map((s, i) => (
+                <li className="step" key={s.t}>
+                  <span className="mark" aria-hidden>{i + 1}</span>
+                  <h3>{s.t}</h3>
+                  <p>{s.b}</p>
+                </li>
+              ))}
+            </ol>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── Features ── */}
       <section>
         <div className="wrap">
-          <div className="section-head">
-            <span className="eyebrow"><span className="dot" /> Why Instacom</span>
-            <h2>Everything you need to move money.</h2>
-            <p>One platform for the whole payment lifecycle, built for how Zambian businesses actually get paid.</p>
-          </div>
-          <div className="features">
-            {FEATURES.map((f) => (
-              <div className="feature" key={f.title}>
-                <span className="ic"><Icon d={f.icon} /></span>
-                <h3>{f.title} <span className="dot" /></h3>
-                <p>{f.body}</p>
-              </div>
-            ))}
-          </div>
+          <Reveal>
+            <div className="section-head">
+              <span className="eyebrow"><span className="dot" /> Why Instacom</span>
+              <h2>Everything you need to move money.</h2>
+              <p>One platform for the whole payment lifecycle, built for how Zambian businesses actually get paid.</p>
+            </div>
+            <div className="features">
+              {FEATURES.map((f) => (
+                <div className="feature" key={f.title}>
+                  <span className="ic"><Icon d={f.icon} /></span>
+                  <h3>{f.title}</h3>
+                  <p>{f.body}</p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
         </div>
       </section>
 
-      {/* ── Use-case band: Collections ── */}
-      <UseCaseBand band={BANDS[0]} />
+      {/* ── Bank of Zambia ── */}
+      <section className="trust tint">
+        <div className="wrap">
+          <Reveal>
+            <div className="inner">
+              <div className="figure">
+                <img
+                  src="/campaign/6.jpg"
+                  alt="Instacom, a Bank of Zambia licensed payment platform for Zambian businesses"
+                  width={1200}
+                  height={800}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <div>
+                <span className="eyebrow"><span className="dot" /> {BOZ.eyebrow}</span>
+                <h2>{BOZ.title}</h2>
+                <p className="lede-2">{BOZ.body}</p>
+                <div className="lic">
+                  <span className="ic"><Icon d={I.shield} /></span>
+                  <span className="txt">
+                    <span className="k">Bank of Zambia licensed</span>
+                  </span>
+                </div>
+                <ul className="points">
+                  {BOZ.points.map((p) => (
+                    <li key={p}><span className="tick"><Icon d={I.check} width={16} height={16} /></span>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
 
-      {/* ── Segments showcase ── */}
+      {/* ── Developers: the one dark block on the page ── */}
+      <section>
+        <div className="wrap">
+          <Reveal>
+            <div className="api">
+              <div>
+                <span className="eyebrow"><span className="dot" /> For developers</span>
+                <h2>An API your team can read.</h2>
+                <p className="dev-lede">
+                  Authenticate with a key and secret, send an idempotency key so retries are safe, and
+                  verify the signature on every webhook. Amounts are integer ngwee, so the books always
+                  balance.
+                </p>
+                <div className="pills">
+                  <span className="pill">REST</span>
+                  <span className="pill">Idempotency-Key</span>
+                  <span className="pill">Signed webhooks</span>
+                  <span className="pill">OpenAPI 3</span>
+                  <span className="pill">Sandbox</span>
+                </div>
+                <div className="actions dev-actions">
+                  <Link className="btn btn-primary" href="/developers">
+                    Read the docs <Icon d={I.arrow} width={18} height={18} />
+                  </Link>
+                </div>
+              </div>
+              <CodePanel />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── Social proof. Slots are sized so real content cannot shift them. ── */}
       <section className="tint">
+        <div className="wrap">
+          <Reveal>
+            <div className="section-head center">
+              <span className="eyebrow"><span className="dot" /> Customers</span>
+              <h2>Trusted by businesses across Zambia.</h2>
+              <p>Retailers, schools, logistics firms and billers collect and pay out on Instacom every day.</p>
+            </div>
+            <div className="proof-logos">
+              {PROOF_LOGOS.map((p) => (
+                <div className="proof-logo" key={p}>{p}</div>
+              ))}
+            </div>
+            <div className="quotes">
+              {TESTIMONIALS.map((t) => (
+                <figure className="quote" key={t.who + t.role}>
+                  <blockquote>{t.quote}</blockquote>
+                  <figcaption>
+                    <span className="who">{t.who}</span>
+                    <span className="role">{t.role}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── Segments ── */}
+      <section>
         <div className="wrap">
           <div className="section-head center">
             <span className="eyebrow"><span className="dot" /> For every business</span>
@@ -130,27 +225,8 @@ export default function Home(): ReactNode {
         </div>
       </section>
 
-      {/* ── Split: provider ── */}
-      <section>
-        <div className="wrap">
-          <div className="split">
-            <div className="figure">
-              <img src={BANDS[2].img} alt={BANDS[2].title} loading="lazy" decoding="async" />
-            </div>
-            <div className="copy">
-              <span className="eyebrow"><span className="dot" /> {BANDS[2].eyebrow}</span>
-              <h2>{BANDS[2].title}</h2>
-              <p>{BANDS[2].body}</p>
-              <div className="actions" style={{ marginTop: 26 }}>
-                <Link className="btn btn-navy" href={BANDS[2].href}>{BANDS[2].cta} <Icon d={I.arrow} width={18} height={18} /></Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Use-case band: Zero cost ── */}
-      <UseCaseBand band={BANDS[1]} />
+      {/* ── Collections use case ── */}
+      <UseCaseBand band={BANDS[0]} />
 
       <CtaBand />
     </>

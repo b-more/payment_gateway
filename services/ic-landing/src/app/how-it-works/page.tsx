@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Icon, I, RAILS } from '@/lib/site';
+import { Icon, I } from '@/lib/site';
 import { CtaBand } from '@/components/cta-band';
+import { RailLogos } from '@/components/rail-logos';
 
 export const metadata: Metadata = {
   title: 'How it works | Instacom Payment Solutions',
@@ -20,7 +21,7 @@ const ACCOUNT: Array<{ ic: string; t: string; b: string }> = [
   { ic: I.swap, t: 'Idempotent by design', b: 'Every mutating request carries an Idempotency-Key, so a retry returns the original result and never double-charges a customer.' },
   { ic: I.pulse, t: 'Append-only ledger', b: 'Each balance change is a double-entry row. Balances are derived from the ledger and reconcilable to the ngwee, never silently overwritten.' },
   { ic: I.shield, t: 'Row-locked float', b: 'Spend is guarded by database row locks inside a transaction, so concurrent payments can never overspend your float.' },
-  { ic: I.bolt, t: 'Reconciled & signed', b: 'Transactions are matched against processor reports daily, and every webhook is HMAC-signed so you can trust each callback.' },
+  { ic: I.bolt, t: 'Reconciled and signed', b: 'Transactions are matched against processor reports daily, and every webhook is HMAC-signed so you can trust each callback.' },
 ];
 
 const FAQ: Array<{ q: string; a: string }> = [
@@ -41,7 +42,7 @@ export default function HowItWorks(): ReactNode {
           <p>Three steps, fully accountable, from the first payment to the money in your bank account.</p>
           <div className="tags">
             <span className="tag"><Icon d={I.shield} width={15} height={15} /> Bank of Zambia licensed</span>
-            <span className="tag"><Icon d={I.swap} width={15} height={15} /> Idempotent &amp; safe</span>
+            <span className="tag"><Icon d={I.swap} width={15} height={15} /> Idempotent and safe</span>
             <span className="tag"><Icon d={I.check} width={15} height={15} /> Settled in ZMW</span>
           </div>
         </div>
@@ -51,9 +52,7 @@ export default function HowItWorks(): ReactNode {
       <div className="rails">
         <div className="wrap">
           <span className="label">Works with every rail</span>
-          <div className="set">
-            {RAILS.map((r) => <span className="rail" key={r}>{r}</span>)}
-          </div>
+          <RailLogos />
         </div>
       </div>
 

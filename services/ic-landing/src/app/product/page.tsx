@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 const CAPS: string[] = [
-  'Collections across MTN, Airtel, Zamtel, Zed Mobile & Visa',
+  'Collections across MTN, Airtel, Zamtel, Zed Mobile and Visa',
   'Disbursements to any wallet or card from one balance',
   'Scheduled settlement to your bank, in Kwacha',
   'Daily reconciliation against processor reports',
@@ -25,11 +25,11 @@ const CAPS: string[] = [
 ];
 
 const FIELD: Array<{ img: string; label: string }> = [
-  { img: '/campaign/1.jpg', label: 'Corporates & enterprise' },
+  { img: '/campaign/1.jpg', label: 'Corporates and enterprise' },
   { img: '/campaign/2.jpg', label: 'SMEs, free onboarding' },
-  { img: '/campaign/4.jpg', label: 'Schools & campuses' },
-  { img: '/campaign/9.jpg', label: 'Logistics & field sales' },
-  { img: '/campaign/7.jpg', label: 'Seamless transactions' },
+  { img: '/campaign/4.jpg', label: 'Schools and campuses' },
+  { img: '/campaign/9.jpg', label: 'Logistics and field sales' },
+  { img: '/campaign/7.jpg', label: 'Everyday transactions' },
 ];
 
 export default function Product(): ReactNode {

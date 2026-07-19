@@ -170,6 +170,23 @@
   .c-dim { color: var(--code-faint); }
   .c-var { color: #d7e2f2; }
 
+
+  .chip.cta {
+    background: linear-gradient(150deg, var(--accent-bright), var(--accent));
+    border-color: var(--accent); color: #fff; font-weight: 700;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+  .chip.cta:hover { text-decoration: none; filter: brightness(1.06); }
+  .quickstart {
+    margin-top: 18px; padding: 14px 18px; border-radius: 12px;
+    background: var(--accent-soft); border: 1px solid var(--line-strong);
+    font-size: 14.5px; color: var(--text); max-width: 74ch; line-height: 1.6;
+  }
+  .quickstart code {
+    font-family: var(--mono); font-size: .88em; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+  }
+
   /* ── sections ── */
   section { padding: clamp(34px, 5vw, 60px) 0; border-top: 1px solid var(--line); }
   .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
@@ -303,10 +320,18 @@
       transaction runs the same locked state machine. Here is exactly how it fits together.
     </p>
     <div class="chips">
+      <a class="chip cta" href="/postman" download>⬇ Download Postman collection</a>
       <span class="chip"><span class="k">base</span> https://api.instacompayzm.com</span>
       <span class="chip"><span class="k">reference</span> <a href="https://api.instacompayzm.com/docs">/docs</a></span>
       <span class="chip live">Airtel rails live</span>
       <a class="chip" href="/developers"><span class="k">also</span> Merchant Portal API →</a>
+    </div>
+
+    <div class="quickstart">
+      <b>Fastest way to start:</b>
+      <a href="/postman" download>download the Postman collection</a>, import it, paste your
+      <code>apiKey</code> / <code>apiSecret</code> / <code>accountId</code> into the
+      <b>Variables</b> tab, and press Send. No signing, no scripts, no setup.
     </div>
 
     <div class="thesis" aria-label="Authentication">

@@ -10,7 +10,7 @@ export function SiteNav(): ReactNode {
   return (
     <header className="nav">
       <div className="wrap">
-        <Link href="/" aria-label="Instacom Payment Solutions — home">
+        <Link href="/" aria-label="Instacom Payment Solutions, home">
           <img className="logo" src="/brand/instacom-logo.png" alt="Instacom Payment Solutions" />
         </Link>
         <nav className="links">

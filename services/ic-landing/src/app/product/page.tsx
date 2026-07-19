@@ -4,15 +4,15 @@ import { Icon, I, MERCHANT, FEATURES } from '@/lib/site';
 import { CtaBand } from '@/components/cta-band';
 
 export const metadata: Metadata = {
-  title: 'Product — Instacom Payment Solutions',
+  title: 'Product | Instacom Payment Solutions',
   description:
-    'Collections, disbursements, settlement and reconciliation — everything Zambian businesses need to move money, on one Bank of Zambia–licensed platform.',
+    'Collections, disbursements, settlement and reconciliation. Everything Zambian businesses need to move money, on one platform licensed by the Bank of Zambia.',
 };
 
 const CAPS: string[] = [
   'Collections across MTN, Airtel, Zamtel, Zed Mobile & Visa',
   'Disbursements to any wallet or card from one balance',
-  'Scheduled settlement to your bank — in Kwacha',
+  'Scheduled settlement to your bank, in Kwacha',
   'Daily reconciliation against processor reports',
   'Append-only, double-entry float ledger',
   'Dual-control approval on large float credits',
@@ -26,7 +26,7 @@ const CAPS: string[] = [
 
 const FIELD: Array<{ img: string; label: string }> = [
   { img: '/campaign/1.jpg', label: 'Corporates & enterprise' },
-  { img: '/campaign/2.jpg', label: 'SMEs — free onboarding' },
+  { img: '/campaign/2.jpg', label: 'SMEs, free onboarding' },
   { img: '/campaign/4.jpg', label: 'Schools & campuses' },
   { img: '/campaign/9.jpg', label: 'Logistics & field sales' },
   { img: '/campaign/7.jpg', label: 'Seamless transactions' },
@@ -39,8 +39,8 @@ export default function Product(): ReactNode {
         <div className="wrap">
           <span className="eyebrow"><span className="dot" /> Product</span>
           <h1>Everything you need to move money.</h1>
-          <p>One platform for the whole payment lifecycle — collections, disbursements, settlement and
-            reconciliation — built for how Zambian businesses actually get paid.</p>
+          <p>One platform for the whole payment lifecycle: collections, disbursements, settlement and
+            reconciliation, built for how Zambian businesses actually get paid.</p>
           <div className="tags">
             <span className="tag"><Icon d={I.swap} width={15} height={15} /> Collections</span>
             <span className="tag"><Icon d={I.swap} width={15} height={15} /> Disbursements</span>
@@ -56,7 +56,7 @@ export default function Product(): ReactNode {
           <div className="section-head">
             <span className="eyebrow"><span className="dot" /> Capabilities</span>
             <h2>One platform, the whole lifecycle.</h2>
-            <p>Everything from the first customer payment to reconciled settlement in your bank — no glue code, no second vendor.</p>
+            <p>Everything from the first customer payment to reconciled settlement in your bank. No glue code, no second vendor.</p>
           </div>
           <div className="features">
             {FEATURES.map((f) => (
@@ -74,9 +74,9 @@ export default function Product(): ReactNode {
       <section>
         <div className="wrap">
           <div className="section-head">
-            <span className="eyebrow"><span className="dot" /> What’s included</span>
+            <span className="eyebrow"><span className="dot" /> What is included</span>
             <h2>Built-in, not bolted on.</h2>
-            <p>The controls a regulated payment platform needs — shipped as standard on every account.</p>
+            <p>The controls a regulated payment platform needs, shipped as standard on every account.</p>
           </div>
           <ul className="checklist">
             {CAPS.map((c) => (
@@ -94,8 +94,8 @@ export default function Product(): ReactNode {
             <span className="eyebrow"><span className="dot" /> For Zambian businesses</span>
             <h2 style={{ marginTop: 14 }}>Streamline your collections, end to end.</h2>
             <p>
-              From a customer’s first payment to the money landing in your bank, Instacom handles routing,
-              settlement and reconciliation — so your team can focus on the business, not the plumbing.
+              From the first customer payment to the money landing in your bank, Instacom handles routing,
+              settlement and reconciliation, so your team can focus on the business, not the plumbing.
             </p>
             <a className="btn btn-primary" href={`${MERCHANT}/getting-started`}>Start collecting <Icon d={I.arrow} width={18} height={18} /></a>
             <div className="stats">
@@ -113,7 +113,7 @@ export default function Product(): ReactNode {
           <div className="section-head center">
             <span className="eyebrow"><span className="dot" /> In the field</span>
             <h2>Trusted by businesses across Zambia.</h2>
-            <p>From warehouses to storefronts to campuses — Instacom keeps the money moving.</p>
+            <p>From warehouses to storefronts to campuses, Instacom keeps the money moving.</p>
           </div>
           <div className="gallery">
             {FIELD.map((f) => (

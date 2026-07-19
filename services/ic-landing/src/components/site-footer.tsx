@@ -10,7 +10,7 @@ export function SiteFooter(): ReactNode {
           <div>
             <img className="logo" src="/brand/instacom-logo.png" alt="Instacom Payment Solutions" />
             <p className="blurb">
-              Instacom Payment Solutions Limited — unifying Zambia’s payment rails into one secure,
+              Instacom Payment Solutions Limited, unifying the payment rails of Zambia into one secure,
               developer-friendly platform. Every kwacha, accounted for.
             </p>
             <div className="social">

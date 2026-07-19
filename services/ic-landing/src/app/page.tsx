@@ -8,9 +8,9 @@ import { SegmentCarousel } from '@/components/segment-carousel';
 export default function Home(): ReactNode {
   return (
     <>
-      {/* ── Hero — full-bleed campaign photo (campaign/7.jpg) ── */}
+      {/* ── Hero: full-bleed campaign photo (campaign/7.jpg) ── */}
       <div className="hero" id="top">
-        <img className="hero-photo" src="/campaign/7.jpg" alt="Instacom — seamless payments for Zambian business" />
+        <img className="hero-photo" src="/campaign/7.jpg" alt="Instacom, seamless payments for Zambian business" />
         <div className="hero-scrim" aria-hidden />
         <div className="wrap">
           <div className="reveal">
@@ -19,11 +19,11 @@ export default function Home(): ReactNode {
               Business payments,<br />made <span className="sky">simple.</span>
             </h1>
             <p className="lede">
-              Instacom unifies MTN, Airtel, Zamtel, Zed Mobile and Visa into one integration — so your
+              Instacom unifies MTN, Airtel, Zamtel, Zed Mobile and Visa into one integration, so your
               business can collect, disburse and settle in Kwacha. Fast. Secure. Reliable.
             </p>
             <div className="actions">
-              <a className="btn btn-primary" href={`${MERCHANT}/getting-started`}>Get started — it’s free</a>
+              <a className="btn btn-primary" href={`${MERCHANT}/getting-started`}>Get started for free</a>
               <Link className="btn btn-light" href="/developers">Explore the API</Link>
             </div>
             <div className="reassure">
@@ -50,7 +50,7 @@ export default function Home(): ReactNode {
         <div className="wrap">
           <div className="inner">
             <div className="figure">
-              <img src="/campaign/6.jpg" alt="Instacom — Bank of Zambia licensed payment platform for Zambian businesses" loading="lazy" decoding="async" />
+              <img src="/campaign/6.jpg" alt="Instacom, Bank of Zambia licensed payment platform for Zambian businesses" loading="lazy" decoding="async" />
             </div>
             <div>
               <span className="eyebrow"><span className="dot" /> {BOZ.eyebrow}</span>
@@ -95,13 +95,13 @@ export default function Home(): ReactNode {
         </div>
       </section>
 
-      {/* ── Why Instacom — all features ── */}
+      {/* ── Why Instacom: all features ── */}
       <section>
         <div className="wrap">
           <div className="section-head">
             <span className="eyebrow"><span className="dot" /> Why Instacom</span>
             <h2>Everything you need to move money.</h2>
-            <p>One platform for the whole payment lifecycle — built for how Zambian businesses actually get paid.</p>
+            <p>One platform for the whole payment lifecycle, built for how Zambian businesses actually get paid.</p>
           </div>
           <div className="features">
             {FEATURES.map((f) => (
@@ -124,7 +124,7 @@ export default function Home(): ReactNode {
           <div className="section-head center">
             <span className="eyebrow"><span className="dot" /> For every business</span>
             <h2>Built for every Zambian business.</h2>
-            <p>From corporates and SMEs to schools, retailers and everyday earners — one platform, every payment.</p>
+            <p>From corporates and SMEs to schools, retailers and everyday earners. One platform, every payment.</p>
           </div>
           <SegmentCarousel />
         </div>

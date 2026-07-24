@@ -79,6 +79,31 @@ test('ONB-3: approval flips status to APPROVED and is audit-logged', async () =>
   assert.equal(a.rowCount, 1);
 });
 
+test('ONB-4: a second account of the same type is rejected; a different type is allowed', async () => {
+  const merchantId = await apply();
+  await onboarding.reviewApplication({ merchantId, decision: 'APPROVED', actorId: randomUUID() });
+
+  const first = await provisioning.provisionAccount({ merchantId, accountType: 'COLLECTION', actorId: randomUUID() });
+  assert.ok(first.accountNumber);
+
+  // Same merchant, same type: this is the double-submit that created the
+  // duplicate. It must now be a clean conflict, not a second account.
+  await assert.rejects(
+    provisioning.provisionAccount({ merchantId, accountType: 'COLLECTION', actorId: randomUUID() }),
+    (err: unknown) => err instanceof ConflictError && /already has a COLLECTION account/.test((err as Error).message),
+  );
+
+  // A different type for the same merchant is still legitimate.
+  const disb = await provisioning.provisionAccount({ merchantId, accountType: 'DISBURSEMENT', actorId: randomUUID() });
+  assert.ok(disb.accountNumber);
+
+  const count = await pool.query<{ n: string }>(
+    'SELECT count(*)::text AS n FROM accounts WHERE merchant_id = $1',
+    [merchantId],
+  );
+  assert.equal(count.rows[0].n, '2', 'exactly one COLLECTION and one DISBURSEMENT');
+});
+
 test('ONB-4/5/6: provisioning issues SANDBOX+LIVE creds, zero-float SANDBOX account, webhook secret', async () => {
   const merchantId = await apply();
   await onboarding.reviewApplication({ merchantId, decision: 'APPROVED', actorId: randomUUID() });

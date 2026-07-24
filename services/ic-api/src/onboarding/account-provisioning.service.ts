@@ -91,6 +91,21 @@ export class AccountProvisioningService {
         throw new ConflictError('merchant must be APPROVED before provisioning accounts'); // ONB-4
       }
 
+      // One account of each type per merchant. This gives a clear 409 in the
+      // normal case; uq_accounts_merchant_type (0021) is the backstop for the
+      // concurrent double-submit this check cannot catch on its own. The
+      // merchant row is already locked FOR UPDATE above, which serialises two
+      // provisions of the same merchant so the loser sees this row.
+      const existing = await client.query<{ account_number: string }>(
+        'SELECT account_number FROM accounts WHERE merchant_id = $1 AND account_type = $2',
+        [input.merchantId, input.accountType],
+      );
+      if (existing.rowCount && existing.rowCount > 0) {
+        throw new ConflictError(
+          `this merchant already has a ${input.accountType} account (${existing.rows[0].account_number})`,
+        );
+      }
+
       // ONB-6 / NN-10: defaults are SANDBOX + zero float (set by the schema).
       // account_number is assigned by the trg_account_number trigger (0013).
       const account = await client.query<{ id: string; account_number: string }>(

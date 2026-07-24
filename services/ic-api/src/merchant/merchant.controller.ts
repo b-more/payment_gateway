@@ -82,10 +82,15 @@ export class MerchantController {
     const record = await this.txns.processTransaction(input);
     if (record.status === 'PROCESSING') {
       const reference = dto.reference ?? record.id;
+      // Debit the payer the GROSS, matching the public /v1/collections path.
+      // Under SOURCE the customer owes amount + charge; sending `amount` here
+      // would credit the merchant the full amount and leave nothing for the
+      // fee. Under MERCHANT the two are equal.
+      const payerOwes = record.totalAmount;
       if (dto.processor === 'AIRTEL') {
-        await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, reference });
+        await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, reference });
       } else {
-        await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: record.amount, externalId: reference });
+        await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, externalId: reference });
       }
       return serializeTransaction(await this.txns.getForAccount(accountId, record.id));
     }

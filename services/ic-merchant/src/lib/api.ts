@@ -22,7 +22,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const text = await res.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
+  // Parse defensively. A gateway 502/504, a CSP block or a misrouted request
+  // returns HTML, and an unguarded JSON.parse threw a SyntaxError instead of an
+  // ApiError. Callers check `err instanceof ApiError`, so that surfaced as a
+  // generic "could not do that" and hid the real status from the user.
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as unknown;
+    } catch {
+      if (!res.ok) {
+        throw new ApiError(res.status, 'ERROR', res.statusText || `Request failed (${res.status})`);
+      }
+      throw new ApiError(res.status, 'ERROR', 'The server returned an unexpected response.');
+    }
+  }
   if (!res.ok) {
     // Session expired / not authenticated mid-use: bounce to the login page.
     if (

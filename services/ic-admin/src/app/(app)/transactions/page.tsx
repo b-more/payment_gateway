@@ -39,7 +39,7 @@ export default function TransactionsPage(): ReactNode {
   const [fStatus, setFStatus] = useState('');
   const [fProcessor, setFProcessor] = useState('');
   const [fType, setFType] = useState('');
-  const [fEnv, setFEnv] = useState('');
+  const [fEnv, setFEnv] = useState('PRODUCTION');
   const [q, setQ] = useState('');
 
   const rows = useMemo(() => data ?? [], [data]);
@@ -59,7 +59,7 @@ export default function TransactionsPage(): ReactNode {
 
   const successCount = filtered.filter((t) => t.status === 'SUCCESS').length;
   const successRate = filtered.length ? Math.round((successCount / filtered.length) * 100) : 0;
-  const hasFilter = !!(fStatus || fProcessor || fType || fEnv || q);
+  const hasFilter = !!(fStatus || fProcessor || fType || q) || fEnv !== 'PRODUCTION';
 
   async function reverse(id: string): Promise<void> {
     if (!window.confirm('Reverse this transaction? This posts a compensating ledger entry and cannot be undone.')) return;
@@ -75,7 +75,7 @@ export default function TransactionsPage(): ReactNode {
     }
   }
 
-  const clearFilters = (): void => { setFStatus(''); setFProcessor(''); setFType(''); setFEnv(''); setQ(''); };
+  const clearFilters = (): void => { setFStatus(''); setFProcessor(''); setFType(''); setFEnv('PRODUCTION'); setQ(''); };
 
   return (
     <>

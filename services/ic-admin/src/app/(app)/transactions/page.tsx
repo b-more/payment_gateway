@@ -163,9 +163,21 @@ export default function TransactionsPage(): ReactNode {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {t.status === 'SUCCESS' ? (
-                        <button className="btn sm danger" disabled={busy === t.id} onClick={() => void reverse(t.id)}>
-                          {busy === t.id ? '…' : 'Reverse'}
-                        </button>
+                        <span className="tip">
+                          <button
+                            className="btn sm danger"
+                            disabled={busy === t.id}
+                            onClick={() => void reverse(t.id)}
+                            title="Ledger correction only. Does not refund the customer. To refund, send a disbursement to their number."
+                          >
+                            {busy === t.id ? '…' : 'Reverse'}
+                          </button>
+                          <span className="tip-body" role="tooltip">
+                            <b>Ledger correction only.</b> This adjusts the merchant&rsquo;s float and marks
+                            the transaction reversed. It does <b>not</b> refund the customer&rsquo;s wallet.
+                            To actually refund someone, send a disbursement to their number for what they paid.
+                          </span>
+                        </span>
                       ) : null}
                     </td>
                   </tr>

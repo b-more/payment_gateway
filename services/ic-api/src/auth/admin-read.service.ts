@@ -8,6 +8,7 @@ import { NotFoundError } from '../money/errors';
 
 export interface DashboardSummary {
   totalCollections: string; // ngwee
+  totalCommission: string; // ngwee — Instacom's earned charge (live, successful)
   totalVolume: number;
   successRate: string; // percent, e.g. "97.50"
   byProcessor: Array<{ processor: string; count: number; amount: string }>;
@@ -25,11 +26,15 @@ export class AdminReadService {
       total_collections: string;
       total_volume: string;
       success_rate: string;
+      total_commission: string;
     }>(
       `SELECT
          COALESCE(SUM(amount) FILTER (WHERE status = 'SUCCESS' AND type = 'COLLECTION'), 0)::text AS total_collections,
          COUNT(*)::text AS total_volume,
-         COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'SUCCESS') / NULLIF(COUNT(*), 0), 2), 0)::text AS success_rate
+         COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'SUCCESS') / NULLIF(COUNT(*), 0), 2), 0)::text AS success_rate,
+         -- Commission Instacom has earned: the charge on successful LIVE
+         -- collections only (sandbox and unsuccessful transactions earn nothing).
+         COALESCE(SUM(charge) FILTER (WHERE status = 'SUCCESS' AND type = 'COLLECTION' AND environment = 'PRODUCTION'), 0)::text AS total_commission
        FROM transactions
        WHERE ($1::uuid IS NULL OR account_id = $1)`,
       [account],
@@ -61,6 +66,7 @@ export class AdminReadService {
 
     return {
       totalCollections: summary.rows[0].total_collections,
+      totalCommission: summary.rows[0].total_commission,
       totalVolume: Number(summary.rows[0].total_volume),
       successRate: summary.rows[0].success_rate,
       byProcessor: byProcessor.rows.map((r) => ({

@@ -130,6 +130,7 @@ function CreateReport({ onDone, onError }: { onDone: () => void; onError: (m: st
             <select value={f.reportType} onChange={set('reportType')}>
               <option value="TRANSACTIONS">Transactions</option>
               <option value="SETTLEMENTS">Settlements</option>
+              <option value="COMMISSION">Commission</option>
             </select>
           </div>
           <div className="field"><label>From</label><input type="date" value={f.from} onChange={set('from')} required /></div>

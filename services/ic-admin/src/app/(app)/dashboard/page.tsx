@@ -8,6 +8,7 @@ import { zmw } from '@/lib/format';
 
 interface Dashboard {
   totalCollections: string;
+  totalCommission: string;
   totalVolume: number;
   successRate: string;
   byProcessor: Array<{ processor: string; count: number; amount: string }>;
@@ -25,8 +26,9 @@ export default function DashboardPage(): ReactNode {
     <>
       <PageHead title="Dashboard" subtitle="Collections, volume and success across all merchants." />
 
-      <div className="grid cols-3" style={{ marginBottom: 16 }}>
+      <div className="grid cols-4" style={{ marginBottom: 16 }}>
         <StatCard label="Total Collections" value={zmw(data.totalCollections)} sub="Successful collections" />
+        <StatCard label="Commission Earned" value={zmw(data.totalCommission)} sub="Charge on live collections" />
         <StatCard label="Total Volume" value={data.totalVolume.toLocaleString()} sub="All transactions" />
         <StatCard label="Success Rate" value={`${data.successRate}%`} sub="Across all statuses" copper={Number(data.successRate) < 90} />
       </div>

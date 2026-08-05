@@ -345,6 +345,9 @@ h3 {
   display: grid;
   gap: 16px;
 }
+.cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
 .cols-3 {
   grid-template-columns: repeat(3, 1fr);
 }
@@ -1281,10 +1284,15 @@ textarea:focus {
   .sidebar {
     display: none;
   }
+  .cols-4,
   .cols-3,
   .cols-2 {
     grid-template-columns: 1fr;
   }
+}
+
+@media (min-width: 721px) and (max-width: 1000px) {
+  .cols-4 { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

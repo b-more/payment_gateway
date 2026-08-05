@@ -7,9 +7,9 @@ export class CreateReportDto {
   @MinLength(2)
   name!: string;
 
-  @ApiProperty({ enum: ['TRANSACTIONS', 'SETTLEMENTS'] })
-  @IsIn(['TRANSACTIONS', 'SETTLEMENTS'])
-  reportType!: 'TRANSACTIONS' | 'SETTLEMENTS';
+  @ApiProperty({ enum: ['TRANSACTIONS', 'SETTLEMENTS', 'COMMISSION'] })
+  @IsIn(['TRANSACTIONS', 'SETTLEMENTS', 'COMMISSION'])
+  reportType!: 'TRANSACTIONS' | 'SETTLEMENTS' | 'COMMISSION';
 
   @ApiProperty({ example: '2026-01-01' })
   @IsDateString()

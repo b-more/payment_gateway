@@ -4,7 +4,7 @@ import { PG_POOL } from '../database/database.module';
 import { NotFoundError } from '../money/errors';
 import { buildReportPdf, formatZmw, type PdfColumn, type PdfSummaryItem } from './pdf';
 
-export type ReportType = 'TRANSACTIONS' | 'SETTLEMENTS';
+export type ReportType = 'TRANSACTIONS' | 'SETTLEMENTS' | 'COMMISSION';
 
 export interface CreateReportInput {
   merchantId: string | null; // null = system/admin report
@@ -112,6 +112,28 @@ export class ReportService {
     return res.rows;
   }
 
+  // Commission = the charge Instacom retained on each successful collection.
+  // Only SUCCESS + PRODUCTION collections earn real commission: a failed or
+  // sandbox transaction retains nothing, and a REVERSED one was unwound. Rows
+  // carry the merchant and rail so the total can be broken down either way.
+  private async fetchCommission(merchantId: string | null, from: string, to: string): Promise<DataRow[]> {
+    const res = await this.pool.query<DataRow>(
+      `SELECT t.id, m.name AS merchant, t.processor,
+              t.amount::text AS amount, t.charge::text AS charge,
+              to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
+         FROM transactions t
+         JOIN accounts a ON a.id = t.account_id
+         JOIN merchants m ON m.id = a.merchant_id
+        WHERE t.status = 'SUCCESS' AND t.environment = 'PRODUCTION'
+          AND t.type = 'COLLECTION' AND t.charge > 0
+          AND t.created_at >= $2::date AND t.created_at < ($3::date + interval '1 day')
+          AND ($1::uuid IS NULL OR a.merchant_id = $1)
+        ORDER BY t.created_at`,
+      [merchantId, from, to],
+    );
+    return res.rows;
+  }
+
   private async fetchSettlements(merchantId: string | null, from: string, to: string): Promise<DataRow[]> {
     const res = await this.pool.query<DataRow>(
       `SELECT s.id, s.account_id, s.amount::text AS amount, s.status,
@@ -136,6 +158,14 @@ export class ReportService {
       for (const r of rows) {
         csv += csvRow([r.id, r.account_id, r.type, r.processor, r.msisdn, r.amount, r.charge, r.net_amount, r.status, r.collection_reference, r.environment, r.created_at]);
       }
+    } else if (report.report_type === 'COMMISSION') {
+      const rows = await this.fetchCommission(report.merchant_id, report.period_start, report.period_end);
+      csv = csvRow(['id', 'merchant', 'processor', 'amount_ngwee', 'commission_ngwee', 'created_at']);
+      for (const r of rows) {
+        csv += csvRow([r.id, r.merchant, r.processor, r.amount, r.charge, r.created_at]);
+      }
+      csv += csvRow(['', '', '', '', '', '']);
+      csv += csvRow(['TOTAL COMMISSION (ngwee)', sumBig(rows, 'charge'), '', '', '', '']);
     } else {
       const rows = await this.fetchSettlements(report.merchant_id, report.period_start, report.period_end);
       csv = csvRow(['id', 'account_id', 'amount_ngwee', 'status', 'settled_at', 'created_at']);
@@ -151,8 +181,14 @@ export class ReportService {
   async exportPdf(reportId: string, merchantId: string | null): Promise<{ filename: string; pdf: Buffer }> {
     const report = await this.getReport(reportId, merchantId);
     const scope = report.merchant_id === null ? 'All merchants (system-wide)' : 'Single merchant account';
+    const title =
+      report.report_type === 'TRANSACTIONS'
+        ? 'Transactions Report'
+        : report.report_type === 'COMMISSION'
+          ? 'Commission Report'
+          : 'Settlements Report';
     const meta = {
-      title: report.report_type === 'TRANSACTIONS' ? 'Transactions Report' : 'Settlements Report',
+      title,
       periodFrom: report.period_start,
       periodTo: report.period_end,
       generatedAt: nowStamp(),
@@ -183,6 +219,31 @@ export class ReportService {
         { label: 'Charges', value: `ZMW ${formatZmw(sumBig(rows, 'charge'))}` },
         { label: 'Net', value: `ZMW ${formatZmw(sumBig(rows, 'net_amount'))}` },
         { label: 'Successful', value: String(rows.filter((r) => r.status === 'SUCCESS').length) },
+      ];
+    } else if (report.report_type === 'COMMISSION') {
+      rows = await this.fetchCommission(report.merchant_id, report.period_start, report.period_end);
+      columns = [
+        { key: 'created_at', label: 'Date / time', weight: 18 },
+        { key: 'merchant', label: 'Merchant', weight: 26 },
+        { key: 'processor', label: 'Rail', weight: 14 },
+        { key: 'amount', label: 'Amount (ZMW)', weight: 21, align: 'right', money: true },
+        { key: 'charge', label: 'Commission (ZMW)', weight: 21, align: 'right', money: true },
+      ];
+      // Total plus a per-rail breakdown, so the reader sees both accumulation
+      // and where it came from.
+      const byRail = new Map<string, bigint>();
+      for (const r of rows) {
+        const rail = String(r.processor);
+        byRail.set(rail, (byRail.get(rail) ?? 0n) + BigInt(r.charge || '0'));
+      }
+      summary = [
+        { label: 'Commission earned', value: `ZMW ${formatZmw(sumBig(rows, 'charge'))}` },
+        { label: 'Collections', value: String(rows.length) },
+        { label: 'Volume', value: `ZMW ${formatZmw(sumBig(rows, 'amount'))}` },
+        ...Array.from(byRail.entries()).map(([rail, total]) => ({
+          label: `  ${rail}`,
+          value: `ZMW ${formatZmw(total.toString())}`,
+        })),
       ];
     } else {
       const raw = await this.fetchSettlements(report.merchant_id, report.period_start, report.period_end);

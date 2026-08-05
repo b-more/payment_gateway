@@ -16,6 +16,14 @@ export interface DashboardSummary {
   trend: Array<{ day: string; amount: string }>;
 }
 
+export interface CommissionSummary {
+  allTime: string; // ngwee
+  thisMonth: string; // ngwee
+  collections: number;
+  byRail: Array<{ processor: string; commission: string; collections: number }>;
+  byMerchant: Array<{ merchant: string; commission: string; collections: number }>;
+}
+
 @Injectable()
 export class AdminReadService {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
@@ -76,6 +84,51 @@ export class AdminReadService {
       })),
       byStatus: byStatus.rows.map((r) => ({ status: r.status, count: Number(r.count) })),
       trend: trend.rows.map((r) => ({ day: r.day, amount: r.amount })),
+    };
+  }
+
+  // Commission overview (§6.1). Commission is the charge Instacom retained on
+  // each successful LIVE collection; sandbox, unsuccessful and reversed
+  // transactions earn nothing. Returns the running total plus a breakdown by
+  // rail and by merchant, and this-month vs all-time, all read-only from the
+  // charge column already on each transaction.
+  async commission(): Promise<CommissionSummary> {
+    const EARNED =
+      "status = 'SUCCESS' AND type = 'COLLECTION' AND environment = 'PRODUCTION'";
+
+    const totals = await this.pool.query<{ all_time: string; this_month: string; collections: string }>(
+      `SELECT
+         COALESCE(SUM(charge), 0)::text AS all_time,
+         COALESCE(SUM(charge) FILTER (WHERE created_at >= date_trunc('month', now())), 0)::text AS this_month,
+         COUNT(*)::text AS collections
+       FROM transactions WHERE ${EARNED}`,
+    );
+
+    const byRail = await this.pool.query<{ processor: string; commission: string; collections: string }>(
+      `SELECT processor,
+              COALESCE(SUM(charge), 0)::text AS commission,
+              COUNT(*)::text AS collections
+         FROM transactions WHERE ${EARNED}
+        GROUP BY processor ORDER BY SUM(charge) DESC`,
+    );
+
+    const byMerchant = await this.pool.query<{ merchant: string; commission: string; collections: string }>(
+      `SELECT m.name AS merchant,
+              COALESCE(SUM(t.charge), 0)::text AS commission,
+              COUNT(*)::text AS collections
+         FROM transactions t
+         JOIN accounts a ON a.id = t.account_id
+         JOIN merchants m ON m.id = a.merchant_id
+        WHERE t.status = 'SUCCESS' AND t.type = 'COLLECTION' AND t.environment = 'PRODUCTION'
+        GROUP BY m.name ORDER BY SUM(t.charge) DESC LIMIT 50`,
+    );
+
+    return {
+      allTime: totals.rows[0].all_time,
+      thisMonth: totals.rows[0].this_month,
+      collections: Number(totals.rows[0].collections),
+      byRail: byRail.rows.map((r) => ({ processor: r.processor, commission: r.commission, collections: Number(r.collections) })),
+      byMerchant: byMerchant.rows.map((r) => ({ merchant: r.merchant, commission: r.commission, collections: Number(r.collections) })),
     };
   }
 

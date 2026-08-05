@@ -8,7 +8,7 @@ import { OnboardingService } from '../onboarding/onboarding.service';
 import { AccountProvisioningService, type ProvisionResult } from '../onboarding/account-provisioning.service';
 import { FloatService } from '../float/float.service';
 import { TransactionService } from '../transactions/transaction.service';
-import { AdminReadService, type DashboardSummary } from './admin-read.service';
+import { AdminReadService, type DashboardSummary, type CommissionSummary } from './admin-read.service';
 import { AccountConfigService } from './admin-config.service';
 import { UserAdminService } from './user-admin.service';
 import { SecurityService } from './security.service';
@@ -279,6 +279,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Dashboard summary metrics' })
   dashboard(@Query('accountId') accountId?: string): Promise<DashboardSummary> {
     return this.read.dashboard({ accountId: accountId ?? null });
+  }
+
+  @Get('commission')
+  @Roles('ADMIN', 'FINANCE', 'AUDITOR') // Instacom revenue — financial roles only
+  @ApiOperation({ summary: 'Commission earned, with breakdown by rail and merchant' })
+  commission(): Promise<CommissionSummary> {
+    return this.read.commission();
   }
 
   @Get('merchants')

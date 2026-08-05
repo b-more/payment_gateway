@@ -13,6 +13,7 @@ const NAV: Array<{ group: string; items: Array<[string, string]> }> = [
       ['Merchants', '/merchants'],
       ['Transactions', '/transactions'],
       ['Settlements', '/settlements'],
+      ['Commission', '/commission'],
       ['Float Management', '/float'],
     ],
   },

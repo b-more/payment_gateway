@@ -413,14 +413,20 @@ export class TransactionService {
       // netAmount + charge, so the operator refunding them must disburse
       // `total_amount` (netAmount from the merchant, charge from Instacom).
       // Refunding `amount` would short a SOURCE customer by the fee.
-      if (current.environment === 'PRODUCTION') {
-        const reversal =
-          current.type === 'COLLECTION'
-            ? { entryType: 'DEBIT' as const, amount: current.netAmount }
-            : { entryType: 'CREDIT' as const, amount: current.amount + current.charge };
+      // The compensating ledger movement, computed once and reused by the audit
+      // so the two can never disagree. A reversed COLLECTION takes back the net
+      // we credited (DEBIT netAmount); a reversed DISBURSEMENT returns the
+      // reserved float (CREDIT amount + charge).
+      const moved =
+        current.type === 'COLLECTION'
+          ? { entryType: 'DEBIT' as const, amount: current.netAmount }
+          : { entryType: 'CREDIT' as const, amount: current.amount + current.charge };
+      const isProd = current.environment === 'PRODUCTION';
+
+      if (isProd) {
         await this.ledger.append(client, {
           accountId: current.accountId,
-          ...reversal,
+          ...moved,
           counterparty: `PROCESSOR_${current.processor}`,
           reference: `REVERSAL:${current.id}`,
           createdBy: input.actorId,
@@ -433,7 +439,13 @@ export class TransactionService {
         action: 'TRANSACTION_REVERSED',
         target: current.id,
         metadata: {
-          restored: (current.amount + current.charge).toString(),
+          // The float this reversal actually moved. The old code always logged
+          // amount + charge, which overstated every COLLECTION reversal by the
+          // fee (the collection only ever credited netAmount) and misreported
+          // SANDBOX, which touches no ledger at all. `direction` disambiguates
+          // the DEBIT (collection) from the CREDIT (disbursement).
+          ledgerAmount: (isProd ? moved.amount : 0n).toString(),
+          direction: isProd ? moved.entryType : 'NONE',
           ...(input.reason === undefined || input.reason === null ? {} : { reason: input.reason }),
         },
         ipAddress: input.ipAddress ?? null,

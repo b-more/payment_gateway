@@ -39,6 +39,7 @@ test('settlement payload: amount is decimal ZMW, Σ services, correct destinatio
     currency: 'ZMW',
     httpTimeoutMs: 15000,
     identityName: 'instacompaymobile',
+    accountNumber: 'COL-0001010',
   }));
   const payload = svc.buildPayload({
     paymentReferenceNumber: 'WIRE-123',

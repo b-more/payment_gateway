@@ -11,8 +11,6 @@ interface Destination {
   bankAccountNumber?: string;
   accountName?: string;
   bankName?: string;
-  bicCode?: string;
-  sortCode?: string;
 }
 interface ZampaySettlement {
   id: string;
@@ -24,10 +22,10 @@ interface ZampaySettlement {
   amount_ngwee: string;
   currency: string;
   status: string;
-  bank_reference: string | null;
+  payment_reference: string | null;
   callback_status: string | null;
+  callback_attempts: number;
   failure_reason: string | null;
-  wired_at: string | null;
   settled_at: string | null;
   created_at: string;
   account_number: string;
@@ -42,30 +40,22 @@ export default function ZampayPage(): ReactNode {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState('');
-  const [wireId, setWireId] = useState('');
-  const [wireRef, setWireRef] = useState('');
 
   if (loading) return <Spinner />;
   if (error || !data) return <Empty>Could not load ZamPay settlements. {error}</Empty>;
 
   const count = (s: string): number => data.filter((z) => z.status === s).length;
 
-  async function confirmWire(id: string): Promise<void> {
-    if (!wireRef.trim()) {
-      setMsg('Enter the bank wire reference first.');
-      return;
-    }
+  async function retry(id: string): Promise<void> {
     setBusy(id);
     setMsg('');
     setOk('');
     try {
-      await apiPost(`/v1/admin/zampay/settlements/${id}/confirm-wire`, { bankReference: wireRef.trim() });
-      setOk('Wire confirmed. The settlement callback will be sent to ZamPay on the next run.');
-      setWireId('');
-      setWireRef('');
+      await apiPost(`/v1/admin/zampay/settlements/${id}/retry`, {});
+      setOk('Re-armed. The reconcile job will retry on its next run.');
       reload();
     } catch (err) {
-      setMsg(err instanceof ApiError ? err.message : 'Could not confirm the wire.');
+      setMsg(err instanceof ApiError ? err.message : 'Could not retry.');
     } finally {
       setBusy('');
     }
@@ -75,13 +65,13 @@ export default function ZampayPage(): ReactNode {
     <>
       <PageHead
         title="ZamPay Settlements"
-        subtitle="Government (GSB) collections awaiting settlement. Wire the funds to the destination account, enter the reference, and the callback is sent to ZamPay."
+        subtitle="Government (GSB) collections. Once collected, we confirm the payment to ZamPay automatically with our payment reference — no manual step. This is a monitor of that activity."
       />
 
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        <StatCard label="Ready to wire" value={String(count('READY_TO_WIRE'))} sub="Awaiting the bank transfer" copper={count('READY_TO_WIRE') > 0} />
-        <StatCard label="Wired" value={String(count('WIRED'))} sub="Callback pending" />
-        <StatCard label="Settled" value={String(count('SETTLED'))} sub="Callback acknowledged" />
+        <StatCard label="Resolved" value={String(count('RESOLVED'))} sub="Callback pending" />
+        <StatCard label="Settled" value={String(count('SETTLED'))} sub="Confirmed to GSB" />
+        <StatCard label="Already paid" value={String(count('INVOICE_PAID'))} sub="Skipped (Flow A)" />
         <StatCard label="Failed" value={String(count('FAILED'))} sub="Need attention" copper={count('FAILED') > 0} />
       </div>
 
@@ -100,14 +90,13 @@ export default function ZampayPage(): ReactNode {
                 <th className="num">Amount</th>
                 <th className="num">Services</th>
                 <th>Status</th>
-                <th>Reference</th>
+                <th>Our reference</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {data.map((z) => {
                 const dest = z.destination;
-                const isWireRow = wireId === z.id;
                 return (
                   <tr key={z.id}>
                     <td style={{ fontWeight: 600 }}>
@@ -127,28 +116,12 @@ export default function ZampayPage(): ReactNode {
                         <Badge value={z.status} />
                       </span>
                     </td>
-                    <td className="mono" style={{ fontSize: 12 }}>{z.bank_reference ?? '—'}</td>
+                    <td className="mono" style={{ fontSize: 12 }}>{z.payment_reference ?? '—'}</td>
                     <td style={{ textAlign: 'right' }}>
-                      {canAct && z.status === 'READY_TO_WIRE' ? (
-                        isWireRow ? (
-                          <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
-                            <input
-                              className="mono"
-                              style={{ width: 190 }}
-                              placeholder="Bank wire reference"
-                              value={wireRef}
-                              onChange={(e) => setWireRef(e.target.value)}
-                            />
-                            <button className="btn sm primary" disabled={busy === z.id} onClick={() => void confirmWire(z.id)}>
-                              {busy === z.id ? '…' : 'Confirm'}
-                            </button>
-                            <button className="btn sm" onClick={() => { setWireId(''); setWireRef(''); }}>Cancel</button>
-                          </div>
-                        ) : (
-                          <button className="btn sm" onClick={() => { setWireId(z.id); setWireRef(''); setMsg(''); }}>
-                            Confirm wire
-                          </button>
-                        )
+                      {canAct && z.status === 'FAILED' ? (
+                        <button className="btn sm" disabled={busy === z.id} onClick={() => void retry(z.id)}>
+                          {busy === z.id ? '…' : 'Retry'}
+                        </button>
                       ) : null}
                     </td>
                   </tr>

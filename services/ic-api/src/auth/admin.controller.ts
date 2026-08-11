@@ -30,7 +30,6 @@ import {
   ReviewDto,
   SettlementConfirmDto,
   SettlementFailDto,
-  ZampayWireConfirmDto,
 } from './dto/auth.dto';
 import { SettlementService } from '../settlements/settlement.service';
 import { ZampayOrchestrationService } from '../zampay/zampay-orchestration.service';
@@ -336,9 +335,9 @@ export class AdminController {
     return this.read.listSettlements();
   }
 
-  // ── ZamPay (GSB) settlement worklist (§ integration). Operator-assisted:
-  // the reconcile job resolves invoices into READY_TO_WIRE instructions; an
-  // operator wires the funds and confirms here, which sends the ZamPay callback. ──
+  // ── ZamPay (GSB) settlement monitor (§ integration). The reconcile job
+  // resolves invoices and sends the payment-confirmation callback to GSB
+  // automatically; this is a read-only view of that activity. ──
 
   @Get('zampay/settlements')
   @Roles('ADMIN', 'FINANCE')
@@ -347,17 +346,16 @@ export class AdminController {
     return this.read.listZampaySettlements(status ?? null);
   }
 
-  @Post('zampay/settlements/:id/confirm-wire')
+  @Post('zampay/settlements/:id/retry')
   @HttpCode(200)
   @Roles('ADMIN', 'FINANCE')
-  @ApiOperation({ summary: 'Confirm the bank wire for a ZamPay instruction — READY_TO_WIRE → WIRED, callback queued' })
-  async confirmZampayWire(
+  @ApiOperation({ summary: 'Retry a FAILED ZamPay settlement — re-arms resolve/callback for the next run' })
+  async retryZampaySettlement(
     @Param('id') id: string,
-    @Body() dto: ZampayWireConfirmDto,
     @CurrentPrincipal() p: Principal,
-  ): Promise<{ id: string; status: 'WIRED' }> {
-    await this.zampay.confirmWired(id, dto.bankReference, p.userId);
-    return { id, status: 'WIRED' };
+  ): Promise<{ id: string; status: 'RETRYING' }> {
+    await this.zampay.retryCallback(id, p.userId);
+    return { id, status: 'RETRYING' };
   }
 
   // ── Settlement lifecycle (§5.8). The scheduled job (ic-settlement-run) also

@@ -137,8 +137,7 @@ export class AdminReadService {
     const res = await this.pool.query(
       `SELECT z.id, z.transaction_id, z.zampay_reference, z.invoice_number, z.transaction_number,
               z.service_ids, z.destination, z.amount_ngwee::text AS amount_ngwee, z.currency, z.status,
-              z.bank_reference, z.callback_status, z.callback_attempts, z.failure_reason,
-              to_char(z.wired_at, 'YYYY-MM-DD HH24:MI') AS wired_at,
+              z.payment_reference, z.callback_status, z.callback_attempts, z.failure_reason,
               to_char(z.settled_at, 'YYYY-MM-DD HH24:MI') AS settled_at,
               to_char(z.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
               a.account_number, m.name AS merchant_name

@@ -1,16 +1,20 @@
-// ZamPay settlement orchestration — DB-driven, matching how settlement already
-// works (status machine on a table, reconcile-job driven), not a Redis queue.
+// ZamPay settlement orchestration — DB-driven, reconcile-job driven.
 //
-//   NEW           enqueued from a successful collection (hook)
-//   READY_TO_WIRE resolved: destination + amount known, awaiting the operator wire
-//   WIRED         operator wired the funds + entered the reference
-//   SETTLED       settlement callback acknowledged by ZamPay
-//   FAILED        invoice read failed / callback exhausted retries
-//   INVOICE_PAID  invoice already Paid (Flow A) — flag, do not wire
+// The callback is an immediate PAYMENT confirmation: once we have collected the
+// funds, we notify GSB (with our own payment reference) so the transaction is
+// marked successful and the customer can complete. There is no operator step and
+// no wait for money to reach the destination bank.
+//
+//   NEW          picked up from a successful collection
+//   RESOLVED     invoice read; destination + amount known; callback pending
+//   SETTLED      settlement callback acknowledged by GSB
+//   FAILED       invoice read failed / callback exhausted retries
+//   INVOICE_PAID invoice already Paid (Flow A) — flag, do not re-confirm
+//   (READY_TO_WIRE / WIRED remain in the enum but are unused — the wire step is gone)
 //
 // The reconcile job (run-zampay-reconcile) calls discoverPending() (pull model:
 // pick up successful ZamPay-account collections) then resolvePending() then
-// sendDueCallbacks(). The collection hot path is untouched.
+// sendDueCallbacks(), all automatic. The collection hot path is untouched.
 
 import { Inject, Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
@@ -99,9 +103,11 @@ export class ZampayOrchestrationService {
       for (const g of r.groups) allGroups.push({ group: g, invoiceNumber: r.invoiceNumber, transactionNumber: r.transactionNumber });
     }
 
-    // A Paid invoice (Flow A) is recorded with full detail but flagged not to
-    // wire; no settleable services is a hard failure. Otherwise every group
-    // becomes a READY_TO_WIRE instruction.
+    // A Paid invoice (Flow A) is recorded but not re-confirmed; no settleable
+    // services is a hard failure. Otherwise every destination group becomes a
+    // RESOLVED instruction whose callback fires automatically on the next pass —
+    // there is no operator step and no wait for a bank wire. The payment
+    // reference we send GSB is our own InstacomPay transaction id.
     const firstInvoice = resolutions[0]?.invoiceNumber ?? null;
     if (allGroups.length === 0) {
       await this.pool.query(
@@ -111,7 +117,8 @@ export class ZampayOrchestrationService {
       );
       return;
     }
-    const status = anyPaid ? 'INVOICE_PAID' : 'READY_TO_WIRE';
+    const status = anyPaid ? 'INVOICE_PAID' : 'RESOLVED';
+    const paymentRef = row.transaction_id; // our payment reference to GSB
 
     await withTransaction(this.pool, async (client) => {
       // First group updates the NEW row in place; the rest are separate rows.
@@ -120,20 +127,24 @@ export class ZampayOrchestrationService {
         `UPDATE zampay_settlements
             SET status=$8::zampay_settlement_status, invoice_number=$2, transaction_number=$3,
                 service_ids=$4, destination=$5::jsonb, amount_ngwee=$6, currency=$7,
+                payment_reference=$9,
+                callback_status=CASE WHEN $8='RESOLVED' THEN 'PENDING' ELSE NULL END,
                 failure_reason=CASE WHEN $8='INVOICE_PAID' THEN 'invoice already Paid (Flow A)' ELSE NULL END
           WHERE id=$1 AND status='NEW'`,
         [row.id, first.invoiceNumber, first.transactionNumber, first.group.serviceIds,
-         JSON.stringify(first.group.destination), first.group.amountNgwee.toString(), first.group.currency, status],
+         JSON.stringify(first.group.destination), first.group.amountNgwee.toString(), first.group.currency, status, paymentRef],
       );
       for (const extra of allGroups.slice(1)) {
         await client.query(
           `INSERT INTO zampay_settlements
              (transaction_id, account_id, zampay_reference, invoice_number, transaction_number,
-              service_ids, destination, amount_ngwee, currency, status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::zampay_settlement_status)
+              service_ids, destination, amount_ngwee, currency, status, payment_reference,
+              callback_status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::zampay_settlement_status,$11,
+                   CASE WHEN $10='RESOLVED' THEN 'PENDING' ELSE NULL END)
            ON CONFLICT (transaction_id, (destination->>'bankAccountNumber')) DO NOTHING`,
           [row.transaction_id, row.account_id, row.zampay_reference, extra.invoiceNumber, extra.transactionNumber,
-           extra.group.serviceIds, JSON.stringify(extra.group.destination), extra.group.amountNgwee.toString(), extra.group.currency, status],
+           extra.group.serviceIds, JSON.stringify(extra.group.destination), extra.group.amountNgwee.toString(), extra.group.currency, status, paymentRef],
         );
       }
       await this.audit.write(client, {
@@ -146,38 +157,44 @@ export class ZampayOrchestrationService {
     });
   }
 
-  /** Operator confirms the bank wire; moves the instruction to WIRED. */
-  async confirmWired(id: string, bankReference: string, actorId: string): Promise<void> {
+  /**
+   * Re-arm a FAILED settlement so the next reconcile run retries it. If it never
+   * resolved (no destination) it returns to NEW; if the callback exhausted its
+   * retries it returns to RESOLVED with a pending callback.
+   */
+  async retryCallback(id: string, actorId: string): Promise<void> {
+    const res = await this.pool.query<{ transaction_id: string }>(
+      `UPDATE zampay_settlements
+          SET status = CASE WHEN destination IS NOT NULL THEN 'RESOLVED' ELSE 'NEW' END,
+              callback_status = CASE WHEN destination IS NOT NULL THEN 'PENDING' ELSE NULL END,
+              callback_attempts = 0, failure_reason = NULL
+        WHERE id = $1 AND status = 'FAILED'
+      RETURNING transaction_id`,
+      [id],
+    );
+    if (res.rowCount === 0) throw new Error('settlement not found or not in a FAILED state');
     await withTransaction(this.pool, async (client) => {
-      const res = await client.query<{ transaction_id: string }>(
-        `UPDATE zampay_settlements
-            SET status='WIRED', bank_reference=$2, wired_by=$3, wired_at=now(), callback_status='PENDING'
-          WHERE id=$1 AND status='READY_TO_WIRE'
-        RETURNING transaction_id`,
-        [id, bankReference, actorId],
-      );
-      if (res.rowCount === 0) throw new Error('settlement not found or not READY_TO_WIRE');
       await this.audit.write(client, {
         actorId,
         actorScope: 'SYSTEM',
-        action: 'ZAMPAY_SETTLEMENT_WIRED',
+        action: 'ZAMPAY_SETTLEMENT_RETRIED',
         target: res.rows[0].transaction_id,
-        metadata: { settlementId: id, bankReference },
+        metadata: { settlementId: id },
       });
     });
   }
 
-  /** Send the settlement callback for every WIRED row whose callback is pending. */
+  /** Send the settlement callback for every RESOLVED row whose callback is pending. */
   async sendDueCallbacks(): Promise<{ sent: number; failed: number }> {
     const due = await this.pool.query<{
-      id: string; transaction_id: string; bank_reference: string; amount_ngwee: string;
-      currency: string; destination: Record<string, string>; service_ids: string[]; wired_date: string;
+      id: string; transaction_id: string; payment_reference: string; amount_ngwee: string;
+      currency: string; destination: Record<string, string>; service_ids: string[]; paid_date: string;
     }>(
-      `SELECT id, transaction_id, bank_reference, amount_ngwee::text, currency, destination, service_ids,
-              to_char(wired_at, 'YYYY-MM-DD') AS wired_date
+      `SELECT id, transaction_id, payment_reference, amount_ngwee::text, currency, destination, service_ids,
+              to_char(created_at, 'YYYY-MM-DD') AS paid_date
          FROM zampay_settlements
-        WHERE status='WIRED' AND callback_status='PENDING' AND callback_attempts < $1
-        ORDER BY wired_at LIMIT 50`,
+        WHERE status='RESOLVED' AND callback_status='PENDING' AND callback_attempts < $1
+        ORDER BY created_at LIMIT 50`,
       [MAX_CALLBACK_ATTEMPTS],
     );
     let sent = 0;
@@ -185,12 +202,12 @@ export class ZampayOrchestrationService {
     for (const row of due.rows) {
       try {
         await this.settlement.sendCallback({
-          paymentReferenceNumber: row.bank_reference,
+          paymentReferenceNumber: row.payment_reference,
           amountNgwee: BigInt(row.amount_ngwee),
           currency: row.currency,
           destination: row.destination as never,
           serviceIds: row.service_ids,
-          createdAt: row.wired_date ?? new Date().toISOString().slice(0, 10),
+          createdAt: row.paid_date ?? new Date().toISOString().slice(0, 10),
         });
         await this.pool.query(
           `UPDATE zampay_settlements

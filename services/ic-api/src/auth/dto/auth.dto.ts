@@ -108,6 +108,13 @@ export class AirtelDisburseDto {
 
 // ── Settlements (§5.8, SET-2) ──
 
+export class ZampayWireConfirmDto {
+  @ApiProperty({ example: 'INZAZM-TRF-20260731-0042', description: 'Bank wire reference — sent to ZamPay as PaymentReferenceNumber.' })
+  @IsString()
+  @MinLength(1)
+  bankReference!: string;
+}
+
 export class SettlementConfirmDto {
   @ApiProperty({
     required: false,

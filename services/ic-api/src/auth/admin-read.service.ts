@@ -132,6 +132,26 @@ export class AdminReadService {
     };
   }
 
+  /** ZamPay settlement worklist. Optional status filter (e.g. READY_TO_WIRE). */
+  async listZampaySettlements(status: string | null): Promise<unknown[]> {
+    const res = await this.pool.query(
+      `SELECT z.id, z.transaction_id, z.zampay_reference, z.invoice_number, z.transaction_number,
+              z.service_ids, z.destination, z.amount_ngwee::text AS amount_ngwee, z.currency, z.status,
+              z.bank_reference, z.callback_status, z.callback_attempts, z.failure_reason,
+              to_char(z.wired_at, 'YYYY-MM-DD HH24:MI') AS wired_at,
+              to_char(z.settled_at, 'YYYY-MM-DD HH24:MI') AS settled_at,
+              to_char(z.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
+              a.account_number, m.name AS merchant_name
+         FROM zampay_settlements z
+         JOIN accounts a ON a.id = z.account_id
+         JOIN merchants m ON m.id = a.merchant_id
+        WHERE ($1::text IS NULL OR z.status = $1::zampay_settlement_status)
+        ORDER BY z.created_at DESC LIMIT 200`,
+      [status],
+    );
+    return res.rows;
+  }
+
   async listMerchants(): Promise<unknown[]> {
     const res = await this.pool.query(
       `SELECT id, name, merchant_type, status, kyc_status,

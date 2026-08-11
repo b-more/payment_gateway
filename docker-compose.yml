@@ -182,6 +182,22 @@ services:
       - ic-public                      # egress to MTN for status polling
     # Run with: docker compose --profile tools run --rm ic-mtn-reconcile
 
+  ic-zampay-reconcile:                 # ZamPay (GSB) settlement — discover/resolve/callback (cron/one-shot)
+    build: ./services/ic-api
+    container_name: ic-zampay-reconcile
+    profiles: ["tools"]
+    restart: "no"
+    env_file: .env
+    environment:
+      DATABASE_URL: ${RUNTIME_DATABASE_URL}   # runtime role (SEC-D7)
+    command: ["node", "dist/jobs/run-zampay-reconcile.js"]
+    depends_on:
+      ic-postgres: { condition: service_healthy }
+    networks:
+      - ic-internal
+      - ic-public                      # egress to ZamPay (GSB) API
+    # Run with: docker compose --profile tools run --rm ic-zampay-reconcile
+
   ic-admin:                            # Admin portal — Next.js (§3, §6.1)
     build:
       context: ./services/ic-admin

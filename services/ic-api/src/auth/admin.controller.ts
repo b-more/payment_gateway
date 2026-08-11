@@ -30,8 +30,10 @@ import {
   ReviewDto,
   SettlementConfirmDto,
   SettlementFailDto,
+  ZampayWireConfirmDto,
 } from './dto/auth.dto';
 import { SettlementService } from '../settlements/settlement.service';
+import { ZampayOrchestrationService } from '../zampay/zampay-orchestration.service';
 import { ApplicationDto } from '../onboarding/dto/application.dto';
 import { AirtelKycService } from '../airtel/airtel-kyc.service';
 import { AirtelBalanceService, type BalanceType } from '../airtel/airtel-balance.service';
@@ -51,6 +53,7 @@ export class AdminController {
     private readonly provisioning: AccountProvisioningService,
     private readonly floats: FloatService,
     private readonly settlements: SettlementService,
+    private readonly zampay: ZampayOrchestrationService,
     private readonly transactions: TransactionService,
     private readonly read: AdminReadService,
     private readonly config: AccountConfigService,
@@ -331,6 +334,30 @@ export class AdminController {
   @ApiOperation({ summary: 'List settlements' })
   listSettlements(): Promise<unknown[]> {
     return this.read.listSettlements();
+  }
+
+  // ── ZamPay (GSB) settlement worklist (§ integration). Operator-assisted:
+  // the reconcile job resolves invoices into READY_TO_WIRE instructions; an
+  // operator wires the funds and confirms here, which sends the ZamPay callback. ──
+
+  @Get('zampay/settlements')
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'List ZamPay settlement instructions (optional ?status=)' })
+  listZampaySettlements(@Query('status') status?: string): Promise<unknown[]> {
+    return this.read.listZampaySettlements(status ?? null);
+  }
+
+  @Post('zampay/settlements/:id/confirm-wire')
+  @HttpCode(200)
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Confirm the bank wire for a ZamPay instruction — READY_TO_WIRE → WIRED, callback queued' })
+  async confirmZampayWire(
+    @Param('id') id: string,
+    @Body() dto: ZampayWireConfirmDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<{ id: string; status: 'WIRED' }> {
+    await this.zampay.confirmWired(id, dto.bankReference, p.userId);
+    return { id, status: 'WIRED' };
   }
 
   // ── Settlement lifecycle (§5.8). The scheduled job (ic-settlement-run) also

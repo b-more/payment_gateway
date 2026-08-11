@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { MerchantModule } from './merchant/merchant.module';
 import { AirtelModule } from './airtel/airtel.module';
 import { MtnModule } from './mtn/mtn.module';
+import { ZampayModule } from './zampay/zampay.module';
 
 // Root module. MoneyModule holds the §5 engine; ApiModule the §8 /v1 HTTP surface;
 // OnboardingModule the §5.1 merchant application; SettlementModule the §5.8/5.9
@@ -24,6 +25,7 @@ import { MtnModule } from './mtn/mtn.module';
     MerchantModule,
     AirtelModule,
     MtnModule,
+    ZampayModule,
   ],
 })
 export class AppModule {}

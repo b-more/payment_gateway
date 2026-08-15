@@ -71,7 +71,7 @@ export default function ZampayPage(): ReactNode {
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
         <StatCard label="Resolved" value={String(count('RESOLVED'))} sub="Callback pending" />
         <StatCard label="Settled" value={String(count('SETTLED'))} sub="Confirmed to GSB" />
-        <StatCard label="Already paid" value={String(count('INVOICE_PAID'))} sub="Skipped (Flow A)" />
+        <StatCard label="Already paid" value={String(count('INVOICE_PAID'))} sub="Paid, nothing to settle" />
         <StatCard label="Failed" value={String(count('FAILED'))} sub="Need attention" copper={count('FAILED') > 0} />
       </div>
 

@@ -118,13 +118,37 @@ test('two destinations on one invoice -> two instructions', async () => {
   assert.ok(rows.every((r) => r.status === 'RESOLVED'));
 });
 
-test('Paid invoice -> INVOICE_PAID, never confirmed', async () => {
+test('Paid invoice with settleable services -> RESOLVED -> settled', async () => {
   await reset();
   const { txn, accountNumber } = await seedCollection('REF3-' + randomUUID().slice(0, 6));
+  const sink: ZampaySettlementCallbackInput[] = [];
   const orch = new ZampayOrchestrationService(
     pool,
     fakeInvoices([{ invoiceNumber: 'INV-3', transactionNumber: 'TX-3', status: 'Paid', currency: 'ZMW',
       groups: [{ destination: LUSAKA, serviceIds: ['x'], amountNgwee: 980n, currency: 'ZMW' }] }]),
+    recordingSettlement(sink),
+    audit,
+  );
+  await orch.discoverPending(accountNumber);
+  await orch.resolvePending();
+  // GSB marks the invoice Paid on collection but still expects our settlement
+  // callback — a Paid invoice is settled, not skipped.
+  const row = (await pool.query("SELECT id, status, callback_status FROM zampay_settlements WHERE transaction_id=$1", [txn])).rows[0];
+  assert.equal(row.status, 'RESOLVED');
+  assert.equal(row.callback_status, 'PENDING');
+  await orch.sendDueCallbacks();
+  const settled = (await pool.query('SELECT status FROM zampay_settlements WHERE id=$1', [row.id])).rows[0];
+  assert.equal(settled.status, 'SETTLED');
+  assert.equal(sink.length, 1);
+  assert.equal(sink[0].paymentReferenceNumber, txn);
+});
+
+test('Paid invoice with no settleable services -> INVOICE_PAID', async () => {
+  await reset();
+  const { txn, accountNumber } = await seedCollection('REF3b-' + randomUUID().slice(0, 6));
+  const orch = new ZampayOrchestrationService(
+    pool,
+    fakeInvoices([{ invoiceNumber: 'INV-3b', transactionNumber: 'TX-3b', status: 'Paid', currency: 'ZMW', groups: [] }]),
     recordingSettlement([]),
     audit,
   );

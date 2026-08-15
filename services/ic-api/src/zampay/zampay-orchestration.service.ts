@@ -9,7 +9,7 @@
 //   RESOLVED     invoice read; destination + amount known; callback pending
 //   SETTLED      settlement callback acknowledged by GSB
 //   FAILED       invoice read failed / callback exhausted retries
-//   INVOICE_PAID invoice already Paid (Flow A) — flag, do not re-confirm
+//   INVOICE_PAID invoice Paid but had no settleable services — nothing to send
 //   (READY_TO_WIRE / WIRED remain in the enum but are unused — the wire step is gone)
 //
 // The reconcile job (run-zampay-reconcile) calls discoverPending() (pull model:
@@ -103,21 +103,23 @@ export class ZampayOrchestrationService {
       for (const g of r.groups) allGroups.push({ group: g, invoiceNumber: r.invoiceNumber, transactionNumber: r.transactionNumber });
     }
 
-    // A Paid invoice (Flow A) is recorded but not re-confirmed; no settleable
-    // services is a hard failure. Otherwise every destination group becomes a
-    // RESOLVED instruction whose callback fires automatically on the next pass —
-    // there is no operator step and no wait for a bank wire. The payment
+    // A destination group is settleable regardless of the invoice's Paid/NotPaid
+    // state: GSB marks the invoice Paid as soon as the customer pays us, and still
+    // expects our settlement callback, so a Paid invoice is settled, not skipped.
+    // Every group becomes a RESOLVED instruction whose callback fires
+    // automatically on the next pass — no operator step, no wait for a bank wire.
+    // INVOICE_PAID is now only the edge case of a Paid invoice with nothing to
+    // settle; a NotPaid invoice with no services is a hard failure. The payment
     // reference we send GSB is our own InstacomPay transaction id.
     const firstInvoice = resolutions[0]?.invoiceNumber ?? null;
     if (allGroups.length === 0) {
       await this.pool.query(
         `UPDATE zampay_settlements SET status=$2::zampay_settlement_status, invoice_number=$3, failure_reason=$4 WHERE id=$1 AND status='NEW'`,
         [row.id, anyPaid ? 'INVOICE_PAID' : 'FAILED', firstInvoice,
-         anyPaid ? 'invoice already Paid (Flow A)' : 'invoice had no settleable services'],
+         anyPaid ? 'invoice Paid but had no settleable services' : 'invoice had no settleable services'],
       );
       return;
     }
-    const status = anyPaid ? 'INVOICE_PAID' : 'RESOLVED';
     const paymentRef = row.transaction_id; // our payment reference to GSB
 
     await withTransaction(this.pool, async (client) => {
@@ -125,14 +127,12 @@ export class ZampayOrchestrationService {
       const first = allGroups[0];
       await client.query(
         `UPDATE zampay_settlements
-            SET status=$8::zampay_settlement_status, invoice_number=$2, transaction_number=$3,
+            SET status='RESOLVED', invoice_number=$2, transaction_number=$3,
                 service_ids=$4, destination=$5::jsonb, amount_ngwee=$6, currency=$7,
-                payment_reference=$9,
-                callback_status=CASE WHEN $8='RESOLVED' THEN 'PENDING' ELSE NULL END,
-                failure_reason=CASE WHEN $8='INVOICE_PAID' THEN 'invoice already Paid (Flow A)' ELSE NULL END
+                payment_reference=$8, callback_status='PENDING', failure_reason=NULL
           WHERE id=$1 AND status='NEW'`,
         [row.id, first.invoiceNumber, first.transactionNumber, first.group.serviceIds,
-         JSON.stringify(first.group.destination), first.group.amountNgwee.toString(), first.group.currency, status, paymentRef],
+         JSON.stringify(first.group.destination), first.group.amountNgwee.toString(), first.group.currency, paymentRef],
       );
       for (const extra of allGroups.slice(1)) {
         await client.query(
@@ -140,11 +140,10 @@ export class ZampayOrchestrationService {
              (transaction_id, account_id, zampay_reference, invoice_number, transaction_number,
               service_ids, destination, amount_ngwee, currency, status, payment_reference,
               callback_status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::zampay_settlement_status,$11,
-                   CASE WHEN $10='RESOLVED' THEN 'PENDING' ELSE NULL END)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,'RESOLVED',$10,'PENDING')
            ON CONFLICT (transaction_id, (destination->>'bankAccountNumber')) DO NOTHING`,
           [row.transaction_id, row.account_id, row.zampay_reference, extra.invoiceNumber, extra.transactionNumber,
-           extra.group.serviceIds, JSON.stringify(extra.group.destination), extra.group.amountNgwee.toString(), extra.group.currency, status, paymentRef],
+           extra.group.serviceIds, JSON.stringify(extra.group.destination), extra.group.amountNgwee.toString(), extra.group.currency, paymentRef],
         );
       }
       await this.audit.write(client, {
@@ -152,7 +151,7 @@ export class ZampayOrchestrationService {
         actorScope: 'SYSTEM',
         action: 'ZAMPAY_SETTLEMENT_RESOLVED',
         target: row.transaction_id,
-        metadata: { invoices: resolutions.map((r) => r.invoiceNumber), groups: allGroups.length, status },
+        metadata: { invoices: resolutions.map((r) => r.invoiceNumber), groups: allGroups.length },
       });
     });
   }

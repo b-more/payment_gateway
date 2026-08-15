@@ -24,6 +24,7 @@ import { AuditService } from '../audit/audit.service';
 import { ZampayInvoiceService, type ZampaySettlementGroup } from './zampay-invoice.service';
 import { ZampaySettlementService } from './zampay-settlement.service';
 import { ZampayError } from './zampay.errors';
+import { zampayEnvConfig } from './zampay.config';
 
 const MAX_CALLBACK_ATTEMPTS = 6;
 
@@ -50,8 +51,8 @@ export class ZampayOrchestrationService {
   async discoverPending(accountNumber: string): Promise<number> {
     if (!accountNumber) return 0;
     const res = await this.pool.query(
-      `INSERT INTO zampay_settlements (transaction_id, account_id, zampay_reference, amount_ngwee, status)
-       SELECT t.id, t.account_id, COALESCE(t.collection_reference, ''), t.total_amount, 'NEW'
+      `INSERT INTO zampay_settlements (transaction_id, account_id, zampay_reference, amount_ngwee, status, environment)
+       SELECT t.id, t.account_id, COALESCE(t.collection_reference, ''), t.total_amount, 'NEW', $2
          FROM transactions t
          JOIN accounts a ON a.id = t.account_id
          JOIN account_settings s ON s.account_id = t.account_id
@@ -60,7 +61,7 @@ export class ZampayOrchestrationService {
           AND t.type = 'COLLECTION' AND t.status = 'SUCCESS'
           AND COALESCE(t.collection_reference, '') <> ''
           AND NOT EXISTS (SELECT 1 FROM zampay_settlements z WHERE z.transaction_id = t.id)`,
-      [accountNumber],
+      [accountNumber, zampayEnvConfig().env],
     );
     return res.rowCount ?? 0;
   }
@@ -139,11 +140,11 @@ export class ZampayOrchestrationService {
           `INSERT INTO zampay_settlements
              (transaction_id, account_id, zampay_reference, invoice_number, transaction_number,
               service_ids, destination, amount_ngwee, currency, status, payment_reference,
-              callback_status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,'RESOLVED',$10,'PENDING')
+              callback_status, environment)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,'RESOLVED',$10,'PENDING',$11)
            ON CONFLICT (transaction_id, (destination->>'bankAccountNumber')) DO NOTHING`,
           [row.transaction_id, row.account_id, row.zampay_reference, extra.invoiceNumber, extra.transactionNumber,
-           extra.group.serviceIds, JSON.stringify(extra.group.destination), extra.group.amountNgwee.toString(), extra.group.currency, paymentRef],
+           extra.group.serviceIds, JSON.stringify(extra.group.destination), extra.group.amountNgwee.toString(), extra.group.currency, paymentRef, zampayEnvConfig().env],
         );
       }
       await this.audit.write(client, {

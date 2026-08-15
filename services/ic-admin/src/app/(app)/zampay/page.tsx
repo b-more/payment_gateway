@@ -30,6 +30,7 @@ interface ZampaySettlement {
   created_at: string;
   account_number: string;
   merchant_name: string | null;
+  environment: string;
 }
 
 export default function ZampayPage(): ReactNode {
@@ -87,6 +88,7 @@ export default function ZampayPage(): ReactNode {
               <tr>
                 <th>Merchant</th>
                 <th>Destination</th>
+                <th>Invoice</th>
                 <th className="num">Amount</th>
                 <th className="num">Services</th>
                 <th>Status</th>
@@ -109,12 +111,31 @@ export default function ZampayPage(): ReactNode {
                         {dest?.bankAccountNumber ?? '—'} · {dest?.bankName ?? ''}
                       </div>
                     </td>
+                    <td className="mono" style={{ fontSize: 12 }}>{z.invoice_number ?? '—'}</td>
                     <td className="num"><Money ngwee={z.amount_ngwee} plain /></td>
                     <td className="num">{z.service_ids?.length ?? 0}</td>
                     <td>
                       <span title={z.failure_reason ?? z.callback_status ?? undefined}>
                         <Badge value={z.status} />
                       </span>
+                      {z.environment !== 'PRODUCTION' ? (
+                        <span
+                          title="Settled against the ZamPay sandbox (TEST), not live"
+                          style={{
+                            marginLeft: 6,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            letterSpacing: 0.4,
+                            color: 'var(--copper, #b5651d)',
+                            border: '1px solid currentColor',
+                            borderRadius: 4,
+                            padding: '1px 5px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          SANDBOX
+                        </span>
+                      ) : null}
                     </td>
                     <td className="mono" style={{ fontSize: 12 }}>{z.payment_reference ?? '—'}</td>
                     <td style={{ textAlign: 'right' }}>

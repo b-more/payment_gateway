@@ -28,6 +28,7 @@ export interface CredentialContext {
   credentialId: string;
   accountId: string;
   environment: 'SANDBOX' | 'LIVE';
+  deviceId: string | null; // set when the credential belongs to a registered device (0027)
 }
 
 export interface SignedRequest {
@@ -53,6 +54,7 @@ interface CredentialRow {
   environment: 'SANDBOX' | 'LIVE';
   status: string;
   signing_key_ciphertext: string | null;
+  device_id: string | null;
 }
 
 interface SecretCredentialRow {
@@ -61,6 +63,7 @@ interface SecretCredentialRow {
   environment: 'SANDBOX' | 'LIVE';
   status: string;
   secret_hash: string;
+  device_id: string | null;
 }
 interface WhitelistRow {
   ip_whitelist: string[];
@@ -110,7 +113,7 @@ export class CredentialService {
     }
 
     const found = await this.pool.query<CredentialRow>(
-      `SELECT id, account_id, environment, status, signing_key_ciphertext
+      `SELECT id, account_id, environment, status, signing_key_ciphertext, device_id
          FROM api_credentials WHERE api_key = $1`,
       [req.apiKey],
     );
@@ -148,6 +151,7 @@ export class CredentialService {
       credentialId: credential.id,
       accountId: credential.account_id,
       environment: credential.environment,
+      deviceId: credential.device_id,
     };
   }
 
@@ -163,7 +167,7 @@ export class CredentialService {
       throw new InvalidSignatureError();
     }
     const found = await this.pool.query<SecretCredentialRow>(
-      `SELECT id, account_id, environment, status, secret_hash
+      `SELECT id, account_id, environment, status, secret_hash, device_id
          FROM api_credentials WHERE api_key = $1`,
       [req.apiKey],
     );
@@ -181,6 +185,7 @@ export class CredentialService {
       credentialId: credential.id,
       accountId: credential.account_id,
       environment: credential.environment,
+      deviceId: credential.device_id,
     };
   }
 

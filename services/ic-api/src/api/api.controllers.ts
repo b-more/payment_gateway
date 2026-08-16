@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -15,7 +16,7 @@ import { NotFoundError, ValidationError } from '../money/errors';
 import { assertRailReady } from '../transactions/rails';
 import { ApiAuthGuard } from './api-auth.guard';
 import { RateLimitGuard } from './rate-limit.guard';
-import { ApiReadService, type BalanceResponse, type SettlementResponse } from './read.service';
+import { ApiReadService, type BalanceResponse, type SettlementResponse, type TransactionPage } from './read.service';
 import { serializeTransaction, type TransactionResponse } from './serializers';
 import { ApiAuthHeaders, ApiIdempotencyHeader } from './swagger';
 import {
@@ -65,6 +66,7 @@ export class CollectionsController {
       collectionReference: dto.collectionReference ?? null,
       environment,
       actorId: cred.credentialId,
+      deviceId: cred.deviceId,
     };
 
     // The rail check runs in BOTH environments: sandbox must not accept a rail
@@ -131,6 +133,7 @@ export class DisbursementsController {
       collectionReference: dto.collectionReference ?? null,
       environment,
       actorId: cred.credentialId,
+      deviceId: cred.deviceId,
     };
 
     // Checked in both environments so sandbox can't certify a rail that
@@ -163,7 +166,27 @@ export class DisbursementsController {
 @Controller('transactions')
 @UseGuards(RateLimitGuard, ApiAuthGuard)
 export class TransactionsController {
-  constructor(private readonly txns: TransactionService) {}
+  constructor(
+    private readonly txns: TransactionService,
+    private readonly read: ApiReadService,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List transactions (device-scoped for a terminal credential)' })
+  async list(
+    @CurrentCredential() cred: CredentialContext,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Query('status') status?: string,
+  ): Promise<TransactionPage> {
+    return this.read.listTransactions({
+      accountId: cred.accountId,
+      deviceId: cred.deviceId,
+      limit: limit ? Number(limit) : undefined,
+      cursor,
+      status,
+    });
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Check transaction status' })

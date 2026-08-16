@@ -33,6 +33,7 @@ export interface ProcessTransactionInput {
   collectionReference?: string | null;
   environment: OperatingMode;
   actorId?: string | null;
+  deviceId?: string | null; // set when initiated from a registered POS terminal (0027)
 }
 
 export interface TransactionRecord {
@@ -511,8 +512,8 @@ export class TransactionService {
     const result = await client.query<TxnRow>(
       `INSERT INTO transactions
          (account_id, type, processor, msisdn, amount, charge, net_amount, total_amount,
-          status, failure_reason, idempotency_key, collection_reference, environment)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          status, failure_reason, idempotency_key, collection_reference, environment, device_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
       [
         input.accountId,
@@ -528,6 +529,7 @@ export class TransactionService {
         input.idempotencyKey,
         input.collectionReference ?? null,
         input.environment,
+        input.deviceId ?? null,
       ],
     );
     return mapTxn(result.rows[0]);

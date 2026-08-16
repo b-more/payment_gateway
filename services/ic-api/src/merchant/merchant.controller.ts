@@ -14,6 +14,8 @@ import { MerchantCollectDto, PayoutRejectDto } from './dto/collect.dto';
 import { CreateMerchantUserDto, AssignRoleDto, SetUserStatusDto } from './dto/user.dto';
 import { PayoutService } from './payout.service';
 import { MerchantUserService } from './merchant-user.service';
+import { DeviceService, type DeviceSummary } from '../devices/device.service';
+import { CreateDeviceDto } from '../devices/dto/create-device.dto';
 import { TransactionService } from '../transactions/transaction.service';
 import { assertRailReady } from '../transactions/rails';
 import { toNgwee } from '../money/money';
@@ -39,6 +41,7 @@ export class MerchantController {
     private readonly mtn: MtnDispatchService,
     private readonly payouts: PayoutService,
     private readonly memberUsers: MerchantUserService,
+    private readonly devices: DeviceService,
   ) {}
 
   private merchantId(principal: Principal): string {
@@ -271,6 +274,40 @@ export class MerchantController {
   @ApiOperation({ summary: 'API credentials (public metadata only)' })
   credentials(@CurrentPrincipal() p: Principal): Promise<unknown[]> {
     return this.read.listCredentials(this.merchantId(p));
+  }
+
+  // ── Terminals (Z100 POS device registration) ──
+
+  @Get('devices')
+  @ApiOperation({ summary: 'List this merchant’s registered POS terminals' })
+  listDevices(@CurrentPrincipal() p: Principal): Promise<DeviceSummary[]> {
+    return this.devices.listDevices(this.merchantId(p));
+  }
+
+  @Post('devices')
+  @HttpCode(201)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Register a POS terminal; returns a one-time activation code' })
+  async registerDevice(
+    @CurrentPrincipal() p: Principal,
+    @Body() dto: CreateDeviceDto,
+  ): Promise<{ device_id: string; label: string; activation_code: string; activation_expires_at: string }> {
+    const d = await this.devices.createDevice({
+      merchantId: this.merchantId(p),
+      accountId: dto.accountId,
+      label: dto.label,
+      actorId: p.userId,
+    });
+    return { device_id: d.deviceId, label: d.label, activation_code: d.activationCode, activation_expires_at: d.activationExpiresAt };
+  }
+
+  @Post('devices/:id/revoke')
+  @HttpCode(200)
+  @Roles('MERCHANT_ADMIN')
+  @ApiOperation({ summary: 'Revoke a terminal (its credential stops working immediately)' })
+  async revokeDevice(@CurrentPrincipal() p: Principal, @Param('id') id: string): Promise<{ ok: true }> {
+    await this.devices.revokeDevice({ deviceId: id, merchantId: this.merchantId(p), actorId: p.userId });
+    return { ok: true };
   }
 
   // ── User management (§6.2) — merchant admin staffs their own account ──

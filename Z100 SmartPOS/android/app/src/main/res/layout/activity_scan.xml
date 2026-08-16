@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Point the scanner at the QR code"
+        android:textSize="18sp"
+        android:textColor="@color/ink" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="The scan will be captured automatically."
+        android:textColor="@color/slate"
+        android:layout_marginTop="8dp" />
+
+    <!-- Focused capture field: the scanner injects the decoded text here (HID). -->
+    <EditText
+        android:id="@+id/hiddenInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Scanned value"
+        android:inputType="text"
+        android:autofillHints="off"
+        android:layout_marginTop="24dp" />
+</LinearLayout>

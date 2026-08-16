@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="New sale"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand" />
+
+        <TextView
+            android:id="@+id/subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Account"
+            android:textColor="@color/slate"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Amount (ngwee — K1.00 = 100)"
+            android:textColor="@color/slate" />
+
+        <EditText
+            android:id="@+id/amount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="e.g. 5000"
+            android:inputType="number"
+            android:autofillHints="off"
+            android:textSize="20sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Customer phone"
+            android:textColor="@color/slate"
+            android:layout_marginTop="12dp" />
+
+        <EditText
+            android:id="@+id/msisdn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="260970000000"
+            android:inputType="phone"
+            android:autofillHints="off"
+            android:textSize="20sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Network"
+            android:textColor="@color/slate"
+            android:layout_marginTop="12dp" />
+
+        <Spinner
+            android:id="@+id/processor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <EditText
+            android:id="@+id/reference"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Reference (optional)"
+            android:inputType="text"
+            android:autofillHints="off"
+            android:layout_marginTop="12dp" />
+
+        <Button
+            android:id="@+id/chargeBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Charge"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textStyle="bold"
+            android:layout_marginTop="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp">
+
+            <Button
+                android:id="@+id/scanBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Scan" />
+
+            <Button
+                android:id="@+id/historyBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="History" />
+
+            <Button
+                android:id="@+id/testPrintBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Test print" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

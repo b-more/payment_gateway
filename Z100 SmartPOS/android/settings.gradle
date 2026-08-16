@@ -1,0 +1,18 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        // The ZCS SmartPos + emv AARs are vendored locally.
+        flatDir { dirs 'app/libs' }
+    }
+}
+rootProject.name = "InstacomPay POS"
+include ':app'

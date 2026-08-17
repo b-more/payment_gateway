@@ -53,8 +53,17 @@ class SaleActivity : AppCompatActivity() {
 
         b.chargeBtn.setOnClickListener { charge() }
 
+        // Pre-fill from a cart charge (Sell screen), else start empty.
+        val pre = intent.getLongExtra(EXTRA_AMOUNT_NGWEE, 0L)
+        if (pre > 0) typed = ngweeToTyped(pre)
         setProcessor("MTN")
         render()
+    }
+
+    private fun ngweeToTyped(ngwee: Long): String {
+        val whole = ngwee / 100
+        val frac = ngwee % 100
+        return if (frac == 0L) whole.toString() else "%d.%02d".format(whole, frac)
     }
 
     // ── keypad ──
@@ -178,5 +187,9 @@ class SaleActivity : AppCompatActivity() {
         val frac = if (parts.size > 1) parts[1].padEnd(2, '0').toLong() else 0L
         val ngwee = whole * 100 + frac
         return if (ngwee <= 0) null else ngwee.toString()
+    }
+
+    companion object {
+        const val EXTRA_AMOUNT_NGWEE = "amount_ngwee"
     }
 }

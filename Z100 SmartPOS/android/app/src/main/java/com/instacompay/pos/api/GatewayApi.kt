@@ -8,6 +8,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -66,6 +67,31 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         Balance(o.optString("float_balance", "0"), o.optString("operating_mode", "SANDBOX"))
     }
 
+    // ── Catalog ──
+    suspend fun listProducts(): List<Product> = withContext(Dispatchers.IO) {
+        val arr = callArray(get("/v1/products"))
+        (0 until arr.length()).map { product(arr.getJSONObject(it)) }
+    }
+
+    suspend fun createProduct(name: String, priceNgwee: String, category: String?): Product =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject().put("name", name).put("price", priceNgwee)
+            if (!category.isNullOrBlank()) body.put("category", category)
+            product(call(post("/v1/products", body, auth = true, idempotencyKey = null)))
+        }
+
+    suspend fun deleteProduct(id: String): Unit = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(AppConfig.baseUrl + "/v1/products/$id").delete().also { authHeaders(it) }.build())
+        Unit
+    }
+
+    private fun product(o: JSONObject) = Product(
+        id = o.getString("id"),
+        name = o.optString("name"),
+        priceNgwee = o.optString("price", "0"),
+        category = nz(o, "category"),
+    )
+
     suspend fun listTransactions(limit: Int = 25, cursor: String? = null): TxnPage =
         withContext(Dispatchers.IO) {
             val path = buildString {
@@ -112,6 +138,17 @@ class GatewayApi(private val creds: SecureCredentialStore) {
                 throw ApiException(resp.code, err.first, err.second)
             }
             return if (text.isBlank()) JSONObject() else JSONObject(text)
+        }
+    }
+
+    private fun callArray(req: Request): JSONArray {
+        client.newCall(req).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
+                val err = parseError(text, resp.code)
+                throw ApiException(resp.code, err.first, err.second)
+            }
+            return if (text.isBlank()) JSONArray() else JSONArray(text)
         }
     }
 

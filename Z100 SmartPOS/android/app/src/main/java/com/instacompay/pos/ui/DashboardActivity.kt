@@ -35,16 +35,16 @@ class DashboardActivity : AppCompatActivity() {
         b.accountLabel.text = creds?.accountNumber?.ifBlank { "Terminal" } ?: "Terminal"
         b.envBadge.visibility = if (creds?.environment == "LIVE") View.GONE else View.VISIBLE
 
-        b.newSaleBtn.setOnClickListener { startActivity(Intent(this, SaleActivity::class.java)) }
-        b.navSell.setOnClickListener { startActivity(Intent(this, SaleActivity::class.java)) }
+        b.newSaleBtn.setOnClickListener { startActivity(Intent(this, SellActivity::class.java)) }
+        b.navSell.setOnClickListener { startActivity(Intent(this, SellActivity::class.java)) }
+        b.navItems.setOnClickListener { startActivity(Intent(this, ItemsActivity::class.java)) }
         b.navHistory.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         b.testPrintBtn.setOnClickListener { testPrint() }
-        // Phase B–D sections — not built yet.
+        // Phases C–D sections — not built yet.
         val soon = android.view.View.OnClickListener { Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show() }
         b.navDisburse.setOnClickListener(soon)
         b.navSettlements.setOnClickListener(soon)
         b.navReports.setOnClickListener(soon)
-        b.navItems.setOnClickListener(soon)
     }
 
     override fun onResume() {

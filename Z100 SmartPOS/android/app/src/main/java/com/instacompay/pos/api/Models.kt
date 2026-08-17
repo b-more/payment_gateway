@@ -38,3 +38,6 @@ data class TxnPage(val items: List<Txn>, val nextCursor: String?)
 
 /** Account balance (GET /v1/accounts/balance). Money as ngwee string. */
 data class Balance(val floatBalance: String, val operatingMode: String)
+
+/** A catalog product (GET/POST /v1/products). Price in ngwee string. */
+data class Product(val id: String, val name: String, val priceNgwee: String, val category: String?)

@@ -35,3 +35,6 @@ data class Txn(
 
 /** One page of the device-scoped transaction list (GET /v1/transactions). */
 data class TxnPage(val items: List<Txn>, val nextCursor: String?)
+
+/** Account balance (GET /v1/accounts/balance). Money as ngwee string. */
+data class Balance(val floatBalance: String, val operatingMode: String)

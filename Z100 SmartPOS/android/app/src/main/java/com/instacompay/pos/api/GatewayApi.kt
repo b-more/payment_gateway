@@ -61,6 +61,11 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         txn(call(get("/v1/transactions/$id")))
     }
 
+    suspend fun getBalance(): Balance = withContext(Dispatchers.IO) {
+        val o = call(get("/v1/accounts/balance"))
+        Balance(o.optString("float_balance", "0"), o.optString("operating_mode", "SANDBOX"))
+    }
+
     suspend fun listTransactions(limit: Int = 25, cursor: String? = null): TxnPage =
         withContext(Dispatchers.IO) {
             val path = buildString {

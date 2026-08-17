@@ -3,9 +3,14 @@ package com.instacompay.pos.ui
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.instacompay.pos.R
+import com.instacompay.pos.api.GatewayApi
+import com.instacompay.pos.api.Txn
 import com.instacompay.pos.data.LocalTxnStore
 import com.instacompay.pos.data.SecureCredentialStore
 import com.instacompay.pos.databinding.ActivityDashboardBinding
@@ -13,11 +18,13 @@ import com.instacompay.pos.hardware.PrinterService
 import com.instacompay.pos.hardware.SdkManager
 import kotlinx.coroutines.launch
 
-/** Home screen after activation: terminal identity, today's takings, quick actions. */
+/** Home screen after activation: terminal identity, balance, today's takings,
+ *  recent sales, and quick actions. */
 class DashboardActivity : AppCompatActivity() {
     private lateinit var b: ActivityDashboardBinding
     private val store by lazy { SecureCredentialStore(this) }
     private val local by lazy { LocalTxnStore(this) }
+    private val api by lazy { GatewayApi(store) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,9 +43,43 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Today's takings come from the on-device log (instant, offline).
         val s = local.todaySummary()
         b.todayCount.text = s.count.toString()
-        b.todayTotal.text = "K%,.2f".format(s.totalNgwee / 100.0)
+        b.todayTotal.text = fmtK(s.totalNgwee)
+        refreshRemote()
+    }
+
+    /** Pull the live balance and recent sales from the gateway (best-effort). */
+    private fun refreshRemote() {
+        lifecycleScope.launch {
+            try { b.balanceAmount.text = fmtKStr(api.getBalance().floatBalance) } catch (_: Exception) { /* keep last */ }
+            try { renderRecent(api.listTransactions(6).items) } catch (_: Exception) { /* offline */ }
+        }
+    }
+
+    private fun renderRecent(items: List<Txn>) {
+        b.recentList.removeAllViews()
+        if (items.isEmpty()) {
+            b.recentEmpty.visibility = View.VISIBLE
+            return
+        }
+        b.recentEmpty.visibility = View.GONE
+        for (t in items) {
+            val row = layoutInflater.inflate(R.layout.row_recent, b.recentList, false)
+            row.findViewById<TextView>(R.id.rowAmount).text = fmtKStr(t.amount)
+            row.findViewById<TextView>(R.id.rowSub).text = "${t.processor} · ${t.msisdn ?: "-"}"
+            val st = row.findViewById<TextView>(R.id.rowStatus)
+            st.text = t.status
+            st.setTextColor(ContextCompat.getColor(this, statusColor(t.status)))
+            b.recentList.addView(row)
+        }
+    }
+
+    private fun statusColor(status: String): Int = when (status) {
+        "SUCCESS" -> R.color.success
+        "FAILED", "EXPIRED", "REVERSED" -> R.color.accent
+        else -> R.color.slate
     }
 
     private fun testPrint() {
@@ -53,4 +94,7 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun fmtK(ngwee: Long): String = "K%,.2f".format(ngwee / 100.0)
+    private fun fmtKStr(ngwee: String): String = fmtK(ngwee.toLongOrNull() ?: 0L)
 }

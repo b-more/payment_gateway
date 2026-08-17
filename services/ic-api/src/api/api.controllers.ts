@@ -223,6 +223,12 @@ export class TransactionsController {
 export class AccountsController {
   constructor(private readonly read: ApiReadService) {}
 
+  @Get('balance')
+  @ApiOperation({ summary: 'Balance for the authenticated account (no id needed — POS convenience)' })
+  async selfBalance(@CurrentCredential() cred: CredentialContext): Promise<BalanceResponse> {
+    return this.read.getBalance(cred.accountId);
+  }
+
   @Get(':id/balance')
   @ApiOperation({ summary: 'Float/balance enquiry' })
   async balance(

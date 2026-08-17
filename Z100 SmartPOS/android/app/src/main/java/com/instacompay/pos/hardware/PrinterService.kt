@@ -26,8 +26,9 @@ class PrinterService(driver: DriverManager) {
         printer.setPrintAppendString("--------------------------------", body())
         printer.setPrintAppendString("If you can read this line,", body())
         printer.setPrintAppendString("the printer is working.", body())
-        printer.setPrintLine(2)
+        printer.setPrintLine(3)
         printer.setPrintStart()
+        cut()
     }
 
     /** Receipt for a completed sale (or a REPRINT). */
@@ -47,8 +48,14 @@ class PrinterService(driver: DriverManager) {
         printer.setPrintLine(1)
         r.qrData?.let { printer.setPrintAppendQRCode(it, 240, 240, Layout.Alignment.ALIGN_CENTER) }
         printer.setPrintAppendString("Thank you", fmt(22, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
-        printer.setPrintLine(3)
+        printer.setPrintLine(4)
         printer.setPrintStart()
+        cut()
+    }
+
+    /** Cut the paper after a print, when the terminal has a cutter. */
+    private fun cut() {
+        if (printer.isSupportCutter) printer.openPrnCutter(1.toByte())
     }
 
     /** Two-column label/value row (label left, value right-aligned). */
@@ -70,7 +77,7 @@ class PrinterService(driver: DriverManager) {
         if (printer.getPrinterStatus() == SdkResult.SDK_PRN_STATUS_PAPEROUT) throw PaperOutException()
     }
 
-    private fun fmt(size: Int, ali: Layout.Alignment, style: Int): PrnStrFormat {
+    private fun fmt(size: Int, ali: Layout.Alignment, style: PrnTextStyle): PrnStrFormat {
         val f = PrnStrFormat()
         f.setTextSize(size)
         f.setAli(ali)

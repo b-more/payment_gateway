@@ -26,7 +26,9 @@ import {
 } from './request-context';
 import { environmentToMode } from '../credentials/crypto';
 import { AirtelDispatchService } from '../airtel/airtel-dispatch.service';
+import { airtelGlobalConfig } from '../airtel/airtel.config';
 import { MtnDispatchService } from '../mtn/mtn-dispatch.service';
+import { mtnGlobalConfig } from '../mtn/mtn.config';
 import { CollectionDto } from './dto/collection.dto';
 import { DisbursementDto } from './dto/disbursement.dto';
 import type { CredentialContext } from '../credentials/credential.service';
@@ -169,6 +171,8 @@ export class TransactionsController {
   constructor(
     private readonly txns: TransactionService,
     private readonly read: ApiReadService,
+    private readonly airtel: AirtelDispatchService,
+    private readonly mtn: MtnDispatchService,
   ) {}
 
   @Get()
@@ -189,12 +193,24 @@ export class TransactionsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Check transaction status' })
+  @ApiOperation({ summary: 'Check transaction status (re-enquires the rail while in-flight)' })
   async status(
     @CurrentCredential() cred: CredentialContext,
     @Param('id') id: string,
   ): Promise<TransactionResponse> {
-    const record = await this.txns.getForAccount(cred.accountId, id);
+    let record = await this.txns.getForAccount(cred.accountId, id);
+    // Resolve-on-read: while a collection is still in flight, ask the rail now so
+    // a polling caller (e.g. a POS terminal) sees SUCCESS as soon as the customer
+    // approves, not only after the async callback/reconcile lands.
+    if (record.status === 'PENDING' || record.status === 'PROCESSING') {
+      if (airtelGlobalConfig().enabled) {
+        try { await this.airtel.resolveByTransactionId(id); } catch { /* enquiry must not break a read */ }
+      }
+      if (mtnGlobalConfig().enabled) {
+        try { await this.mtn.resolveByTransactionId(id); } catch { /* ditto */ }
+      }
+      record = await this.txns.getForAccount(cred.accountId, id);
+    }
     return serializeTransaction(record);
   }
 

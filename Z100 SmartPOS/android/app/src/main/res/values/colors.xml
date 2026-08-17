@@ -5,4 +5,8 @@
     <color name="copper">#B5651D</color>
     <color name="ink">#111827</color>
     <color name="slate">#6B7280</color>
+    <color name="bg">#F4F6FB</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="line">#E3E8F2</color>
+    <color name="success">#1F7A4D</color>
 </resources>

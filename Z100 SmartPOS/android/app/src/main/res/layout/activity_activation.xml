@@ -1,62 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:background="@color/bg">
 
-    <LinearLayout
+    <include layout="@layout/brand_header" />
+
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="InstacomPay POS"
-            android:textSize="26sp"
-            android:textStyle="bold"
-            android:textColor="@color/brand"
-            android:layout_marginTop="24dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Activate this terminal"
-            android:textSize="16sp"
-            android:textColor="@color/slate"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="24dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Enter the one-time activation code from the merchant portal (Terminals)."
-            android:textColor="@color/slate"
-            android:layout_marginBottom="12dp" />
-
-        <EditText
-            android:id="@+id/codeInput"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="e.g. K7Q2MXPT-9F4TQ2RW"
-            android:inputType="textCapCharacters"
-            android:autofillHints="off"
-            android:textSize="18sp" />
+            android:orientation="vertical"
+            android:padding="24dp">
 
-        <Button
-            android:id="@+id/activateBtn"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Activate"
-            android:layout_marginTop="16dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Activate this terminal"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/ink"
+                android:layout_marginTop="16dp" />
 
-        <TextView
-            android:id="@+id/status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="@color/copper"
-            android:layout_marginTop="16dp" />
-    </LinearLayout>
-</ScrollView>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Enter the one-time activation code from the merchant portal (Terminals)."
+                android:textColor="@color/slate"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="20dp" />
+
+            <EditText
+                android:id="@+id/codeInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. K7Q2MXPT-9F4TQ2RW"
+                android:inputType="textCapCharacters"
+                android:autofillHints="off"
+                android:textSize="20sp" />
+
+            <Button
+                android:id="@+id/activateBtn"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Activate"
+                android:textSize="17sp"
+                android:textAllCaps="false"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="@color/copper"
+                android:gravity="center"
+                android:layout_marginTop="16dp" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

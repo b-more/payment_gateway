@@ -61,12 +61,13 @@ class SaleActivity : AppCompatActivity() {
     }
 
     private fun charge() {
-        val amount = b.amount.text.toString().trim()
         val msisdn = b.msisdn.text.toString().trim()
         val processor = processors[b.processor.selectedItemPosition]
         val reference = b.reference.text.toString().trim().ifEmpty { null }
-        if (!amount.matches(Regex("^\\d+$")) || amount == "0") {
-            Toast.makeText(this, "Enter a valid amount in ngwee", Toast.LENGTH_SHORT).show(); return
+        // The cashier types Kwacha (2, 2.5, 2.50); the wire wants integer ngwee.
+        val amountNgwee = kwachaToNgwee(b.amount.text.toString())
+        if (amountNgwee == null) {
+            Toast.makeText(this, "Enter a valid amount, e.g. 2 or 2.50", Toast.LENGTH_SHORT).show(); return
         }
         if (!msisdn.matches(Regex("^260\\d{9}$"))) {
             Toast.makeText(this, "Phone must be 260XXXXXXXXX", Toast.LENGTH_SHORT).show(); return
@@ -75,17 +76,19 @@ class SaleActivity : AppCompatActivity() {
         setBusy(true, "Requesting payment…")
         lifecycleScope.launch {
             try {
-                var txn = api.createCollection(processor, amount, msisdn, reference, idempotencyKey)
+                var txn = api.createCollection(processor, amountNgwee, msisdn, reference, idempotencyKey)
                 // Persist with the idempotency key so a retry never double-charges.
-                local.upsert(LocalTxn(txn.id, idempotencyKey, processor, msisdn, amount, txn.status, reference, System.currentTimeMillis()))
+                local.upsert(LocalTxn(txn.id, idempotencyKey, processor, msisdn, amountNgwee, txn.status, reference, System.currentTimeMillis()))
                 txn = poll(txn)
                 local.updateStatus(txn.id, txn.status)
-                if (txn.isSuccess) {
-                    printReceipt(txn, msisdn, reference)
-                    b.status.text = "Paid • ${fmtK(txn.amount)}"
-                    b.amount.text?.clear(); b.msisdn.text?.clear(); b.reference.text?.clear()
-                } else {
-                    b.status.text = "Not completed: ${txn.failureReason ?: txn.status}"
+                when {
+                    txn.isSuccess -> {
+                        printReceipt(txn, msisdn, reference)
+                        b.status.text = "Paid • ${fmtK(txn.amount)}"
+                        b.amount.text?.clear(); b.msisdn.text?.clear(); b.reference.text?.clear()
+                    }
+                    !txn.isTerminal -> b.status.text = "Still processing — check History in a moment"
+                    else -> b.status.text = "Not completed: ${txn.failureReason ?: txn.status}"
                 }
             } catch (e: ApiException) {
                 b.status.text = e.message
@@ -100,9 +103,11 @@ class SaleActivity : AppCompatActivity() {
     private suspend fun poll(initial: Txn): Txn {
         var txn = initial
         var attempts = 0
-        while (!txn.isTerminal && attempts < 30) {
-            b.status.text = "Waiting for customer… (${txn.status})"
-            delay(2000)
+        // ~2 minutes; the gateway re-enquires the rail on each read, so this
+        // resolves as soon as the customer approves.
+        while (!txn.isTerminal && attempts < 40) {
+            b.status.text = "Waiting for customer to approve on their phone…"
+            delay(3000)
             txn = api.getTransaction(txn.id)
             attempts++
         }
@@ -153,5 +158,20 @@ class SaleActivity : AppCompatActivity() {
     private fun fmtK(ngwee: String): String {
         val n = ngwee.toLongOrNull() ?: 0L
         return "K%,.2f".format(n / 100.0)
+    }
+
+    /**
+     * Kwacha (as typed: "2", "2.5", "2.50", "0.05") -> integer ngwee string.
+     * Parsed digit-by-digit so there is no binary float drift; null if invalid
+     * (more than 2 decimals, non-numeric, or zero).
+     */
+    private fun kwachaToNgwee(input: String): String? {
+        val s = input.trim()
+        if (!s.matches(Regex("^\\d+(\\.\\d{1,2})?$"))) return null
+        val parts = s.split(".")
+        val whole = parts[0].toLongOrNull() ?: return null
+        val frac = if (parts.size > 1) parts[1].padEnd(2, '0').toLong() else 0L
+        val ngwee = whole * 100 + frac
+        return if (ngwee <= 0) null else ngwee.toString()
     }
 }

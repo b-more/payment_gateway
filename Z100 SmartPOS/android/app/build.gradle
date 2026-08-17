@@ -3,13 +3,24 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// Permanent release signing. The keystore + passwords live OUTSIDE the repo.
+// Point the KEYSTORE_PROPERTIES env var at a keystore.properties file whose
+// `storeFile` is resolved relative to that file's directory. If absent (e.g. a
+// contributor without the keystore), builds fall back to the debug signing.
+def keystorePropertiesFile = file(System.getenv('KEYSTORE_PROPERTIES') ?: "${rootDir}/keystore.properties")
+def hasKeystore = keystorePropertiesFile.exists()
+def keystoreProperties = new Properties()
+if (hasKeystore) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace 'com.instacompay.pos'
     compileSdk 34
 
     defaultConfig {
         applicationId "com.instacompay.pos"
-        minSdk 23          // matches the ZCS demo
+        minSdk 21          // lowered from 23 for older terminals (see README: EncryptedSharedPreferences needs 23+ at runtime)
         targetSdk 34
         versionCode 1
         versionName "0.1.0"
@@ -21,15 +32,43 @@ android {
         buildConfigField "boolean", "CARD_ENABLED", "false"
     }
 
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                storeFile new File(keystorePropertiesFile.parentFile, keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildFeatures {
         buildConfig true
         viewBinding true
     }
 
+    // Package native libs the legacy way (compressed + extracted at install →
+    // android:extractNativeLibs="true"). Modern AGP defaults to uncompressed libs,
+    // which some older / OEM POS installers reject with "App not installed".
+    packaging {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+
     buildTypes {
+        // All builds use the permanent release cert and are non-debuggable, so a
+        // stable signature means `adb install -r` updates in place forever.
+        debug {
+            if (hasKeystore) signingConfig signingConfigs.release
+            debuggable false
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasKeystore) signingConfig signingConfigs.release
+            debuggable false
         }
     }
 

@@ -50,11 +50,17 @@ object SdkManager {
 
     /**
      * Device serial number, sent to the gateway at activation for per-terminal
-     * identification. TODO: read the real Z100 SN via the SDK — the exact getter
-     * is in doc/smart_pos_api_en.chm (Sys). Optional on the server, so "" is fine
-     * until wired.
+     * identification. Reads via Sys.getSN(out); "" if unavailable (optional on
+     * the server). Requires the SDK to be initialised — call after [init].
      */
-    fun serialNumber(): String = ""
+    fun serialNumber(): String {
+        val out = arrayOfNulls<String>(1)
+        return try {
+            if (sys.getSN(out) == SdkResult.SDK_OK) out[0].orEmpty() else ""
+        } catch (_: Throwable) {
+            ""
+        }
+    }
 
     /** Run a blocking SDK block on the serialised hardware dispatcher. */
     suspend fun <T> onHardware(block: () -> T): T = withContext(hw) { block() }

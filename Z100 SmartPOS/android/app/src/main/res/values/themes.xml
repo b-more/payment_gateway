@@ -7,4 +7,35 @@
 
     <!-- Windowed theme the ZCS PIN entry activity is declared with. -->
     <style name="Theme.WindowActivity" parent="Theme.Material3.DayNight.Dialog" />
+
+    <!-- POS numeric keypad key. -->
+    <style name="PosKey">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_margin">5dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bg_key</item>
+        <item name="android:textSize">26sp</item>
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- Nav rail item. -->
+    <style name="PosNav">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">11dp</item>
+        <item name="android:paddingBottom">11dp</item>
+        <item name="android:layout_marginBottom">3dp</item>
+        <item name="android:textColor">@color/slate</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
 </resources>

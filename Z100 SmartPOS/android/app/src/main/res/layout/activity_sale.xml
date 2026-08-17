@@ -1,161 +1,187 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/bg">
 
-    <include layout="@layout/brand_header" />
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingStart="14dp"
+        android:paddingEnd="16dp">
 
-    <ScrollView
+        <ImageView
+            android:id="@+id/backBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_back"
+            android:contentDescription="Back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="New sale"
+            android:textColor="@color/ink"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginStart="6dp" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:orientation="horizontal">
 
+        <!-- LEFT: amount + inputs -->
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.05"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:gravity="center"
+            android:padding="20dp"
+            android:background="@color/surface">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="New sale"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:textColor="@color/ink" />
-
-            <TextView
-                android:id="@+id/subtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Account"
+                android:text="AMOUNT"
                 android:textColor="@color/slate"
-                android:layout_marginBottom="16dp" />
+                android:textSize="13sp"
+                android:letterSpacing="0.05" />
 
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
+            <LinearLayout
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="1dp"
-                app:cardBackgroundColor="@color/surface">
+                android:orientation="horizontal"
+                android:gravity="bottom"
+                android:layout_marginTop="2dp">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:text="K"
+                    android:textColor="#94A3B8"
+                    android:textSize="30sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp"
+                    android:paddingBottom="6dp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Amount (Kwacha)"
-                        android:textColor="@color/slate" />
+                <TextView
+                    android:id="@+id/amountText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="@color/ink"
+                    android:textSize="60sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium" />
+            </LinearLayout>
 
-                    <EditText
-                        android:id="@+id/amount"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="e.g. 2 or 2.50"
-                        android:inputType="numberDecimal"
-                        android:autofillHints="off"
-                        android:textSize="30sp"
-                        android:textStyle="bold" />
+            <!-- Network segmented -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/bg_segment"
+                android:padding="4dp"
+                android:layout_marginTop="22dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Customer phone"
-                        android:textColor="@color/slate"
-                        android:layout_marginTop="14dp" />
+                <TextView
+                    android:id="@+id/mtnBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MTN"
+                    android:paddingStart="26dp"
+                    android:paddingEnd="26dp"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
-                    <EditText
-                        android:id="@+id/msisdn"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="260970000000"
-                        android:inputType="phone"
-                        android:autofillHints="off"
-                        android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/airtelBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Airtel"
+                    android:paddingStart="26dp"
+                    android:paddingEnd="26dp"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Network"
-                        android:textColor="@color/slate"
-                        android:layout_marginTop="14dp" />
+            <EditText
+                android:id="@+id/msisdn"
+                android:layout_width="320dp"
+                android:layout_height="wrap_content"
+                android:hint="260970000000"
+                android:inputType="phone"
+                android:autofillHints="off"
+                android:textSize="18sp"
+                android:gravity="center"
+                android:layout_marginTop="16dp" />
 
-                    <Spinner
-                        android:id="@+id/processor"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:layout_marginTop="12dp" />
+        </LinearLayout>
 
-                    <EditText
-                        android:id="@+id/reference"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Reference (optional)"
-                        android:inputType="text"
-                        android:autofillHints="off"
-                        android:layout_marginTop="14dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/line" />
+
+        <!-- RIGHT: keypad -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/key1" style="@style/PosKey" android:text="1" />
+                <TextView android:id="@+id/key2" style="@style/PosKey" android:text="2" />
+                <TextView android:id="@+id/key3" style="@style/PosKey" android:text="3" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/key4" style="@style/PosKey" android:text="4" />
+                <TextView android:id="@+id/key5" style="@style/PosKey" android:text="5" />
+                <TextView android:id="@+id/key6" style="@style/PosKey" android:text="6" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/key7" style="@style/PosKey" android:text="7" />
+                <TextView android:id="@+id/key8" style="@style/PosKey" android:text="8" />
+                <TextView android:id="@+id/key9" style="@style/PosKey" android:text="9" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/keyDot" style="@style/PosKey" android:text="." />
+                <TextView android:id="@+id/key0" style="@style/PosKey" android:text="0" />
+                <TextView android:id="@+id/keyDel" style="@style/PosKey" android:text="⌫" />
+            </LinearLayout>
 
             <Button
                 android:id="@+id/chargeBtn"
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
+                android:layout_height="56dp"
                 android:text="Charge"
                 android:textSize="18sp"
-                android:textAllCaps="false" />
-
-            <TextView
-                android:id="@+id/status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textStyle="bold"
-                android:textSize="16sp"
-                android:gravity="center"
-                android:layout_marginTop="14dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="16dp">
-
-                <Button
-                    android:id="@+id/scanBtn"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textAllCaps="false"
-                    android:text="Scan" />
-
-                <Button
-                    android:id="@+id/historyBtn"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textAllCaps="false"
-                    android:text="History" />
-
-                <Button
-                    android:id="@+id/testPrintBtn"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textAllCaps="false"
-                    android:text="Test print" />
-            </LinearLayout>
+                android:textAllCaps="false"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
-    </ScrollView>
+    </LinearLayout>
 </LinearLayout>

@@ -3,259 +3,144 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:background="@color/bg">
 
-    <include layout="@layout/brand_header" />
+    <!-- Nav rail -->
+    <LinearLayout
+        android:layout_width="212dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@color/surface"
+        android:padding="14dp">
 
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:adjustViewBounds="true"
+            android:scaleType="fitStart"
+            android:src="@drawable/instacom_logo"
+            android:contentDescription="@string/app_name"
+            android:layout_marginStart="4dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="18dp" />
+
+        <TextView android:id="@+id/navHome" style="@style/PosNav" android:background="@drawable/bg_nav_on" android:textColor="@color/brand" android:text="Home" />
+        <TextView android:id="@+id/navSell" style="@style/PosNav" android:text="Sell" />
+        <TextView android:id="@+id/navDisburse" style="@style/PosNav" android:text="Disburse" />
+        <TextView android:id="@+id/navHistory" style="@style/PosNav" android:text="History" />
+        <TextView android:id="@+id/navSettlements" style="@style/PosNav" android:text="Settlements" />
+        <TextView android:id="@+id/navReports" style="@style/PosNav" android:text="Reports" />
+        <TextView android:id="@+id/navItems" style="@style/PosNav" android:text="Items" />
+
+        <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
-
-            <!-- Terminal identity -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="1dp"
-                app:cardBackgroundColor="@color/surface">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="TERMINAL"
-                            android:textColor="@color/slate"
-                            android:textSize="11sp"
-                            android:letterSpacing="0.08" />
-
-                        <TextView
-                            android:id="@+id/accountLabel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Terminal"
-                            android:textColor="@color/ink"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/envBadge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_badge"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
-                        android:paddingTop="3dp"
-                        android:paddingBottom="3dp"
-                        android:text="SANDBOX"
-                        android:textColor="@color/accent"
-                        android:textStyle="bold"
-                        android:textSize="11sp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Available balance -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="1dp"
-                app:cardBackgroundColor="@color/surface">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Available balance"
-                        android:textColor="@color/slate"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/balanceAmount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="—"
-                        android:textColor="@color/brand"
-                        android:textSize="32sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Today's takings -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="1dp"
-                app:cardBackgroundColor="@color/surface">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:padding="18dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Today's sales"
-                            android:textColor="@color/slate"
-                            android:textSize="13sp" />
-
-                        <TextView
-                            android:id="@+id/todayCount"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="@color/ink"
-                            android:textSize="30sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="end">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Total collected"
-                            android:textColor="@color/slate"
-                            android:textSize="13sp" />
-
-                        <TextView
-                            android:id="@+id/todayTotal"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="K0.00"
-                            android:textColor="@color/brand"
-                            android:textSize="26sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <Button
-                android:id="@+id/newSaleBtn"
-                android:layout_width="match_parent"
-                android:layout_height="62dp"
-                android:text="New sale"
-                android:textSize="18sp"
-                android:textAllCaps="false"
-                android:layout_marginTop="20dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="14dp">
-
-                <Button
-                    android:id="@+id/scanBtn"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textAllCaps="false"
-                    android:text="Scan" />
-
-                <Button
-                    android:id="@+id/historyBtn"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textAllCaps="false"
-                    android:text="History" />
-
-                <Button
-                    android:id="@+id/testPrintBtn"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textAllCaps="false"
-                    android:text="Test print" />
-            </LinearLayout>
-
-            <!-- Recent sales -->
+            android:background="@color/bg"
+            android:padding="10dp">
             <TextView
+                android:id="@+id/accountLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Recent sales"
+                android:text="Terminal"
                 android:textColor="@color/ink"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_marginTop="22dp"
-                android:layout_marginBottom="8dp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/testPrintBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Test print"
+                android:textColor="@color/brand"
+                android:textSize="12sp"
+                android:paddingTop="4dp"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/line" />
+
+    <!-- Main -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Dashboard" android:textColor="@color/ink" android:textSize="20sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Your terminal today" android:textColor="@color/slate" android:textSize="13sp" />
+            </LinearLayout>
+            <Button
+                android:id="@+id/newSaleBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="46dp"
+                android:text="New sale"
+                android:textAllCaps="false"
+                android:textSize="15sp"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp" />
+        </LinearLayout>
+
+        <!-- Stat row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="14dp">
 
             <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="1dp"
-                app:cardBackgroundColor="@color/surface">
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.5"
+                app:cardCornerRadius="16dp" app:cardElevation="1dp" app:cardBackgroundColor="@color/surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Available balance" android:textColor="@color/slate" android:textSize="13sp" />
+                        <TextView android:id="@+id/envBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/bg_badge" android:paddingStart="8dp" android:paddingEnd="8dp" android:paddingTop="3dp" android:paddingBottom="3dp" android:text="SANDBOX" android:textColor="@color/accent" android:textStyle="bold" android:textSize="11sp" />
+                    </LinearLayout>
+                    <TextView android:id="@+id/balanceAmount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—" android:textColor="@color/ink" android:textSize="34sp" android:textStyle="bold" android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="6dp">
-
-                    <LinearLayout
-                        android:id="@+id/recentList"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
-
-                    <TextView
-                        android:id="@+id/recentEmpty"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="No sales yet"
-                        android:textColor="@color/slate"
-                        android:gravity="center"
-                        android:padding="16dp" />
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="14dp"
+                app:cardCornerRadius="16dp" app:cardElevation="1dp" app:cardBackgroundColor="@color/surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="18dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Collected today" android:textColor="@color/slate" android:textSize="13sp" />
+                        <TextView android:id="@+id/todayTotal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K0.00" android:textColor="@color/success" android:textSize="24sp" android:textStyle="bold" android:layout_marginTop="4dp" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="0.7" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sales" android:textColor="@color/slate" android:textSize="13sp" />
+                        <TextView android:id="@+id/todayCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="@color/ink" android:textSize="24sp" android:textStyle="bold" android:layout_marginTop="4dp" />
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
-    </ScrollView>
+
+        <!-- Recent -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="14dp"
+            app:cardCornerRadius="16dp" app:cardElevation="1dp" app:cardBackgroundColor="@color/surface">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Recent sales" android:textColor="@color/ink" android:textSize="15sp" android:textStyle="bold" android:padding="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+                <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                        <LinearLayout android:id="@+id/recentList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
+                        <TextView android:id="@+id/recentEmpty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No sales yet" android:textColor="@color/slate" android:gravity="center" android:padding="18dp" />
+                    </LinearLayout>
+                </ScrollView>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
 </LinearLayout>

@@ -72,6 +72,8 @@ class DashboardActivity : AppCompatActivity() {
             val st = row.findViewById<TextView>(R.id.rowStatus)
             st.text = t.status
             st.setTextColor(ContextCompat.getColor(this, statusColor(t.status)))
+            // Tap a row for reprint / refund (shared with History).
+            row.setOnClickListener { TxnActions.show(this, t) { refreshRemote() } }
             b.recentList.addView(row)
         }
     }

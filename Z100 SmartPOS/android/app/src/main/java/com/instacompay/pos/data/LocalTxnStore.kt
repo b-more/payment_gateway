@@ -16,6 +16,8 @@ data class LocalTxn(
     val createdAt: Long,
 )
 
+data class DaySummary(val count: Int, val totalNgwee: Long)
+
 /**
  * On-device transaction log — survives restarts for reprint and offline history.
  * The persisted idempotency key lets a network retry reuse the same key so the
@@ -58,6 +60,28 @@ class LocalTxnStore(context: Context) : SQLiteOpenHelper(context, "pos.db", null
 
     fun updateStatus(id: String, status: String) {
         writableDatabase.execSQL("UPDATE txns SET status=? WHERE id=?", arrayOf(status, id))
+    }
+
+    /** Count + total ngwee of SUCCESSful sales made on this terminal since midnight. */
+    fun todaySummary(): DaySummary {
+        val startOfDay = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        var count = 0
+        var total = 0L
+        readableDatabase.rawQuery(
+            "SELECT amount_ngwee FROM txns WHERE status='SUCCESS' AND created_at >= ?",
+            arrayOf(startOfDay.toString()),
+        ).use { c ->
+            while (c.moveToNext()) {
+                count++
+                total += c.getString(0).toLongOrNull() ?: 0L
+            }
+        }
+        return DaySummary(count, total)
     }
 
     fun recent(limit: Int = 50): List<LocalTxn> {

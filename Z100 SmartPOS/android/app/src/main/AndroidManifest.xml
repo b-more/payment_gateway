@@ -24,7 +24,7 @@
         android:usesCleartextTraffic="false">
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -32,6 +32,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ui.WelcomeActivity" android:exported="false" />
+        <activity android:name=".ui.DashboardActivity" android:exported="false" />
         <activity android:name=".ui.ActivationActivity" android:exported="false" />
         <activity android:name=".ui.SaleActivity" android:exported="false" />
         <activity android:name=".ui.HistoryActivity" android:exported="false" />

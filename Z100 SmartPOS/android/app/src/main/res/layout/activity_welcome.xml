@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/surface"
+    android:padding="28dp">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.6" />
+
+    <ImageView
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:src="@drawable/instacom_logo"
+        android:contentDescription="@string/app_name" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Accept payments, anywhere"
+        android:textColor="@color/ink"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginTop="28dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Turn this terminal into a point of sale — collect mobile-money payments and print receipts in seconds."
+        android:textColor="@color/slate"
+        android:textSize="15sp"
+        android:lineSpacingExtra="4dp"
+        android:layout_marginTop="10dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <Button
+        android:id="@+id/activateBtn"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:text="Activate terminal"
+        android:textSize="17sp"
+        android:textAllCaps="false" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="You'll need the one-time code from your merchant portal (Terminals)."
+        android:textColor="@color/slate"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:layout_marginTop="14dp" />
+</LinearLayout>

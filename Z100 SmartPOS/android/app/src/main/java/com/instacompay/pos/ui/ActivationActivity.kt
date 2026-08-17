@@ -40,7 +40,10 @@ class ActivationActivity : AppCompatActivity() {
                 val serial = withContext(Dispatchers.IO) { SdkManager.serialNumber() }
                 val result = api.activate(code, serial)
                 store.save(result)
-                startActivity(Intent(this@ActivationActivity, SaleActivity::class.java))
+                startActivity(
+                    Intent(this@ActivationActivity, DashboardActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                )
                 finish()
             } catch (e: ApiException) {
                 b.status.text = e.message

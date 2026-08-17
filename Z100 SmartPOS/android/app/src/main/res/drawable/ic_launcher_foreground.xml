@@ -4,19 +4,11 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Payment card motif, centred within the adaptive safe zone. -->
-    <!-- Card body -->
+    <!-- The "i" mark from the Instacom wordmark: white stem + red dot. -->
+    <path
+        android:fillColor="#E11B22"
+        android:pathData="M45,40 A9,9 0 1 0 63,40 A9,9 0 1 0 45,40 Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M30,38 L78,38 A6,6 0 0 1 84,44 L84,64 A6,6 0 0 1 78,70 L30,70 A6,6 0 0 1 24,64 L24,44 A6,6 0 0 1 30,38 Z" />
-    <!-- Magnetic stripe -->
-    <path android:fillColor="#1C4FD6" android:pathData="M24,46 L84,46 L84,52 L24,52 Z" />
-    <!-- Chip -->
-    <path
-        android:fillColor="#2A5BE0"
-        android:pathData="M31,57 L41,57 A2,2 0 0 1 43,59 L43,64 A2,2 0 0 1 41,66 L31,66 A2,2 0 0 1 29,64 L29,59 A2,2 0 0 1 31,57 Z" />
-    <!-- Contactless waves -->
-    <path
-        android:fillColor="#7FA0F0"
-        android:pathData="M70,56 A8,8 0 0 1 70,68 L67,66 A4,4 0 0 0 67,58 Z" />
+        android:pathData="M48,58 A6,6 0 0 1 54,52 A6,6 0 0 1 60,58 L60,76 A6,6 0 0 1 54,82 A6,6 0 0 1 48,76 Z" />
 </vector>

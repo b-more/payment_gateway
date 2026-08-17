@@ -25,6 +25,8 @@ export interface ActivatedDevice {
   secret: string; // shown ONCE
   signingKey: string; // shown ONCE
   accountNumber: string;
+  merchantName: string;
+  branch: string;
   environment: 'SANDBOX' | 'LIVE';
 }
 
@@ -120,12 +122,13 @@ export class DeviceService {
     const found = await this.pool.query<{
       id: string;
       account_id: string;
+      label: string;
       environment: 'SANDBOX' | 'LIVE';
       status: string;
       activation_code_hash: string | null;
       activation_expires_at: Date | null;
     }>(
-      `SELECT id, account_id, environment, status, activation_code_hash, activation_expires_at
+      `SELECT id, account_id, label, environment, status, activation_code_hash, activation_expires_at
          FROM devices WHERE activation_ref = $1`,
       [ref],
     );
@@ -137,11 +140,13 @@ export class DeviceService {
     if (device.activation_expires_at && device.activation_expires_at.getTime() < Date.now()) throw invalid;
     if (!(await verifySecret(code, device.activation_code_hash))) throw invalid;
 
-    const account = await this.pool.query<{ account_number: string }>(
-      'SELECT account_number FROM accounts WHERE id = $1',
+    const account = await this.pool.query<{ account_number: string; merchant_name: string }>(
+      `SELECT a.account_number, m.name AS merchant_name
+         FROM accounts a JOIN merchants m ON m.id = a.merchant_id WHERE a.id = $1`,
       [device.account_id],
     );
     const accountNumber = account.rows[0]?.account_number ?? '';
+    const merchantName = account.rows[0]?.merchant_name ?? '';
 
     return withTransaction(this.pool, async (client) => {
       const cred = await this.credentials.generate({ accountId: device.account_id, environment: device.environment }, client);
@@ -167,6 +172,8 @@ export class DeviceService {
         secret: cred.secret,
         signingKey: cred.signingKey,
         accountNumber,
+        merchantName,
+        branch: device.label,
         environment: device.environment,
       };
     });

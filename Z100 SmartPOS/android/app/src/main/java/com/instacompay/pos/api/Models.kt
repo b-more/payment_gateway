@@ -7,6 +7,8 @@ data class ActivationResult(
     val secret: String,
     val signingKey: String,
     val accountNumber: String,
+    val merchantName: String,
+    val branch: String,
     val environment: String,
 )
 

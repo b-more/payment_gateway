@@ -153,14 +153,7 @@ class SaleActivity : AppCompatActivity() {
     }
 
     private suspend fun printReceipt(txn: Txn, msisdn: String) {
-        val data = ReceiptData(
-            merchantName = store.load()?.accountNumber ?: "InstacomPay",
-            timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()),
-            amount = "K%,.2f".format(txn.amount.toLong() / 100.0),
-            charge = "K%,.2f".format(txn.charge.toLong() / 100.0),
-            total = "K%,.2f".format(txn.totalAmount.toLong() / 100.0),
-            msisdn = msisdn, status = txn.status, reference = txn.id.take(8), qrData = txn.id,
-        )
+        val data = buildReceipt(this, txn, msisdn, processor)
         try {
             SdkManager.onHardware { SdkManager.printer().printSaleReceipt(data) }
         } catch (e: PrinterService.PaperOutException) {

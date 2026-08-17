@@ -36,16 +36,9 @@ object TxnActions {
     }
 
     private fun reprint(activity: AppCompatActivity, t: Txn) {
-        val store = SecureCredentialStore(activity)
         activity.lifecycleScope.launch {
             try {
-                val data = ReceiptData(
-                    merchantName = store.load()?.accountNumber ?: "InstacomPay",
-                    timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()),
-                    amount = fmtK(t.amount), charge = fmtK(t.charge), total = fmtK(t.totalAmount),
-                    msisdn = t.msisdn ?: "-", status = t.status,
-                    reference = t.collectionReference ?: t.id.take(8), qrData = t.id, reprint = true,
-                )
+                val data = buildReceipt(activity, t, t.msisdn ?: "-", t.processor, reprint = true)
                 SdkManager.onHardware { SdkManager.printer().printSaleReceipt(data) }
                 toast(activity, "Reprinted")
             } catch (e: PrinterService.PaperOutException) {

@@ -11,6 +11,7 @@ import { MtnModule } from './mtn/mtn.module';
 import { ZampayModule } from './zampay/zampay.module';
 import { DeviceModule } from './devices/device.module';
 import { ProductModule } from './products/product.module';
+import { ReceiptModule } from './receipts/receipt.module';
 
 // Root module. MoneyModule holds the §5 engine; ApiModule the §8 /v1 HTTP surface;
 // OnboardingModule the §5.1 merchant application; SettlementModule the §5.8/5.9
@@ -30,6 +31,7 @@ import { ProductModule } from './products/product.module';
     ZampayModule,
     DeviceModule,
     ProductModule,
+    ReceiptModule,
   ],
 })
 export class AppModule {}

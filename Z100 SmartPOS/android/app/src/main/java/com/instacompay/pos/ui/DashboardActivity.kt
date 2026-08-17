@@ -32,7 +32,9 @@ class DashboardActivity : AppCompatActivity() {
         setContentView(b.root)
 
         val creds = store.load()
-        b.accountLabel.text = creds?.accountNumber?.ifBlank { "Terminal" } ?: "Terminal"
+        b.accountLabel.text = creds?.merchantName?.ifBlank { creds.accountNumber }?.ifBlank { "Terminal" } ?: "Terminal"
+        b.branchLabel.text = listOf(creds?.branch.orEmpty(), creds?.accountNumber.orEmpty())
+            .filter { it.isNotBlank() }.joinToString(" · ")
         b.envBadge.visibility = if (creds?.environment == "LIVE") View.GONE else View.VISIBLE
 
         b.newSaleBtn.setOnClickListener { startActivity(Intent(this, SellActivity::class.java)) }

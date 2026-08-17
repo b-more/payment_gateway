@@ -10,6 +10,8 @@ export interface ActivateDeviceResponse {
   secret: string;
   signing_key: string;
   account_number: string;
+  merchant_name: string;
+  branch: string;
   environment: 'SANDBOX' | 'LIVE';
 }
 
@@ -33,6 +35,8 @@ export class DeviceController {
       secret: d.secret,
       signing_key: d.signingKey,
       account_number: d.accountNumber,
+      merchant_name: d.merchantName,
+      branch: d.branch,
       environment: d.environment,
     };
   }

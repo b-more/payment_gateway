@@ -12,6 +12,8 @@ data class StoredCredentials(
     val signingKey: String,
     val deviceId: String,
     val accountNumber: String,
+    val merchantName: String,
+    val branch: String,
     val environment: String,
 )
 
@@ -43,6 +45,8 @@ class SecureCredentialStore(context: Context) {
             .putString("signingKey", r.signingKey)
             .putString("deviceId", r.deviceId)
             .putString("accountNumber", r.accountNumber)
+            .putString("merchantName", r.merchantName)
+            .putString("branch", r.branch)
             .putString("environment", r.environment)
             .apply()
     }
@@ -56,6 +60,8 @@ class SecureCredentialStore(context: Context) {
             signingKey = prefs.getString("signingKey", "").orEmpty(),
             deviceId = prefs.getString("deviceId", "").orEmpty(),
             accountNumber = prefs.getString("accountNumber", "").orEmpty(),
+            merchantName = prefs.getString("merchantName", "").orEmpty(),
+            branch = prefs.getString("branch", "").orEmpty(),
             environment = prefs.getString("environment", "SANDBOX").orEmpty(),
         )
     }

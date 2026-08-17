@@ -41,6 +41,8 @@ class GatewayApi(private val creds: SecureCredentialStore) {
                 secret = o.getString("secret"),
                 signingKey = nz(o, "signing_key").orEmpty(),
                 accountNumber = nz(o, "account_number").orEmpty(),
+                merchantName = nz(o, "merchant_name").orEmpty(),
+                branch = nz(o, "branch").orEmpty(),
                 environment = nz(o, "environment") ?: "SANDBOX",
             )
         }

@@ -53,9 +53,14 @@ class PrinterService(driver: DriverManager) {
         cut()
     }
 
-    /** Cut the paper after a print, when the terminal has a cutter. */
+    /**
+     * Cut the paper after a print. Called unconditionally (as the vendor demo's
+     * post-print cut does) — isSupportCutter() reports false on many Z100 units
+     * even when the cutter is fitted, so gating on it wrongly skips the cut. On a
+     * unit with no cutter this is a harmless no-op.
+     */
     private fun cut() {
-        if (printer.isSupportCutter) printer.openPrnCutter(1.toByte())
+        printer.openPrnCutter(1.toByte())
     }
 
     /** Two-column label/value row (label left, value right-aligned). */

@@ -88,12 +88,21 @@ class PrinterService(driver: DriverManager) {
     }
 
     /**
-     * Cut the paper. Called unconditionally (as the vendor demo's post-print cut
-     * does) — isSupportCutter() is unreliable on some units. A no-op where there
-     * is no cutter (then the paper is torn on the tear bar; the extra feed above
-     * clears the last line).
+     * Cut the paper. setPrintStart() can return before the print physically
+     * finishes, and openPrnCutter() issued mid-print is silently dropped — so
+     * wait for the printer to go idle (status SDK_OK, like the demo's cutPaper)
+     * before cutting. No-op where there is no cutter.
      */
     private fun cut() {
+        var tries = 0
+        while (tries < 30) {
+            when (printer.getPrinterStatus()) {
+                SdkResult.SDK_OK -> break
+                SdkResult.SDK_PRN_STATUS_PAPEROUT -> return
+            }
+            try { Thread.sleep(80) } catch (_: InterruptedException) {}
+            tries++
+        }
         printer.openPrnCutter(1.toByte())
     }
 

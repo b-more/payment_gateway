@@ -37,6 +37,7 @@ class HistoryActivity : AppCompatActivity() {
                 )
                 b.status.text = if (txns.isEmpty()) "No transactions yet" else ""
             } catch (e: Exception) {
+                if (lockIfRevoked(e)) return@launch
                 b.status.text = "Error: ${e.message}"
             }
         }

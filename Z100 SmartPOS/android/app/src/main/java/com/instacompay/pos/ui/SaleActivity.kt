@@ -119,6 +119,8 @@ class SaleActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: ApiException) {
+                if (lockIfRevoked(e)) return@launch
+                b.status.setTextColor(ContextCompat.getColor(this@SaleActivity, R.color.accent))
                 b.status.text = e.message
             } catch (e: Exception) {
                 b.status.text = "Error: ${e.message}"

@@ -59,8 +59,15 @@ class DashboardActivity : AppCompatActivity() {
     /** Pull the live balance and recent sales from the gateway (best-effort). */
     private fun refreshRemote() {
         lifecycleScope.launch {
-            try { b.balanceAmount.text = fmtKStr(api.getBalance().floatBalance) } catch (_: Exception) { /* keep last */ }
-            try { renderRecent(api.listTransactions(6).items) } catch (_: Exception) { /* offline */ }
+            try {
+                // The balance call is our revocation check: a revoked terminal 401s
+                // here and gets locked back to activation.
+                b.balanceAmount.text = fmtKStr(api.getBalance().floatBalance)
+                renderRecent(api.listTransactions(6).items)
+            } catch (e: Exception) {
+                if (lockIfRevoked(e)) return@launch
+                // otherwise offline/transient — keep the last values
+            }
         }
     }
 

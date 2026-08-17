@@ -77,6 +77,7 @@ object TxnActions {
                 toast(activity, "Refund ${d.status}")
                 onChanged()
             } catch (e: ApiException) {
+                if (activity.lockIfRevoked(e)) return@launch
                 toast(activity, e.message ?: "Refund failed")
             } catch (e: Exception) {
                 toast(activity, "Error: ${e.message}")

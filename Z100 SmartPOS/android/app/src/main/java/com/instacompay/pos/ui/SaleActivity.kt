@@ -41,7 +41,7 @@ class SaleActivity : AppCompatActivity() {
 
         b.backBtn.setOnClickListener { finish() }
         b.mtnBtn.setOnClickListener { setProcessor("MTN") }
-        b.airtelBtn.setOnClickListener { setProcessor("Airtel") }
+        b.airtelBtn.setOnClickListener { setProcessor("AIRTEL") }
 
         val digits = mapOf(
             b.key0 to "0", b.key1 to "1", b.key2 to "2", b.key3 to "3", b.key4 to "4",
@@ -82,7 +82,7 @@ class SaleActivity : AppCompatActivity() {
     private fun setProcessor(p: String) {
         processor = p
         styleSeg(b.mtnBtn, p == "MTN")
-        styleSeg(b.airtelBtn, p == "Airtel")
+        styleSeg(b.airtelBtn, p == "AIRTEL")
     }
 
     private fun styleSeg(tv: TextView, on: Boolean) {

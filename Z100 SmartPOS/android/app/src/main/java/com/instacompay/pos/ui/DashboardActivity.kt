@@ -42,9 +42,9 @@ class DashboardActivity : AppCompatActivity() {
         b.navItems.setOnClickListener { startActivity(Intent(this, ItemsActivity::class.java)) }
         b.navHistory.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         b.testPrintBtn.setOnClickListener { testPrint() }
-        // Phases C–D sections — not built yet.
+        b.navDisburse.setOnClickListener { startActivity(Intent(this, DisburseActivity::class.java)) }
+        // Phase D sections — not built yet.
         val soon = android.view.View.OnClickListener { Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show() }
-        b.navDisburse.setOnClickListener(soon)
         b.navSettlements.setOnClickListener(soon)
         b.navReports.setOnClickListener(soon)
     }

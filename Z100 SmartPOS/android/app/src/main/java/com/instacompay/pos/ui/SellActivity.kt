@@ -32,7 +32,7 @@ class SellActivity : AppCompatActivity() {
         b.navHome.setOnClickListener { finish() }
         b.navHistory.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         b.navItems.setOnClickListener { startActivity(Intent(this, ItemsActivity::class.java)) }
-        b.navDisburse.setOnClickListener { toast("Coming soon") }
+        b.navDisburse.setOnClickListener { startActivity(Intent(this, DisburseActivity::class.java)) }
         b.customAmountBtn.setOnClickListener { startActivity(Intent(this, SaleActivity::class.java)) }
         b.clearBtn.setOnClickListener { cart.clear(); renderCart() }
         b.chargeBtn.setOnClickListener { charge() }

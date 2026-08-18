@@ -7,6 +7,8 @@ import { CredentialsModule } from '../credentials/credentials.module';
 import { ApiAuthGuard } from './api-auth.guard';
 import { RateLimitGuard } from './rate-limit.guard';
 import { ApiReadService } from './read.service';
+import { PayoutService } from '../merchant/payout.service';
+import { AuditService } from '../audit/audit.service';
 import {
   AccountsController,
   CollectionsController,
@@ -25,6 +27,6 @@ import {
     AccountsController,
     SettlementsController,
   ],
-  providers: [ApiReadService, ApiAuthGuard, RateLimitGuard],
+  providers: [ApiReadService, ApiAuthGuard, RateLimitGuard, PayoutService, AuditService],
 })
 export class ApiModule {}

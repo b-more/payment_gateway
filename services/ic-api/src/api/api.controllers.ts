@@ -32,6 +32,10 @@ import { mtnGlobalConfig } from '../mtn/mtn.config';
 import { CollectionDto } from './dto/collection.dto';
 import { DisbursementDto } from './dto/disbursement.dto';
 import type { CredentialContext } from '../credentials/credential.service';
+import { PayoutService } from '../merchant/payout.service';
+import { Inject } from '@nestjs/common';
+import type { Pool } from 'pg';
+import { PG_POOL } from '../database/database.module';
 
 // Every /v1 controller is gated by rate limiting (SEC-API6) then auth
 // (SEC-API2/3/4). All work is scoped to the authenticated credential's account.
@@ -112,7 +116,36 @@ export class DisbursementsController {
     private readonly txns: TransactionService,
     private readonly airtel: AirtelDispatchService,
     private readonly mtn: MtnDispatchService,
+    private readonly payouts: PayoutService,
+    @Inject(PG_POOL) private readonly pool: Pool,
   ) {}
+
+  // Maker-checker: a terminal REQUESTS a payout; a manager approves it in the
+  // merchant portal (the device credential cannot approve — no portal role).
+  @Post('request')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Request a payout for approval (maker-checker)' })
+  async request(
+    @CurrentCredential() cred: CredentialContext,
+    @Body() dto: DisbursementDto,
+  ): Promise<{ id: string; status: string }> {
+    const acc = await this.pool.query<{ merchant_id: string }>(
+      'SELECT merchant_id FROM accounts WHERE id = $1',
+      [cred.accountId],
+    );
+    const merchantId = acc.rows[0]?.merchant_id;
+    if (!merchantId) throw new NotFoundError('account not found');
+    assertRailReady(dto.processor);
+    return this.payouts.requestPayout({
+      accountId: cred.accountId,
+      merchantId,
+      processor: dto.processor,
+      amountNgwee: toNgwee(dto.amount),
+      msisdn: dto.msisdn,
+      reference: dto.collectionReference ?? null,
+      requestedBy: cred.deviceId ?? cred.credentialId, // the terminal is the maker
+    });
+  }
 
   @Post()
   @HttpCode(200)

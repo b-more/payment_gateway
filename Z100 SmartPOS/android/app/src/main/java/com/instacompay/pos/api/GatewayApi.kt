@@ -64,6 +64,15 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         txn(call(get("/v1/transactions/$id")))
     }
 
+    /** Maker-checker payout request (a manager approves it in the portal). */
+    suspend fun requestPayout(processor: String, amountNgwee: String, msisdn: String, reference: String?): Pair<String, String> =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject().put("processor", processor).put("amount", amountNgwee).put("msisdn", msisdn)
+            if (!reference.isNullOrBlank()) body.put("collectionReference", reference)
+            val o = call(post("/v1/disbursements/request", body, auth = true, idempotencyKey = null))
+            o.getString("id") to o.optString("status", "PENDING_APPROVAL")
+        }
+
     suspend fun getBalance(): Balance = withContext(Dispatchers.IO) {
         val o = call(get("/v1/accounts/balance"))
         Balance(o.optString("float_balance", "0"), o.optString("operating_mode", "SANDBOX"))

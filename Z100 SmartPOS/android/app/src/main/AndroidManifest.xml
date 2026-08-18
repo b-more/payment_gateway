@@ -41,6 +41,7 @@
         <activity android:name=".ui.ScanActivity" android:exported="false" android:screenOrientation="landscape" />
         <activity android:name=".ui.SellActivity" android:exported="false" android:screenOrientation="landscape" />
         <activity android:name=".ui.ItemsActivity" android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".ui.SuccessActivity" android:exported="false" android:screenOrientation="landscape" />
 
         <!-- ZCS SDK PIN entry screen — required for the pinpad to render. -->
         <activity

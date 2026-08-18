@@ -1,5 +1,6 @@
 package com.instacompay.pos.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
 import android.widget.Toast
@@ -116,10 +117,17 @@ class SaleActivity : AppCompatActivity() {
                 local.updateStatus(txn.id, txn.status)
                 when {
                     txn.isSuccess -> {
-                        printReceipt(txn, msisdn)
-                        b.status.setTextColor(ContextCompat.getColor(this@SaleActivity, R.color.success))
-                        b.status.text = "Paid • K%,.2f".format(txn.amount.toLong() / 100.0)
-                        typed = ""; render(); b.msisdn.text?.clear()
+                        startActivity(
+                            Intent(this@SaleActivity, SuccessActivity::class.java)
+                                .putExtra("id", txn.id)
+                                .putExtra("amount", txn.amount)
+                                .putExtra("charge", txn.charge)
+                                .putExtra("total", txn.totalAmount)
+                                .putExtra("msisdn", msisdn)
+                                .putExtra("network", processor)
+                                .putExtra("status", txn.status),
+                        )
+                        finish()
                     }
                     !txn.isTerminal -> b.status.text = "Still processing — check History"
                     else -> {

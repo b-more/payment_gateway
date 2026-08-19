@@ -66,4 +66,10 @@
             <TextView android:id="@+id/railEmpty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No collections in this period." android:textColor="@color/slate" android:textSize="13sp" android:padding="14dp" android:visibility="gone" />
         </LinearLayout>
     </ScrollView>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:background="@color/surface" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Print an end-of-day summary" android:textColor="@color/slate" android:textSize="13sp" />
+        <Button android:id="@+id/printZBtn" android:layout_width="wrap_content" android:layout_height="48dp" android:text="Print Z-report" android:textAllCaps="false" android:textSize="15sp" android:backgroundTint="@color/ink" android:paddingStart="22dp" android:paddingEnd="22dp" />
+    </LinearLayout>
 </LinearLayout>

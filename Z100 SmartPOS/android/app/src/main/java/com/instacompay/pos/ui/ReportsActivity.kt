@@ -1,9 +1,11 @@
 package com.instacompay.pos.ui
 
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -12,7 +14,14 @@ import com.instacompay.pos.api.GatewayApi
 import com.instacompay.pos.api.ReportSummary
 import com.instacompay.pos.data.SecureCredentialStore
 import com.instacompay.pos.databinding.ActivityReportsBinding
+import com.instacompay.pos.hardware.PrinterService
+import com.instacompay.pos.hardware.SdkManager
+import com.instacompay.pos.hardware.ZRail
+import com.instacompay.pos.hardware.ZReportData
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** Takings summary for this terminal over a chosen window (today / 7d / 30d). */
 class ReportsActivity : AppCompatActivity() {
@@ -20,6 +29,7 @@ class ReportsActivity : AppCompatActivity() {
     private val store by lazy { SecureCredentialStore(this) }
     private val api by lazy { GatewayApi(store) }
     private var range = "today"
+    private var current: ReportSummary? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +40,7 @@ class ReportsActivity : AppCompatActivity() {
         b.rangeToday.setOnClickListener { select("today") }
         b.range7d.setOnClickListener { select("7d") }
         b.range30d.setOnClickListener { select("30d") }
+        b.printZBtn.setOnClickListener { printZReport() }
         select("today")
     }
 
@@ -48,16 +59,62 @@ class ReportsActivity : AppCompatActivity() {
 
     private fun load() {
         b.status.text = "Loading…"
+        b.printZBtn.isEnabled = false
         lifecycleScope.launch {
             try {
-                render(api.reportSummary(range))
+                val s = api.reportSummary(range)
+                current = s
+                render(s)
                 b.status.text = ""
+                b.printZBtn.isEnabled = true
             } catch (e: Exception) {
                 if (lockIfRevoked(e)) return@launch
                 b.status.text = "Error: ${e.message}"
             }
         }
     }
+
+    private fun periodLabel() = when (range) {
+        "7d" -> "Last 7 days"
+        "30d" -> "Last 30 days"
+        else -> "Today — " + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    }
+
+    private fun printZReport() {
+        val s = current ?: return
+        val creds = store.load()
+        val logo = runCatching { BitmapFactory.decodeResource(resources, R.drawable.instacom_logo) }.getOrNull()
+        val z = ZReportData(
+            merchantName = creds?.merchantName?.ifBlank { creds.accountNumber } ?: "InstacomPay",
+            branch = creds?.branch.orEmpty(),
+            terminal = creds?.accountNumber.orEmpty(),
+            period = periodLabel(),
+            printedAt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()),
+            collectionsCount = s.collectionsCount,
+            gross = fmtK(s.gross),
+            charges = fmtK(s.charges),
+            net = fmtK(s.net),
+            payoutsCount = s.payoutsCount,
+            payoutsTotal = fmtK(s.payoutsTotal),
+            rails = s.rails.map { ZRail(railLabel(it.processor), it.count, fmtK(it.gross)) },
+            logo = logo,
+        )
+        b.printZBtn.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                SdkManager.onHardware { SdkManager.printer().printZReport(z) }
+                toast("Z-report printed")
+            } catch (e: PrinterService.PaperOutException) {
+                toast("Printer out of paper")
+            } catch (e: Exception) {
+                toast("Print error: ${e.message}")
+            } finally {
+                b.printZBtn.isEnabled = true
+            }
+        }
+    }
+
+    private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 
     private fun render(s: ReportSummary) {
         b.grossAmount.text = fmtK(s.gross)

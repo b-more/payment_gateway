@@ -70,6 +70,43 @@ class PrinterService(driver: DriverManager) {
         cut()
     }
 
+    /** End-of-day Z-report: a printed summary of this terminal's takings. */
+    fun printZReport(z: ZReportData) {
+        ensureReady()
+
+        z.logo?.let { printer.setPrintAppendBitmap(prepLogo(it), Layout.Alignment.ALIGN_CENTER) }
+        printer.setPrintAppendString(z.merchantName, fmt(30, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.BOLD))
+        if (z.branch.isNotBlank()) printer.setPrintAppendString(z.branch, fmt(22, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+        printer.setPrintAppendString("END-OF-DAY Z-REPORT", fmt(24, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.BOLD))
+        printer.setPrintAppendString(z.period, fmt(20, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+        printer.setPrintAppendString("Printed " + z.printedAt, fmt(18, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+        if (z.terminal.isNotBlank()) printer.setPrintAppendString("Terminal " + z.terminal, fmt(18, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+
+        printer.setPrintAppendString("--------------------------------", body())
+        printer.setPrintAppendString("COLLECTIONS", fmt(22, Layout.Alignment.ALIGN_NORMAL, PrnTextStyle.BOLD))
+        row("Sales", z.collectionsCount.toString())
+        row("Gross", z.gross)
+        row("Charges", z.charges)
+        row("Net", z.net, big = true)
+
+        printer.setPrintAppendString("--------------------------------", body())
+        printer.setPrintAppendString("PAYOUTS", fmt(22, Layout.Alignment.ALIGN_NORMAL, PrnTextStyle.BOLD))
+        row("Count", z.payoutsCount.toString())
+        row("Total", z.payoutsTotal)
+
+        if (z.rails.isNotEmpty()) {
+            printer.setPrintAppendString("--------------------------------", body())
+            printer.setPrintAppendString("BY NETWORK", fmt(22, Layout.Alignment.ALIGN_NORMAL, PrnTextStyle.BOLD))
+            for (r in z.rails) row("${r.label} (${r.count})", r.amount)
+        }
+
+        printer.setPrintAppendString("--------------------------------", body())
+        printer.setPrintAppendString("Powered by InstacomPay", fmt(18, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+        printer.setPrintLine(5)
+        printer.setPrintStart()
+        cut()
+    }
+
     /** Two-column label/value row (label left, value right-aligned). */
     private fun row(label: String, value: String, big: Boolean = false) {
         val size = if (big) 26 else 24
@@ -142,3 +179,22 @@ data class ReceiptData(
     val logo: Bitmap? = null,
     val reprint: Boolean = false,
 )
+
+/** A printed end-of-day summary (money pre-formatted as "K…" strings). */
+data class ZReportData(
+    val merchantName: String,
+    val branch: String,
+    val terminal: String,
+    val period: String,
+    val printedAt: String,
+    val collectionsCount: Int,
+    val gross: String,
+    val charges: String,
+    val net: String,
+    val payoutsCount: Int,
+    val payoutsTotal: String,
+    val rails: List<ZRail>,
+    val logo: Bitmap? = null,
+)
+
+data class ZRail(val label: String, val count: Int, val amount: String)

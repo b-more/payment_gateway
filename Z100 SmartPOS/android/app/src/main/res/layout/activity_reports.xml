@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingStart="14dp"
+        android:paddingEnd="10dp">
+
+        <ImageView android:id="@+id/backBtn" android:layout_width="40dp" android:layout_height="40dp" android:padding="8dp" android:src="@drawable/ic_back" android:contentDescription="Back" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Reports" android:textColor="@color/ink" android:textSize="16sp" android:textStyle="bold" android:layout_marginStart="6dp" />
+
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:background="@drawable/bg_segment" android:padding="3dp">
+            <TextView android:id="@+id/rangeToday" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Today" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="7dp" android:paddingBottom="7dp" android:textSize="13sp" android:textStyle="bold" />
+            <TextView android:id="@+id/range7d" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="7 days" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="7dp" android:paddingBottom="7dp" android:textSize="13sp" android:textStyle="bold" />
+            <TextView android:id="@+id/range30d" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="30 days" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="7dp" android:paddingBottom="7dp" android:textSize="13sp" android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+
+            <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="" android:textColor="@color/slate" android:textSize="13sp" android:layout_marginBottom="8dp" />
+
+            <!-- Headline collections card -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@drawable/bg_card" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="COLLECTIONS" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" />
+                <TextView android:id="@+id/grossAmount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K0.00" android:textColor="@color/ink" android:textSize="40sp" android:textStyle="bold" android:layout_marginTop="2dp" />
+                <TextView android:id="@+id/collSub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 sales" android:textColor="@color/slate" android:textSize="14sp" android:layout_marginTop="2dp" />
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Net to you" android:textColor="@color/slate" android:textSize="12sp" />
+                        <TextView android:id="@+id/netAmount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K0.00" android:textColor="@color/success" android:textSize="18sp" android:textStyle="bold" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Charges" android:textColor="@color/slate" android:textSize="12sp" />
+                        <TextView android:id="@+id/chargesAmount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K0.00" android:textColor="@color/ink" android:textSize="18sp" android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Payouts card -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:background="@drawable/bg_card" android:padding="18dp" android:layout_marginTop="12dp">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PAYOUTS" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" />
+                    <TextView android:id="@+id/payoutSub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 payouts" android:textColor="@color/slate" android:textSize="14sp" android:layout_marginTop="2dp" />
+                </LinearLayout>
+                <TextView android:id="@+id/payoutAmount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K0.00" android:textColor="@color/ink" android:textSize="24sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Rail breakdown -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BY NETWORK" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" android:layout_marginTop="18dp" android:layout_marginStart="2dp" />
+            <LinearLayout android:id="@+id/railList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@drawable/bg_card" android:padding="6dp" android:layout_marginTop="6dp" />
+            <TextView android:id="@+id/railEmpty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No collections in this period." android:textColor="@color/slate" android:textSize="13sp" android:padding="14dp" android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

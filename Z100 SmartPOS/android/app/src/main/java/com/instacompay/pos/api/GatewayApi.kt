@@ -116,6 +116,43 @@ class GatewayApi(private val creds: SecureCredentialStore) {
             TxnPage(items, nz(o, "next_cursor"))
         }
 
+    // ── Settlements & reports ──
+    suspend fun listSettlements(): List<Settlement> = withContext(Dispatchers.IO) {
+        val arr = callArray(get("/v1/settlements"))
+        (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i)
+            Settlement(
+                id = o.getString("id"),
+                amount = o.optString("amount", "0"),
+                status = o.optString("status"),
+                settledAt = nz(o, "settled_at"),
+                createdAt = o.optString("created_at"),
+            )
+        }
+    }
+
+    suspend fun reportSummary(range: String): ReportSummary = withContext(Dispatchers.IO) {
+        val o = call(get("/v1/reports/summary?range=$range"))
+        val c = o.getJSONObject("collections")
+        val p = o.getJSONObject("payouts")
+        val railsArr = o.optJSONArray("rails")
+        val rails = ArrayList<RailLine>()
+        if (railsArr != null) for (i in 0 until railsArr.length()) {
+            val r = railsArr.getJSONObject(i)
+            rails.add(RailLine(r.optString("processor"), r.optInt("count"), r.optString("gross", "0")))
+        }
+        ReportSummary(
+            range = o.optString("range", range),
+            collectionsCount = c.optInt("count"),
+            gross = c.optString("gross", "0"),
+            charges = c.optString("charges", "0"),
+            net = c.optString("net", "0"),
+            payoutsCount = p.optInt("count"),
+            payoutsTotal = p.optString("total", "0"),
+            rails = rails,
+        )
+    }
+
     // ── request plumbing ──
     private fun paymentBody(processor: String, amountNgwee: String, msisdn: String, reference: String?): JSONObject {
         val b = JSONObject().put("processor", processor).put("amount", amountNgwee).put("msisdn", msisdn)

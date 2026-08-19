@@ -58,6 +58,14 @@ export interface SettlementResponse {
   created_at: string;
 }
 
+export interface ReportSummaryResponse {
+  range: string;
+  from: string;
+  collections: { count: number; gross: string; charges: string; net: string };
+  payouts: { count: number; total: string };
+  rails: { processor: string; count: number; gross: string }[];
+}
+
 interface AccountRow {
   float_balance: string;
   low_float_threshold: string;
@@ -158,6 +166,70 @@ export class ApiReadService {
         environment: r.environment,
       })),
       next_cursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
+    };
+  }
+
+  /**
+   * A takings summary for the POS "Reports" screen. Device-scoped when a
+   * terminal credential is used, otherwise account-wide. Range is a fixed
+   * window (today / last 7 / last 30 days) so the terminal never sends dates.
+   */
+  async reportSummary(opts: {
+    accountId: string;
+    deviceId: string | null;
+    range: string | undefined;
+  }): Promise<ReportSummaryResponse> {
+    const range = opts.range === '7d' || opts.range === '30d' || opts.range === 'today' ? opts.range : 'today';
+    const fromExpr =
+      range === 'today'
+        ? "date_trunc('day', now())"
+        : range === '7d'
+          ? "now() - interval '7 days'"
+          : "now() - interval '30 days'";
+
+    const params: unknown[] = [opts.accountId];
+    let scope = 'account_id = $1';
+    if (opts.deviceId) {
+      params.push(opts.deviceId);
+      scope += ` AND device_id = $${params.length}`;
+    }
+    const where = `${scope} AND created_at >= ${fromExpr}`;
+
+    const totals = await this.pool.query<{
+      from: Date;
+      coll_count: string;
+      gross: string;
+      charges: string;
+      net: string;
+      payout_count: string;
+      payout_total: string;
+    }>(
+      `SELECT ${fromExpr} AS from,
+              COUNT(*) FILTER (WHERE type = 'COLLECTION' AND status = 'SUCCESS')::text AS coll_count,
+              COALESCE(SUM(amount) FILTER (WHERE type = 'COLLECTION' AND status = 'SUCCESS'), 0)::text AS gross,
+              COALESCE(SUM(charge) FILTER (WHERE type = 'COLLECTION' AND status = 'SUCCESS'), 0)::text AS charges,
+              COALESCE(SUM(net_amount) FILTER (WHERE type = 'COLLECTION' AND status = 'SUCCESS'), 0)::text AS net,
+              COUNT(*) FILTER (WHERE type = 'DISBURSEMENT' AND status = 'SUCCESS')::text AS payout_count,
+              COALESCE(SUM(amount) FILTER (WHERE type = 'DISBURSEMENT' AND status = 'SUCCESS'), 0)::text AS payout_total
+         FROM transactions WHERE ${where}`,
+      params,
+    );
+
+    const rails = await this.pool.query<{ processor: string; count: string; gross: string }>(
+      `SELECT processor, COUNT(*)::text AS count, COALESCE(SUM(amount), 0)::text AS gross
+         FROM transactions
+        WHERE ${where} AND type = 'COLLECTION' AND status = 'SUCCESS'
+        GROUP BY processor ORDER BY SUM(amount) DESC`,
+      params,
+    );
+
+    const t = totals.rows[0];
+    return {
+      range,
+      from: t.from.toISOString(),
+      collections: { count: Number(t.coll_count), gross: t.gross, charges: t.charges, net: t.net },
+      payouts: { count: Number(t.payout_count), total: t.payout_total },
+      rails: rails.rows.map((r) => ({ processor: r.processor, count: Number(r.count), gross: r.gross })),
     };
   }
 

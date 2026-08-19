@@ -43,10 +43,8 @@ class DashboardActivity : AppCompatActivity() {
         b.navHistory.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         b.testPrintBtn.setOnClickListener { testPrint() }
         b.navDisburse.setOnClickListener { startActivity(Intent(this, DisburseActivity::class.java)) }
-        // Phase D sections — not built yet.
-        val soon = android.view.View.OnClickListener { Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show() }
-        b.navSettlements.setOnClickListener(soon)
-        b.navReports.setOnClickListener(soon)
+        b.navSettlements.setOnClickListener { startActivity(Intent(this, SettlementsActivity::class.java)) }
+        b.navReports.setOnClickListener { startActivity(Intent(this, ReportsActivity::class.java)) }
     }
 
     override fun onResume() {

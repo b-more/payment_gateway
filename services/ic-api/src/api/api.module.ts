@@ -13,6 +13,7 @@ import {
   AccountsController,
   CollectionsController,
   DisbursementsController,
+  ReportsController,
   SettlementsController,
   TransactionsController,
 } from './api.controllers';
@@ -26,6 +27,7 @@ import {
     TransactionsController,
     AccountsController,
     SettlementsController,
+    ReportsController,
   ],
   providers: [ApiReadService, ApiAuthGuard, RateLimitGuard, PayoutService, AuditService],
 })

@@ -16,7 +16,7 @@ import { NotFoundError, ValidationError } from '../money/errors';
 import { assertRailReady } from '../transactions/rails';
 import { ApiAuthGuard } from './api-auth.guard';
 import { RateLimitGuard } from './rate-limit.guard';
-import { ApiReadService, type BalanceResponse, type SettlementResponse, type TransactionPage } from './read.service';
+import { ApiReadService, type BalanceResponse, type ReportSummaryResponse, type SettlementResponse, type TransactionPage } from './read.service';
 import { serializeTransaction, type TransactionResponse } from './serializers';
 import { ApiAuthHeaders, ApiIdempotencyHeader } from './swagger';
 import {
@@ -286,5 +286,22 @@ export class SettlementsController {
   @ApiOperation({ summary: 'List settlements for the account' })
   async list(@CurrentCredential() cred: CredentialContext): Promise<SettlementResponse[]> {
     return this.read.listSettlements(cred.accountId);
+  }
+}
+
+@ApiTags('reports')
+@ApiAuthHeaders()
+@Controller('reports')
+@UseGuards(RateLimitGuard, ApiAuthGuard)
+export class ReportsController {
+  constructor(private readonly read: ApiReadService) {}
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Takings summary (device-scoped for a terminal credential)' })
+  async summary(
+    @CurrentCredential() cred: CredentialContext,
+    @Query('range') range?: string,
+  ): Promise<ReportSummaryResponse> {
+    return this.read.reportSummary({ accountId: cred.accountId, deviceId: cred.deviceId, range });
   }
 }

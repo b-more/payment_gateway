@@ -4,29 +4,75 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
+    android:background="@color/bg"
     android:padding="24dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Point the scanner at the QR code"
-        android:textSize="18sp"
+        android:text="Scan a barcode"
+        android:textSize="22sp"
+        android:textStyle="bold"
         android:textColor="@color/ink" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="The scan will be captured automatically."
+        android:text="Point the scanner at the item's barcode — it's captured automatically."
         android:textColor="@color/slate"
+        android:textSize="14sp"
+        android:gravity="center"
         android:layout_marginTop="8dp" />
 
-    <!-- Focused capture field: the scanner injects the decoded text here (HID). -->
+    <!-- Focused capture field: the scanner injects the decoded text here (HID).
+         Kept visible and narrow so a value can also be typed as a fallback. -->
     <EditText
         android:id="@+id/hiddenInput"
-        android:layout_width="match_parent"
+        android:layout_width="360dp"
         android:layout_height="wrap_content"
         android:hint="Scanned value"
         android:inputType="text"
         android:autofillHints="off"
-        android:layout_marginTop="24dp" />
+        android:gravity="center"
+        android:textSize="18sp"
+        android:layout_marginTop="22dp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="20dp">
+
+        <Button
+            android:id="@+id/cancelBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="Cancel"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:backgroundTint="@color/slate"
+            android:paddingStart="22dp" android:paddingEnd="22dp"
+            android:layout_marginEnd="10dp" />
+
+        <Button
+            android:id="@+id/rescanBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="Scan again"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:backgroundTint="@color/brand"
+            android:paddingStart="22dp" android:paddingEnd="22dp" />
+
+        <Button
+            android:id="@+id/useBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="Use"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:backgroundTint="@color/ink"
+            android:paddingStart="26dp" android:paddingEnd="26dp"
+            android:layout_marginStart="10dp" />
+    </LinearLayout>
 </LinearLayout>

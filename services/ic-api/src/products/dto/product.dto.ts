@@ -19,6 +19,12 @@ export class CreateProductDto {
   @MaxLength(40)
   category?: string;
 
+  @ApiProperty({ required: false, example: '6009510800012', description: 'Optional barcode for scan-to-cart.' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9._-]{1,64}$/)
+  barcode?: string;
+
   @ApiProperty({ required: false, description: 'Product photo, base64-encoded (≈1MB max after device compression).' })
   @IsOptional()
   @IsString()
@@ -57,6 +63,12 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @ApiProperty({ required: false, description: 'Optional barcode for scan-to-cart.' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9._-]{1,64}$/)
+  barcode?: string;
 
   @ApiProperty({ required: false, description: 'Replacement photo, base64-encoded.' })
   @IsOptional()

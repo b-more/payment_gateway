@@ -32,6 +32,7 @@ export class ProductController {
       name: dto.name,
       priceNgwee: BigInt(dto.price),
       category: dto.category ?? null,
+      barcode: dto.barcode ?? null,
       image: dto.image ? Buffer.from(dto.image, 'base64') : null,
       imageMime: dto.imageMime ?? null,
     });
@@ -49,6 +50,7 @@ export class ProductController {
       priceNgwee: dto.price ? BigInt(dto.price) : undefined,
       category: dto.category,
       active: dto.active,
+      barcode: dto.barcode,
       image: dto.image ? Buffer.from(dto.image, 'base64') : undefined,
       imageMime: dto.imageMime,
     });

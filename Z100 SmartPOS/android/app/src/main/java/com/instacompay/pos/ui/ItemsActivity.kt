@@ -1,5 +1,7 @@
 package com.instacompay.pos.ui
 
+import android.app.Activity
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -38,6 +40,14 @@ class ItemsActivity : AppCompatActivity() {
     private var pendingImage: Bitmap? = null
     private var pendingThumb: ImageView? = null
     private var cameraUri: Uri? = null
+    private var barcodeField: EditText? = null
+
+    private val scan = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        if (res.resultCode == Activity.RESULT_OK) {
+            val code = res.data?.getStringExtra(ScanActivity.EXTRA_RESULT)?.trim().orEmpty()
+            if (code.isNotEmpty()) barcodeField?.setText(code)
+        }
+    }
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { setPending(decodeScaled(it)) }
@@ -82,11 +92,18 @@ class ItemsActivity : AppCompatActivity() {
                 setImageResource(R.drawable.ic_grid)
             }
             if (p.hasImage) loadThumb(p.id, thumb)
-            val name = TextView(this).apply {
-                text = p.name; setTextColor(color(R.color.ink)); textSize = 15f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            val nameCol = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
+            nameCol.addView(TextView(this).apply {
+                text = p.name; setTextColor(color(R.color.ink)); textSize = 15f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            })
+            if (!p.barcode.isNullOrBlank()) nameCol.addView(TextView(this).apply {
+                text = "▤ ${p.barcode}"; setTextColor(color(R.color.slate)); textSize = 12f
+            })
+            val name = nameCol
             val price = TextView(this).apply {
                 text = fmtK(p.priceNgwee); setTextColor(color(R.color.brand)); textSize = 15f
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
@@ -120,6 +137,23 @@ class ItemsActivity : AppCompatActivity() {
         val price = EditText(this).apply { hint = "Price in Kwacha (e.g. 10 or 10.50)"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL }
         val category = EditText(this).apply { hint = "Category (optional)"; inputType = InputType.TYPE_CLASS_TEXT }
 
+        val barcode = EditText(this).apply {
+            hint = "Barcode (optional)"; inputType = InputType.TYPE_CLASS_TEXT
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        barcodeField = barcode
+        val scanBtn = TextView(this).apply {
+            text = "Scan"; setTextColor(color(R.color.brand)); textSize = 15f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(dp(14), dp(10), dp(6), dp(10))
+            isClickable = true; isFocusable = true
+            setOnClickListener { scan.launch(Intent(this@ItemsActivity, ScanActivity::class.java)) }
+        }
+        val barcodeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            addView(barcode); addView(scanBtn)
+        }
+
         val photoRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(14), 0, dp(4))
@@ -139,7 +173,7 @@ class ItemsActivity : AppCompatActivity() {
         pendingThumb = thumb
         photoRow.addView(thumb); photoRow.addView(photoBtn)
 
-        box.addView(name); box.addView(price); box.addView(category); box.addView(photoRow)
+        box.addView(name); box.addView(price); box.addView(category); box.addView(barcodeRow); box.addView(photoRow)
 
         AlertDialog.Builder(this)
             .setTitle("Add item")
@@ -150,15 +184,17 @@ class ItemsActivity : AppCompatActivity() {
                 val cat = category.text.toString().trim().ifEmpty { null }
                 if (n.isEmpty() || ngwee == null) { toast("Enter a name and a valid price"); return@setPositiveButton }
                 val imageB64 = pendingImage?.let { jpegBase64(it) }
+                val bc = barcode.text.toString().trim().ifEmpty { null }
+                if (bc != null && !bc.matches(Regex("^[A-Za-z0-9._-]{1,64}$"))) { toast("Invalid barcode"); return@setPositiveButton }
                 lifecycleScope.launch {
                     try {
-                        api.createProduct(n, ngwee, cat, imageB64, if (imageB64 != null) "image/jpeg" else null)
-                        pendingImage = null; pendingThumb = null
+                        api.createProduct(n, ngwee, cat, imageB64, if (imageB64 != null) "image/jpeg" else null, bc)
+                        pendingImage = null; pendingThumb = null; barcodeField = null
                         load()
                     } catch (e: Exception) { if (!lockIfRevoked(e)) toast("Could not add item") }
                 }
             }
-            .setNegativeButton("Cancel") { _, _ -> pendingImage = null; pendingThumb = null }
+            .setNegativeButton("Cancel") { _, _ -> pendingImage = null; pendingThumb = null; barcodeField = null }
             .show()
     }
 

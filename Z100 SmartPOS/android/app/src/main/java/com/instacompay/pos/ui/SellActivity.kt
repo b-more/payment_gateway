@@ -1,5 +1,6 @@
 package com.instacompay.pos.ui
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -7,6 +8,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.instacompay.pos.R
@@ -25,6 +27,13 @@ class SellActivity : AppCompatActivity() {
     private var products: List<Product> = emptyList()
     private val cart = LinkedHashMap<String, Int>()   // productId -> qty
 
+    private val scan = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        if (res.resultCode == Activity.RESULT_OK) {
+            val code = res.data?.getStringExtra(ScanActivity.EXTRA_RESULT)?.trim().orEmpty()
+            if (code.isNotEmpty()) onScanned(code)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivitySellBinding.inflate(layoutInflater)
@@ -34,6 +43,7 @@ class SellActivity : AppCompatActivity() {
         b.navHistory.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         b.navItems.setOnClickListener { startActivity(Intent(this, ItemsActivity::class.java)) }
         b.navDisburse.setOnClickListener { startActivity(Intent(this, DisburseActivity::class.java)) }
+        b.scanBtn.setOnClickListener { scan.launch(Intent(this, ScanActivity::class.java)) }
         b.customAmountBtn.setOnClickListener { startActivity(Intent(this, SaleActivity::class.java)) }
         b.clearBtn.setOnClickListener { cart.clear(); renderCart() }
         b.chargeBtn.setOnClickListener { charge() }
@@ -81,6 +91,18 @@ class SellActivity : AppCompatActivity() {
             val spacer = View(this); spacer.layoutParams = LinearLayout.LayoutParams(0, dp(88), 1f).apply { setMargins(dp(5), dp(5), dp(5), dp(5)) }
             r.addView(spacer)
         } }
+    }
+
+    /** A scanned barcode: find the matching catalog item and drop it in the cart. */
+    private fun onScanned(code: String) {
+        val p = products.firstOrNull { it.barcode?.equals(code, ignoreCase = true) == true }
+        if (p == null) {
+            toast("No item with barcode $code")
+            return
+        }
+        cart[p.id] = (cart[p.id] ?: 0) + 1
+        renderCart()
+        toast("Added ${p.name}")
     }
 
     private fun loadTileImage(id: String, img: ImageView) {

@@ -10,6 +10,7 @@ export interface ProductResponse {
   category: string | null;
   sort_order: number;
   has_image: boolean;
+  barcode: string | null;
 }
 
 interface Row {
@@ -19,10 +20,11 @@ interface Row {
   category: string | null;
   sort_order: number;
   has_image: boolean;
+  barcode: string | null;
 }
 
 const RETURNING =
-  'id, name, price_ngwee::text AS price, category, sort_order, (image_data IS NOT NULL) AS has_image';
+  'id, name, price_ngwee::text AS price, category, sort_order, (image_data IS NOT NULL) AS has_image, barcode';
 
 /** Product catalog, scoped to the credential's COLLECTION account. */
 @Injectable()
@@ -41,13 +43,13 @@ export class ProductService {
 
   async create(
     accountId: string,
-    input: { name: string; priceNgwee: bigint; category: string | null; image?: Buffer | null; imageMime?: string | null },
+    input: { name: string; priceNgwee: bigint; category: string | null; barcode?: string | null; image?: Buffer | null; imageMime?: string | null },
   ): Promise<ProductResponse> {
     const r = await this.pool.query<Row>(
-      `INSERT INTO products (account_id, name, price_ngwee, category, image_data, image_mime)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO products (account_id, name, price_ngwee, category, barcode, image_data, image_mime)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING ${RETURNING}`,
-      [accountId, input.name, input.priceNgwee.toString(), input.category, input.image ?? null, input.imageMime ?? null],
+      [accountId, input.name, input.priceNgwee.toString(), input.category, input.barcode ?? null, input.image ?? null, input.imageMime ?? null],
     );
     return r.rows[0];
   }
@@ -60,24 +62,26 @@ export class ProductService {
       priceNgwee: bigint | undefined;
       category: string | null | undefined;
       active: boolean | undefined;
+      barcode?: string | undefined;
       image?: Buffer | undefined;
       imageMime?: string | undefined;
     },
   ): Promise<ProductResponse> {
-    // Image is only touched when a new one is supplied (COALESCE keeps the old).
+    // Image/barcode are only touched when supplied (COALESCE keeps the old).
     const r = await this.pool.query<Row>(
       `UPDATE products
           SET name = COALESCE($3, name),
               price_ngwee = COALESCE($4, price_ngwee),
               category = COALESCE($5, category),
               active = COALESCE($6, active),
-              image_data = COALESCE($7, image_data),
-              image_mime = COALESCE($8, image_mime)
+              barcode = COALESCE($7, barcode),
+              image_data = COALESCE($8, image_data),
+              image_mime = COALESCE($9, image_mime)
         WHERE id = $1 AND account_id = $2
       RETURNING ${RETURNING}`,
       [
         id, accountId, patch.name ?? null, patch.priceNgwee?.toString() ?? null,
-        patch.category ?? null, patch.active ?? null, patch.image ?? null, patch.imageMime ?? null,
+        patch.category ?? null, patch.active ?? null, patch.barcode ?? null, patch.image ?? null, patch.imageMime ?? null,
       ],
     );
     if (r.rowCount === 0) throw new NotFoundError('product not found');

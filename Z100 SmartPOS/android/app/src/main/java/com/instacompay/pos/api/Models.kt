@@ -48,6 +48,7 @@ data class Product(
     val priceNgwee: String,
     val category: String?,
     val hasImage: Boolean = false,
+    val barcode: String? = null,
 )
 
 /** A payout to the merchant's bank (GET /v1/settlements). Amount in ngwee string. */

@@ -25,8 +25,16 @@ class ScanActivity : AppCompatActivity() {
         b.hiddenInput.requestFocus()
         b.hiddenInput.setOnEditorActionListener { _, _, _ -> submit(); true }
         b.hiddenInput.addTextChangedListener(afterTextChanged = { s ->
+            // A barcode scan is committed with a trailing newline/return.
             if (s?.contains('\n') == true) submit()
         })
+        b.cancelBtn.setOnClickListener { done = true; powerOff(); finish() }
+        b.useBtn.setOnClickListener { submit() }
+        b.rescanBtn.setOnClickListener { b.hiddenInput.setText(""); b.hiddenInput.requestFocus(); trigger() }
+        startScanner()
+    }
+
+    private fun startScanner() {
         lifecycleScope.launch {
             try {
                 SdkManager.onHardware {
@@ -38,14 +46,24 @@ class ScanActivity : AppCompatActivity() {
         }
     }
 
-    private fun submit() {
-        if (done) return
-        done = true
-        val text = b.hiddenInput.text.toString().replace("\n", "").trim()
+    private fun trigger() {
+        lifecycleScope.launch {
+            try { SdkManager.onHardware { SdkManager.scanner().trigger() } } catch (_: Exception) {}
+        }
+    }
+
+    private fun powerOff() {
         lifecycleScope.launch {
             try { SdkManager.onHardware { SdkManager.scanner().powerOff() } } catch (_: Exception) {}
         }
-        if (text.isEmpty()) { finish(); return }
+    }
+
+    private fun submit() {
+        if (done) return
+        val text = b.hiddenInput.text.toString().replace("\n", "").trim()
+        if (text.isEmpty()) return  // nothing scanned yet — keep waiting
+        done = true
+        powerOff()
         setResult(RESULT_OK, Intent().putExtra(EXTRA_RESULT, text))
         finish()
     }

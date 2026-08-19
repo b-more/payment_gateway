@@ -86,10 +86,11 @@ class GatewayApi(private val creds: SecureCredentialStore) {
 
     suspend fun createProduct(
         name: String, priceNgwee: String, category: String?,
-        imageBase64: String? = null, imageMime: String? = null,
+        imageBase64: String? = null, imageMime: String? = null, barcode: String? = null,
     ): Product = withContext(Dispatchers.IO) {
         val body = JSONObject().put("name", name).put("price", priceNgwee)
         if (!category.isNullOrBlank()) body.put("category", category)
+        if (!barcode.isNullOrBlank()) body.put("barcode", barcode)
         if (!imageBase64.isNullOrBlank()) body.put("image", imageBase64).put("imageMime", imageMime ?: "image/jpeg")
         product(call(post("/v1/products", body, auth = true, idempotencyKey = null)))
     }
@@ -117,6 +118,7 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         priceNgwee = o.optString("price", "0"),
         category = nz(o, "category"),
         hasImage = o.optBoolean("has_image", false),
+        barcode = nz(o, "barcode"),
     )
 
     suspend fun listTransactions(limit: Int = 25, cursor: String? = null): TxnPage =

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temp files handed to the camera app via FileProvider. -->
+    <cache-path name="captures" path="captures/" />
+</paths>

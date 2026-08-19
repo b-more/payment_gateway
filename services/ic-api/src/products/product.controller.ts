@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Header, HttpCode, NotFoundException, Param, Patch, Post, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiAuthGuard } from '../api/api-auth.guard';
 import { RateLimitGuard } from '../api/rate-limit.guard';
 import { ApiAuthHeaders } from '../api/swagger';
@@ -31,6 +32,8 @@ export class ProductController {
       name: dto.name,
       priceNgwee: BigInt(dto.price),
       category: dto.category ?? null,
+      image: dto.image ? Buffer.from(dto.image, 'base64') : null,
+      imageMime: dto.imageMime ?? null,
     });
   }
 
@@ -46,7 +49,22 @@ export class ProductController {
       priceNgwee: dto.price ? BigInt(dto.price) : undefined,
       category: dto.category,
       active: dto.active,
+      image: dto.image ? Buffer.from(dto.image, 'base64') : undefined,
+      imageMime: dto.imageMime,
     });
+  }
+
+  @Get(':id/image')
+  @ApiExcludeEndpoint()
+  @Header('Cache-Control', 'private, max-age=86400')
+  async image(
+    @CurrentCredential() cred: CredentialContext,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const img = await this.products.getImage(cred.accountId, id);
+    if (!img) throw new NotFoundException('no image');
+    res.type(img.mime).send(img.data);
   }
 
   @Delete(':id')

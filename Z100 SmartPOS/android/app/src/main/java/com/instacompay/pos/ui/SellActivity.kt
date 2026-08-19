@@ -3,6 +3,7 @@ package com.instacompay.pos.ui
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -65,11 +66,13 @@ class SellActivity : AppCompatActivity() {
                 b.productGrid.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
             }
             val tile = layoutInflater.inflate(R.layout.item_product, row, false)
-            val lp = LinearLayout.LayoutParams(0, dp(88), 1f)
+            val lp = LinearLayout.LayoutParams(0, dp(140), 1f)
             lp.setMargins(dp(5), dp(5), dp(5), dp(5))
             tile.layoutParams = lp
             tile.findViewById<TextView>(R.id.pName).text = p.name
             tile.findViewById<TextView>(R.id.pPrice).text = fmtK(p.priceNgwee)
+            val img = tile.findViewById<ImageView>(R.id.pImage)
+            if (p.hasImage) loadTileImage(p.id, img)
             tile.setOnClickListener { cart[p.id] = (cart[p.id] ?: 0) + 1; renderCart() }
             row!!.addView(tile)
         }
@@ -78,6 +81,18 @@ class SellActivity : AppCompatActivity() {
             val spacer = View(this); spacer.layoutParams = LinearLayout.LayoutParams(0, dp(88), 1f).apply { setMargins(dp(5), dp(5), dp(5), dp(5)) }
             r.addView(spacer)
         } }
+    }
+
+    private fun loadTileImage(id: String, img: ImageView) {
+        lifecycleScope.launch {
+            val bmp = ProductImages.load(api, id) ?: return@launch
+            // Guard against tile recycling: only apply if this view still maps to this product.
+            if (img.getTag(R.id.pImage) == null || img.getTag(R.id.pImage) == id) {
+                img.setImageBitmap(bmp)
+                img.visibility = View.VISIBLE
+            }
+        }
+        img.setTag(R.id.pImage, id)
     }
 
     private fun renderCart() {

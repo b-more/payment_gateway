@@ -84,16 +84,31 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         (0 until arr.length()).map { product(arr.getJSONObject(it)) }
     }
 
-    suspend fun createProduct(name: String, priceNgwee: String, category: String?): Product =
-        withContext(Dispatchers.IO) {
-            val body = JSONObject().put("name", name).put("price", priceNgwee)
-            if (!category.isNullOrBlank()) body.put("category", category)
-            product(call(post("/v1/products", body, auth = true, idempotencyKey = null)))
-        }
+    suspend fun createProduct(
+        name: String, priceNgwee: String, category: String?,
+        imageBase64: String? = null, imageMime: String? = null,
+    ): Product = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("name", name).put("price", priceNgwee)
+        if (!category.isNullOrBlank()) body.put("category", category)
+        if (!imageBase64.isNullOrBlank()) body.put("image", imageBase64).put("imageMime", imageMime ?: "image/jpeg")
+        product(call(post("/v1/products", body, auth = true, idempotencyKey = null)))
+    }
 
     suspend fun deleteProduct(id: String): Unit = withContext(Dispatchers.IO) {
         call(Request.Builder().url(AppConfig.baseUrl + "/v1/products/$id").delete().also { authHeaders(it) }.build())
         Unit
+    }
+
+    /** Raw image bytes for a product, or null if it has none (404). */
+    suspend fun productImageBytes(id: String): ByteArray? = withContext(Dispatchers.IO) {
+        client.newCall(get("/v1/products/$id/image")).execute().use { resp ->
+            if (resp.code == 404) return@withContext null
+            if (!resp.isSuccessful) {
+                val err = parseError(resp.body?.string().orEmpty(), resp.code)
+                throw ApiException(resp.code, err.first, err.second)
+            }
+            resp.body?.bytes()
+        }
     }
 
     private fun product(o: JSONObject) = Product(
@@ -101,6 +116,7 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         name = o.optString("name"),
         priceNgwee = o.optString("price", "0"),
         category = nz(o, "category"),
+        hasImage = o.optBoolean("has_image", false),
     )
 
     suspend fun listTransactions(limit: Int = 25, cursor: String? = null): TxnPage =

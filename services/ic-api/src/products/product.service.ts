@@ -9,6 +9,7 @@ export interface ProductResponse {
   price: string; // ngwee
   category: string | null;
   sort_order: number;
+  has_image: boolean;
 }
 
 interface Row {
@@ -17,7 +18,11 @@ interface Row {
   price: string;
   category: string | null;
   sort_order: number;
+  has_image: boolean;
 }
+
+const RETURNING =
+  'id, name, price_ngwee::text AS price, category, sort_order, (image_data IS NOT NULL) AS has_image';
 
 /** Product catalog, scoped to the credential's COLLECTION account. */
 @Injectable()
@@ -26,7 +31,7 @@ export class ProductService {
 
   async list(accountId: string): Promise<ProductResponse[]> {
     const r = await this.pool.query<Row>(
-      `SELECT id, name, price_ngwee::text AS price, category, sort_order
+      `SELECT ${RETURNING}
          FROM products WHERE account_id = $1 AND active = true
         ORDER BY sort_order, name`,
       [accountId],
@@ -34,12 +39,15 @@ export class ProductService {
     return r.rows;
   }
 
-  async create(accountId: string, input: { name: string; priceNgwee: bigint; category: string | null }): Promise<ProductResponse> {
+  async create(
+    accountId: string,
+    input: { name: string; priceNgwee: bigint; category: string | null; image?: Buffer | null; imageMime?: string | null },
+  ): Promise<ProductResponse> {
     const r = await this.pool.query<Row>(
-      `INSERT INTO products (account_id, name, price_ngwee, category)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, price_ngwee::text AS price, category, sort_order`,
-      [accountId, input.name, input.priceNgwee.toString(), input.category],
+      `INSERT INTO products (account_id, name, price_ngwee, category, image_data, image_mime)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING ${RETURNING}`,
+      [accountId, input.name, input.priceNgwee.toString(), input.category, input.image ?? null, input.imageMime ?? null],
     );
     return r.rows[0];
   }
@@ -47,20 +55,45 @@ export class ProductService {
   async update(
     accountId: string,
     id: string,
-    patch: { name: string | undefined; priceNgwee: bigint | undefined; category: string | null | undefined; active: boolean | undefined },
+    patch: {
+      name: string | undefined;
+      priceNgwee: bigint | undefined;
+      category: string | null | undefined;
+      active: boolean | undefined;
+      image?: Buffer | undefined;
+      imageMime?: string | undefined;
+    },
   ): Promise<ProductResponse> {
+    // Image is only touched when a new one is supplied (COALESCE keeps the old).
     const r = await this.pool.query<Row>(
       `UPDATE products
           SET name = COALESCE($3, name),
               price_ngwee = COALESCE($4, price_ngwee),
               category = COALESCE($5, category),
-              active = COALESCE($6, active)
+              active = COALESCE($6, active),
+              image_data = COALESCE($7, image_data),
+              image_mime = COALESCE($8, image_mime)
         WHERE id = $1 AND account_id = $2
-      RETURNING id, name, price_ngwee::text AS price, category, sort_order`,
-      [id, accountId, patch.name ?? null, patch.priceNgwee?.toString() ?? null, patch.category ?? null, patch.active ?? null],
+      RETURNING ${RETURNING}`,
+      [
+        id, accountId, patch.name ?? null, patch.priceNgwee?.toString() ?? null,
+        patch.category ?? null, patch.active ?? null, patch.image ?? null, patch.imageMime ?? null,
+      ],
     );
     if (r.rowCount === 0) throw new NotFoundError('product not found');
     return r.rows[0];
+  }
+
+  /** Raw image bytes for one product (account-scoped), or null if it has none. */
+  async getImage(accountId: string, id: string): Promise<{ data: Buffer; mime: string } | null> {
+    const r = await this.pool.query<{ image_data: Buffer | null; image_mime: string | null }>(
+      'SELECT image_data, image_mime FROM products WHERE id = $1 AND account_id = $2',
+      [id, accountId],
+    );
+    if (r.rowCount === 0) throw new NotFoundError('product not found');
+    const row = r.rows[0];
+    if (!row.image_data) return null;
+    return { data: row.image_data, mime: row.image_mime ?? 'application/octet-stream' };
   }
 
   /** Soft-delete: keep the row (past sales may reference it) but hide it. */

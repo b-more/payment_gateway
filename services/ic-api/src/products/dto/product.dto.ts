@@ -18,6 +18,19 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(40)
   category?: string;
+
+  @ApiProperty({ required: false, description: 'Product photo, base64-encoded (≈1MB max after device compression).' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1_400_000)
+  @Matches(/^[A-Za-z0-9+/=\r\n]+$/)
+  image?: string;
+
+  @ApiProperty({ required: false, example: 'image/jpeg' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^image\/(png|jpeg|webp)$/)
+  imageMime?: string;
 }
 
 export class UpdateProductDto {
@@ -44,4 +57,17 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @ApiProperty({ required: false, description: 'Replacement photo, base64-encoded.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1_400_000)
+  @Matches(/^[A-Za-z0-9+/=\r\n]+$/)
+  image?: string;
+
+  @ApiProperty({ required: false, example: 'image/jpeg' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^image\/(png|jpeg|webp)$/)
+  imageMime?: string;
 }

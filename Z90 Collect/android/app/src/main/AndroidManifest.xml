@@ -28,5 +28,6 @@
         <activity android:name=".ui.ActivationActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".ui.CollectActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".ui.ReceiptActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".ui.HistoryActivity" android:exported="false" android:screenOrientation="portrait" />
     </application>
 </manifest>

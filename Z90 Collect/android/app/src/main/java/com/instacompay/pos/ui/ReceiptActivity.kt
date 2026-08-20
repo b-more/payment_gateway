@@ -49,9 +49,12 @@ class ReceiptActivity : AppCompatActivity() {
 
         b.amountPaid.text = fmtK(txn.totalAmount)
 
+        // Opened from History → a reprint of an existing sale.
+        printedOnce = intent.getBooleanExtra("reprint", false)
+
         // Build the receipt once; the preview and the printout come from the same data.
-        val receipt = buildReceipt(this, txn, network, reprint = false)
-        renderPreview(receipt)
+        renderPreview(buildReceipt(this, txn, network, reprint = printedOnce))
+        if (printedOnce) b.printBtn.text = "Print again"
 
         b.printBtn.setOnClickListener { print() }
         b.newSaleBtn.setOnClickListener { finish() }

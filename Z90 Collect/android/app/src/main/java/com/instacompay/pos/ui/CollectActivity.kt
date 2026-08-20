@@ -11,6 +11,8 @@ import com.instacompay.pos.R
 import com.instacompay.pos.api.ApiException
 import com.instacompay.pos.api.GatewayApi
 import com.instacompay.pos.api.Txn
+import com.instacompay.pos.data.LocalSale
+import com.instacompay.pos.data.LocalTxnStore
 import com.instacompay.pos.data.SecureCredentialStore
 import com.instacompay.pos.databinding.ActivityCollectBinding
 import kotlinx.coroutines.delay
@@ -22,6 +24,7 @@ class CollectActivity : AppCompatActivity() {
     private lateinit var b: ActivityCollectBinding
     private val store by lazy { SecureCredentialStore(this) }
     private val api by lazy { GatewayApi(store) }
+    private val local by lazy { LocalTxnStore(this) }
 
     private var typed = ""
     private var processor = "MTN"
@@ -36,6 +39,7 @@ class CollectActivity : AppCompatActivity() {
         b.merchantName.text = c?.displayName ?: "InstacomPay"
         b.envBadge.visibility = if (c?.environment == "LIVE") View.GONE else View.VISIBLE
 
+        b.historyBtn.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         b.mtnBtn.setOnClickListener { setProcessor("MTN") }
         b.airtelBtn.setOnClickListener { setProcessor("AIRTEL") }
 
@@ -50,6 +54,40 @@ class CollectActivity : AppCompatActivity() {
 
         setProcessor("MTN")
         render()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshToday()
+        reconcilePending()
+    }
+
+    private fun refreshToday() {
+        val s = local.todaySummary()
+        b.todayLine.text = if (s.count > 0) "Today: ${fmtK(s.totalNgwee.toString())} · ${s.count}" else ""
+    }
+
+    /** Re-check any sale whose outcome we never confirmed (network dropped). */
+    private fun reconcilePending() {
+        lifecycleScope.launch {
+            for (s in local.needingReconcile()) {
+                try {
+                    // Idempotent re-issue: same key returns the existing txn, no double charge.
+                    var txn = api.createCollection(s.processor, s.amountNgwee, s.msisdn, null, s.idempotencyKey)
+                    var tries = 0
+                    while (!txn.isTerminal && tries < 2) { delay(1500); txn = api.getTransaction(txn.id); tries++ }
+                    local.upsert(s.copy(
+                        serverId = txn.id, status = txn.status, chargeNgwee = txn.charge,
+                        totalNgwee = txn.totalAmount, reference = txn.id.take(8).uppercase(),
+                        failureReason = txn.failureReason,
+                    ))
+                } catch (e: ApiException) {
+                    if (lockIfRevoked(e)) return@launch
+                    // leave for next time
+                } catch (_: Exception) { /* still offline — try again later */ }
+            }
+            refreshToday()
+        }
     }
 
     private fun press(k: String) {
@@ -93,10 +131,25 @@ class CollectActivity : AppCompatActivity() {
         setBusy(true)
         setStatus("Sending prompt to $msisdn…", false)
         val idem = UUID.randomUUID().toString()
+        val netLabel = if (processor == "AIRTEL") "Airtel Money" else "MTN MoMo"
+        // Record the attempt BEFORE the network call, so a crash/blackout never loses it.
+        val base = LocalSale(
+            idempotencyKey = idem, serverId = "", processor = processor, networkLabel = netLabel,
+            msisdn = msisdn, amountNgwee = amountNgwee, chargeNgwee = "0", totalNgwee = amountNgwee,
+            status = "PENDING", reference = "", failureReason = null, createdAt = System.currentTimeMillis(),
+        )
+        local.upsert(base)
+
         lifecycleScope.launch {
             try {
                 var txn = api.createCollection(processor, amountNgwee, msisdn, null, idem)
+                local.upsert(base.copy(serverId = txn.id, status = txn.status, reference = txn.id.take(8).uppercase()))
                 txn = poll(txn)
+                local.upsert(base.copy(
+                    serverId = txn.id, status = txn.status, chargeNgwee = txn.charge,
+                    totalNgwee = txn.totalAmount, reference = txn.id.take(8).uppercase(), failureReason = txn.failureReason,
+                ))
+                refreshToday()
                 if (txn.isSuccess) {
                     goToReceipt(txn)
                 } else {
@@ -105,10 +158,20 @@ class CollectActivity : AppCompatActivity() {
                 }
             } catch (e: ApiException) {
                 if (lockIfRevoked(e)) return@launch
-                setStatus(e.message ?: "Failed", true)
+                if (e.statusCode in 400..499) {
+                    // The gateway rejected it — the charge did not happen.
+                    local.upsert(base.copy(status = "FAILED", failureReason = e.message))
+                    setStatus(e.message ?: "Failed", true)
+                } else {
+                    // Server error — outcome unknown; keep it for reconcile.
+                    local.upsert(base.copy(status = "UNKNOWN", failureReason = e.message))
+                    setStatus("Saved — will confirm when the network is back", true)
+                }
                 setBusy(false)
             } catch (e: Exception) {
-                setStatus("Error: ${e.message}", true)
+                // Network/timeout — the prompt may have gone out; keep for reconcile.
+                local.upsert(base.copy(status = "UNKNOWN", failureReason = "No network"))
+                setStatus("Saved — will retry when back online (see History)", true)
                 setBusy(false)
             }
         }

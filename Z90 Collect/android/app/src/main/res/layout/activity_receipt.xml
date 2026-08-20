@@ -3,94 +3,73 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/bg"
-    android:padding="24dp">
+    android:background="@color/bg">
 
-    <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.6" />
-
-    <TextView
-        android:layout_width="88dp"
-        android:layout_height="88dp"
-        android:background="@drawable/bg_success_ring"
-        android:text="✓"
-        android:textColor="@color/success"
-        android:textSize="44sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_gravity="center_horizontal" />
-
-    <TextView
+    <!-- Success header -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Payment received"
-        android:textColor="@color/ink"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginTop="16dp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:padding="16dp">
+        <TextView
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_success_ring"
+            android:text="✓"
+            android:textColor="@color/success"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="12dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Payment received" android:textColor="@color/ink" android:textSize="17sp" android:textStyle="bold" />
+            <TextView android:id="@+id/amountPaid" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K0.00" android:textColor="@color/success" android:textSize="15sp" android:textStyle="bold" />
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PREVIEW" android:textColor="@color/slate" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.1" />
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
 
-    <TextView
-        android:id="@+id/amountPaid"
+    <!-- Paper preview -->
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="K0.00"
-        android:textColor="@color/success"
-        android:textSize="40sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginTop="4dp" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="18dp"
+        android:clipToPadding="false">
+        <LinearLayout
+            android:id="@+id/receiptPaper"
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="vertical"
+            android:background="@drawable/bg_paper"
+            android:padding="16dp" />
+    </ScrollView>
 
-    <TextView
-        android:id="@+id/merchantName"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="InstacomPay"
-        android:textColor="@color/slate"
-        android:textSize="14sp"
-        android:gravity="center"
-        android:layout_marginTop="2dp" />
-
-    <!-- Detail card -->
+    <!-- Actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@color/surface"
-        android:padding="16dp"
-        android:layout_marginTop="24dp">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Phone" android:textColor="@color/slate" android:textSize="14sp" />
-            <TextView android:id="@+id/detailPhone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="@color/ink" android:textSize="14sp" android:textStyle="bold" />
-        </LinearLayout>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="10dp">
-            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Network" android:textColor="@color/slate" android:textSize="14sp" />
-            <TextView android:id="@+id/detailNetwork" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="@color/ink" android:textSize="14sp" android:textStyle="bold" />
-        </LinearLayout>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="10dp">
-            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Reference" android:textColor="@color/slate" android:textSize="14sp" />
-            <TextView android:id="@+id/detailRef" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="@color/ink" android:textSize="14sp" android:textStyle="bold" />
-        </LinearLayout>
+        android:padding="16dp">
+        <Button
+            android:id="@+id/printBtn"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Print receipt"
+            android:textAllCaps="false"
+            android:textSize="17sp" />
+        <Button
+            android:id="@+id/newSaleBtn"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="New sale"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/brand"
+            style="?attr/materialButtonOutlinedStyle" />
     </LinearLayout>
-
-    <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
-
-    <Button
-        android:id="@+id/printBtn"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:text="Print again"
-        android:textAllCaps="false"
-        android:textSize="16sp"
-        android:backgroundTint="@color/surface"
-        android:textColor="@color/brand"
-        style="?attr/materialButtonOutlinedStyle" />
-
-    <Button
-        android:id="@+id/newSaleBtn"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="New sale"
-        android:textAllCaps="false"
-        android:textSize="17sp"
-        android:layout_marginTop="10dp" />
 </LinearLayout>

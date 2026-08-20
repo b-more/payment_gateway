@@ -36,6 +36,11 @@ class CollectActivity : AppCompatActivity() {
     private var processor = "MTN"
     private var busy = false
 
+    private companion object {
+        const val FOREGROUND_POLL_TRIES = 12 // ~24s blocking the screen
+        const val MAX_POLL_TRIES = 60        // ~2min total, then background reconcile takes over
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityCollectBinding.inflate(layoutInflater)
@@ -217,53 +222,60 @@ class CollectActivity : AppCompatActivity() {
         local.upsert(base)
 
         lifecycleScope.launch {
+            var released = false
             try {
                 var txn = api.createCollection(processor, amountNgwee, msisdn, null, idem)
                 local.upsert(base.copy(serverId = txn.id, status = txn.status, reference = txn.id.take(8).uppercase()))
-                txn = poll(txn)
-                local.upsert(base.copy(
-                    serverId = txn.id, status = txn.status, chargeNgwee = txn.charge,
-                    totalNgwee = txn.totalAmount, reference = txn.id.take(8).uppercase(), failureReason = txn.failureReason,
-                ))
+                // The prompt is on the customer's phone now; the wait is their approval.
+                if (!txn.isTerminal) setStatus("Prompt sent — ask the customer to approve on their phone", false)
+
+                var tries = 0
+                while (!txn.isTerminal && tries < MAX_POLL_TRIES) {
+                    delay(2000)
+                    tries++
+                    txn = api.getTransaction(txn.id)
+                    local.upsert(base.copy(
+                        serverId = txn.id, status = txn.status, chargeNgwee = txn.charge,
+                        totalNgwee = txn.totalAmount, reference = txn.id.take(8).uppercase(), failureReason = txn.failureReason,
+                    ))
+                    // Don't freeze the till: after a short wait, free the screen for the
+                    // next sale and let this one finish confirming in the background.
+                    if (!txn.isTerminal && !released && tries >= FOREGROUND_POLL_TRIES) {
+                        released = true
+                        releaseForNextSale()
+                    }
+                }
                 refreshToday()
-                if (txn.isSuccess) {
-                    goToReceipt(txn)
-                } else {
-                    setStatus("${txn.status}${txn.failureReason?.let { " — $it" } ?: ""}", true)
-                    setBusy(false)
+                when {
+                    txn.isSuccess && !released -> goToReceipt(txn)
+                    txn.isSuccess && released -> toast("Sale to ${base.msisdn} confirmed")
+                    !released -> { setStatus("${txn.status}${txn.failureReason?.let { " — $it" } ?: ""}", true); setBusy(false) }
+                    // released & not successful: it's in History; don't interrupt the next sale.
                 }
             } catch (e: ApiException) {
                 if (lockIfRevoked(e)) return@launch
-                if (e.statusCode in 400..499) {
-                    // The gateway rejected it — the charge did not happen.
-                    local.upsert(base.copy(status = "FAILED", failureReason = e.message))
-                    setStatus(e.message ?: "Failed", true)
-                } else {
-                    // Server error — outcome unknown; keep it for reconcile.
-                    local.upsert(base.copy(status = "UNKNOWN", failureReason = e.message))
-                    setStatus("Saved — will confirm when the network is back", true)
+                val failed = e.statusCode in 400..499
+                local.upsert(base.copy(status = if (failed) "FAILED" else "UNKNOWN", failureReason = e.message))
+                if (!released) {
+                    setStatus(if (failed) (e.message ?: "Failed") else "Saved — will confirm when the network is back", true)
+                    setBusy(false)
                 }
-                setBusy(false)
             } catch (e: Exception) {
                 // Network/timeout — the prompt may have gone out; keep for reconcile.
                 local.upsert(base.copy(status = "UNKNOWN", failureReason = "No network"))
-                setStatus("Saved — will retry when back online (see History)", true)
-                setBusy(false)
+                if (!released) {
+                    setStatus("Saved — will retry when back online (see History)", true)
+                    setBusy(false)
+                }
             }
         }
     }
 
-    /** Poll the transaction to a terminal state (the gateway re-enquires on read). */
-    private suspend fun poll(initial: Txn): Txn {
-        var txn = initial
-        var tries = 0
-        while (!txn.isTerminal && tries < 45) {
-            setStatus("Waiting for the customer to approve…", false)
-            delay(2000)
-            txn = api.getTransaction(txn.id)
-            tries++
-        }
-        return txn
+    /** Stop blocking the screen; the in-flight sale keeps confirming in the background. */
+    private fun releaseForNextSale() {
+        typed = ""; b.msisdn.text?.clear(); render()
+        setBusy(false)
+        setStatus("Still pending — it'll confirm on its own. You can start the next sale.", false)
     }
 
     private fun goToReceipt(txn: Txn) {

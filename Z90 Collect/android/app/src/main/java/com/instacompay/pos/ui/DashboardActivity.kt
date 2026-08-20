@@ -33,6 +33,9 @@ class DashboardActivity : AppCompatActivity() {
     private val staff by lazy { StaffStore(this) }
     private val time = SimpleDateFormat("HH:mm", Locale.US)
 
+    private var balanceNgwee: String? = null
+    private var balanceRevealed = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityDashboardBinding.inflate(layoutInflater)
@@ -48,13 +51,46 @@ class DashboardActivity : AppCompatActivity() {
         b.pendingBanner.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         b.staffBtn.setOnClickListener { openStaffGated(staff) }
         b.attendantChip.setOnClickListener { onAttendantTap() }
+        b.balanceCard.setOnClickListener { onBalanceTap() }
     }
 
     override fun onResume() {
         super.onResume()
+        // Balance is owner-only: re-lock every time the screen is shown when staff
+        // are in use, so an attendant on the till can't read the float.
+        balanceRevealed = !balanceLocked()
         renderLocal()
+        renderBalance()
         refreshAttendant()
         loadBalanceAndReconcile()
+    }
+
+    /** The float is hidden from standard attendants — shown only to the manager. */
+    private fun balanceLocked(): Boolean = usesStaff && staff.hasManagerPin
+
+    private fun renderBalance() {
+        if (balanceRevealed) {
+            b.balanceText.text = balanceNgwee?.let { fmtK(it) } ?: "—"
+            b.balanceHint.visibility = View.GONE
+        } else {
+            b.balanceText.text = "••••••"
+            b.balanceHint.visibility = View.VISIBLE
+        }
+    }
+
+    private fun onBalanceTap() {
+        if (balanceRevealed) return
+        val input = pinField()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Manager PIN")
+            .setMessage("The account balance is visible to the manager only.")
+            .setView(input)
+            .setPositiveButton("Show") { _, _ ->
+                if (staff.verifyManager(input.text.toString())) { balanceRevealed = true; renderBalance() }
+                else android.widget.Toast.makeText(this, "Wrong PIN", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // ── Local (instant, offline) ──
@@ -136,7 +172,8 @@ class DashboardActivity : AppCompatActivity() {
     private fun loadBalanceAndReconcile() {
         lifecycleScope.launch {
             try {
-                b.balanceText.text = fmtK(api.getBalance().floatBalance)
+                balanceNgwee = api.getBalance().floatBalance
+                renderBalance()
             } catch (e: Exception) {
                 if (lockIfRevoked(e)) return@launch
             }
@@ -173,10 +210,17 @@ class DashboardActivity : AppCompatActivity() {
         if (staff.isSignedIn) {
             androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Signed in as ${staff.currentAttendantName}")
-                .setPositiveButton("Switch attendant") { _, _ -> promptSignIn(staff) { refreshAttendant() } }
+                .setPositiveButton("Switch attendant") { _, _ -> promptSignIn(staff) { onAttendantChanged() } }
                 .setNegativeButton("Sign out") { _, _ -> staff.signOut(); refreshAttendant() }
                 .show()
-        } else promptSignIn(staff) { refreshAttendant() }
+        } else promptSignIn(staff) { onAttendantChanged() }
+    }
+
+    private fun onAttendantChanged() {
+        // A new attendant on the till → hide the float again.
+        balanceRevealed = !balanceLocked()
+        renderBalance()
+        refreshAttendant()
     }
 
     private fun color(res: Int) = ContextCompat.getColor(this, res)

@@ -25,10 +25,11 @@
     <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
 
-            <!-- Balance -->
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/surface" android:padding="18dp">
+            <!-- Balance (owner/manager only when staff are in use) -->
+            <LinearLayout android:id="@+id/balanceCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/surface" android:padding="18dp" android:clickable="true" android:focusable="true">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AVAILABLE BALANCE" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" />
                 <TextView android:id="@+id/balanceText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—" android:textColor="@color/ink" android:textSize="30sp" android:textStyle="bold" android:layout_marginTop="2dp" />
+                <TextView android:id="@+id/balanceHint" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tap to show — manager only" android:textColor="@color/brand" android:textSize="12sp" android:textStyle="bold" android:visibility="gone" />
             </LinearLayout>
 
             <!-- Today -->

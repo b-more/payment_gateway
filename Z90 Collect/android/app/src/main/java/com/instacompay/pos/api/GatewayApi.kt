@@ -64,6 +64,11 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         txn(call(get("/v1/transactions/$id")))
     }
 
+    suspend fun getBalance(): Balance = withContext(Dispatchers.IO) {
+        val o = call(get("/v1/accounts/balance"))
+        Balance(o.optString("float_balance", "0"), o.optString("operating_mode", "SANDBOX"))
+    }
+
     /** Text the customer a link to their receipt (defaults to the payer's number). */
     suspend fun sendReceipt(txnId: String, phone: String?): Unit = withContext(Dispatchers.IO) {
         val body = JSONObject()

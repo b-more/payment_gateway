@@ -39,7 +39,7 @@ class ActivationActivity : AppCompatActivity() {
                 }.getOrDefault("")
                 val result = api.activate(code, serial)
                 store.save(result)
-                startActivity(Intent(this@ActivationActivity, CollectActivity::class.java)
+                startActivity(Intent(this@ActivationActivity, DashboardActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
                 finish()
             } catch (e: ApiException) {

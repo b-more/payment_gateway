@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingStart="16dp" android:paddingEnd="12dp">
+        <ImageView android:layout_width="26dp" android:layout_height="26dp" android:adjustViewBounds="true" android:src="@drawable/instacom_logo" android:contentDescription="InstacomPay" android:layout_marginEnd="10dp" android:scaleType="fitCenter" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/merchantName" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="InstacomPay" android:textColor="@color/ink" android:textSize="16sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/branchLine" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="" android:textColor="@color/slate" android:textSize="11sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/envBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SANDBOX" android:textColor="#B45309" android:textSize="11sp" android:textStyle="bold" android:background="@drawable/bg_badge_amber" android:paddingStart="9dp" android:paddingEnd="9dp" android:paddingTop="4dp" android:paddingBottom="4dp" />
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+
+            <!-- Balance -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/surface" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AVAILABLE BALANCE" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" />
+                <TextView android:id="@+id/balanceText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—" android:textColor="@color/ink" android:textSize="30sp" android:textStyle="bold" android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <!-- Today -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/surface" android:padding="18dp" android:layout_marginTop="12dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TODAY'S TAKINGS" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" />
+                <TextView android:id="@+id/todayTotal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K0.00" android:textColor="@color/success" android:textSize="34sp" android:textStyle="bold" android:layout_marginTop="2dp" />
+                <TextView android:id="@+id/todayCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 collections" android:textColor="@color/slate" android:textSize="14sp" />
+                <LinearLayout android:id="@+id/netBreakdown" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="8dp" />
+            </LinearLayout>
+
+            <!-- Pending banner -->
+            <TextView android:id="@+id/pendingBanner" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="" android:textColor="#B45309" android:textSize="13sp" android:textStyle="bold" android:background="@drawable/bg_badge_amber" android:padding="12dp" android:layout_marginTop="12dp" android:visibility="gone" android:clickable="true" android:focusable="true" />
+
+            <!-- Attendant -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:background="@color/surface" android:padding="14dp" android:layout_marginTop="12dp">
+                <TextView android:id="@+id/attendantChip" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Single operator" android:textColor="@color/slate" android:textSize="14sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
+                <TextView android:id="@+id/staffBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Staff &amp; cash-up" android:textColor="@color/brand" android:textSize="13sp" android:textStyle="bold" android:padding="4dp" android:clickable="true" android:focusable="true" />
+            </LinearLayout>
+
+            <!-- Recent -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="18dp" android:layout_marginBottom="6dp">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="RECENT SALES" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" />
+                <TextView android:id="@+id/seeAll" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="See all" android:textColor="@color/brand" android:textSize="13sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/recentList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/surface" />
+            <TextView android:id="@+id/recentEmpty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No sales yet." android:textColor="@color/slate" android:background="@color/surface" android:padding="18dp" android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- New sale -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/surface" android:padding="16dp">
+        <Button android:id="@+id/newSaleBtn" android:layout_width="match_parent" android:layout_height="58dp" android:text="New sale" android:textAllCaps="false" android:textSize="18sp" />
+    </LinearLayout>
+</LinearLayout>

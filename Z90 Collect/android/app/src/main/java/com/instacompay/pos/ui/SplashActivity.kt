@@ -17,7 +17,7 @@ class SplashActivity : AppCompatActivity() {
 
         Handler(Looper.getMainLooper()).postDelayed({
             val activated = SecureCredentialStore(this).isActivated
-            startActivity(Intent(this, if (activated) CollectActivity::class.java else WelcomeActivity::class.java))
+            startActivity(Intent(this, if (activated) DashboardActivity::class.java else WelcomeActivity::class.java))
             finish()
         }, 1200)
     }

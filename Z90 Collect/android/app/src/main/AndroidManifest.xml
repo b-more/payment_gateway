@@ -25,6 +25,7 @@
         </activity>
 
         <activity android:name=".ui.WelcomeActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".ui.DashboardActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".ui.ActivationActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".ui.CollectActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".ui.ReceiptActivity" android:exported="false" android:screenOrientation="portrait" />

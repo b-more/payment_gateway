@@ -41,3 +41,6 @@ data class Txn(
         val TERMINAL = setOf("SUCCESS", "FAILED", "REVERSED", "EXPIRED")
     }
 }
+
+/** Account balance (GET /v1/accounts/balance). Money as ngwee string. */
+data class Balance(val floatBalance: String, val operatingMode: String)

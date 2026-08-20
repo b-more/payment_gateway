@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingStart="16dp"
+        android:paddingEnd="12dp">
+        <TextView android:id="@+id/merchantName" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="InstacomPay" android:textColor="@color/ink" android:textSize="16sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/envBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SANDBOX" android:textColor="#B45309" android:textSize="11sp" android:textStyle="bold" android:background="@drawable/bg_badge_amber" android:paddingStart="9dp" android:paddingEnd="9dp" android:paddingTop="4dp" android:paddingBottom="4dp" />
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Amount -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AMOUNT" android:textColor="@color/slate" android:textSize="12sp" android:letterSpacing="0.06" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="2dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K" android:textColor="#94A3B8" android:textSize="26sp" android:textStyle="bold" android:layout_marginEnd="6dp" android:paddingBottom="6dp" />
+            <TextView android:id="@+id/amountText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="@color/ink" android:textSize="52sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Network + phone -->
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:background="@drawable/bg_segment" android:padding="4dp" android:layout_marginTop="12dp">
+            <TextView android:id="@+id/mtnBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MTN" android:paddingStart="30dp" android:paddingEnd="30dp" android:paddingTop="9dp" android:paddingBottom="9dp" android:textSize="15sp" android:textStyle="bold" />
+            <TextView android:id="@+id/airtelBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Airtel" android:paddingStart="30dp" android:paddingEnd="30dp" android:paddingTop="9dp" android:paddingBottom="9dp" android:textSize="15sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <EditText android:id="@+id/msisdn" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Customer phone — 260970000000" android:inputType="phone" android:autofillHints="off" android:textSize="18sp" android:layout_marginTop="10dp" />
+
+        <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="" android:textColor="@color/slate" android:textSize="13sp" android:textStyle="bold" android:layout_marginTop="8dp" android:minLines="1" />
+        <ProgressBar android:id="@+id/progress" android:layout_width="match_parent" android:layout_height="3dp" style="?android:attr/progressBarStyleHorizontal" android:indeterminate="true" android:indeterminateTint="@color/brand" android:visibility="gone" />
+
+        <!-- Keypad -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical" android:layout_marginTop="8dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/key1" style="@style/PadKey" android:text="1" />
+                <TextView android:id="@+id/key2" style="@style/PadKey" android:text="2" />
+                <TextView android:id="@+id/key3" style="@style/PadKey" android:text="3" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/key4" style="@style/PadKey" android:text="4" />
+                <TextView android:id="@+id/key5" style="@style/PadKey" android:text="5" />
+                <TextView android:id="@+id/key6" style="@style/PadKey" android:text="6" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/key7" style="@style/PadKey" android:text="7" />
+                <TextView android:id="@+id/key8" style="@style/PadKey" android:text="8" />
+                <TextView android:id="@+id/key9" style="@style/PadKey" android:text="9" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+                <TextView android:id="@+id/keyDot" style="@style/PadKey" android:text="." />
+                <TextView android:id="@+id/key0" style="@style/PadKey" android:text="0" />
+                <TextView android:id="@+id/keyDel" style="@style/PadKey" android:text="⌫" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <Button android:id="@+id/chargeBtn" android:layout_width="match_parent" android:layout_height="58dp" android:text="Charge" android:textAllCaps="false" android:textSize="18sp" android:layout_marginTop="8dp" android:enabled="false" />
+    </LinearLayout>
+</LinearLayout>

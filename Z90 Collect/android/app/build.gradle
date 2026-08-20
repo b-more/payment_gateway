@@ -1,0 +1,88 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Permanent release signing — same keystore as the Z100 app (both are InstacomPay
+// terminals). Point KEYSTORE_PROPERTIES at a keystore.properties file whose
+// `storeFile` resolves relative to that file's directory.
+def keystorePropertiesFile = file(System.getenv('KEYSTORE_PROPERTIES') ?: "${rootDir}/keystore.properties")
+def hasKeystore = keystorePropertiesFile.exists()
+def keystoreProperties = new Properties()
+if (hasKeystore) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+android {
+    // Keep the code namespace shared with the Z100 app (same package sources),
+    // but a DISTINCT applicationId so both apps install side-by-side on a device.
+    namespace 'com.instacompay.pos'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.instacompay.collect"
+        minSdk 23          // EncryptedSharedPreferences needs 23+; the Z90 is Android 12.
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        buildConfigField "String", "GATEWAY_BASE_URL", "\"https://api.instacompayzm.com\""
+        buildConfigField "boolean", "CARD_ENABLED", "false"
+    }
+
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                storeFile new File(keystorePropertiesFile.parentFile, keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+        viewBinding true
+    }
+
+    // Legacy jniLibs packaging (extracted at install) — some OEM POS installers
+    // reject uncompressed libs with "App not installed".
+    packaging {
+        jniLibs { useLegacyPackaging true }
+    }
+
+    buildTypes {
+        debug {
+            if (hasKeystore) signingConfig signingConfigs.release
+            debuggable false
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasKeystore) signingConfig signingConfigs.release
+            debuggable false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
+
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+}

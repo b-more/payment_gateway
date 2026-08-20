@@ -28,6 +28,13 @@ export interface ActivatedDevice {
   merchantName: string;
   branch: string;
   environment: 'SANDBOX' | 'LIVE';
+  // Merchant profile — printed on receipts (name, address, TPIN, etc.).
+  tradingName: string;
+  address: string;
+  city: string;
+  tpin: string;
+  merchantPhone: string;
+  registrationNumber: string;
 }
 
 export interface DeviceSummary {
@@ -140,13 +147,19 @@ export class DeviceService {
     if (device.activation_expires_at && device.activation_expires_at.getTime() < Date.now()) throw invalid;
     if (!(await verifySecret(code, device.activation_code_hash))) throw invalid;
 
-    const account = await this.pool.query<{ account_number: string; merchant_name: string }>(
-      `SELECT a.account_number, m.name AS merchant_name
+    const account = await this.pool.query<{
+      account_number: string; merchant_name: string; trading_name: string | null;
+      address: string | null; city: string | null; tpin: string | null;
+      merchant_phone: string | null; registration_number: string | null;
+    }>(
+      `SELECT a.account_number, m.name AS merchant_name, m.trading_name,
+              m.address, m.city, m.tpin, m.phone AS merchant_phone, m.registration_number
          FROM accounts a JOIN merchants m ON m.id = a.merchant_id WHERE a.id = $1`,
       [device.account_id],
     );
-    const accountNumber = account.rows[0]?.account_number ?? '';
-    const merchantName = account.rows[0]?.merchant_name ?? '';
+    const r = account.rows[0];
+    const accountNumber = r?.account_number ?? '';
+    const merchantName = r?.merchant_name ?? '';
 
     return withTransaction(this.pool, async (client) => {
       const cred = await this.credentials.generate({ accountId: device.account_id, environment: device.environment }, client);
@@ -175,6 +188,12 @@ export class DeviceService {
         merchantName,
         branch: device.label,
         environment: device.environment,
+        tradingName: r?.trading_name ?? '',
+        address: r?.address ?? '',
+        city: r?.city ?? '',
+        tpin: r?.tpin ?? '',
+        merchantPhone: r?.merchant_phone ?? '',
+        registrationNumber: r?.registration_number ?? '',
       };
     });
   }

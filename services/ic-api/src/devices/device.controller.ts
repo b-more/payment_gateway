@@ -13,6 +13,12 @@ export interface ActivateDeviceResponse {
   merchant_name: string;
   branch: string;
   environment: 'SANDBOX' | 'LIVE';
+  trading_name: string;
+  address: string;
+  city: string;
+  tpin: string;
+  merchant_phone: string;
+  registration_number: string;
 }
 
 // Public terminal activation. No API-key auth — the terminal has no credential
@@ -38,6 +44,12 @@ export class DeviceController {
       merchant_name: d.merchantName,
       branch: d.branch,
       environment: d.environment,
+      trading_name: d.tradingName,
+      address: d.address,
+      city: d.city,
+      tpin: d.tpin,
+      merchant_phone: d.merchantPhone,
+      registration_number: d.registrationNumber,
     };
   }
 }

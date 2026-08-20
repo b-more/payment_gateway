@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@color/surface"
+    android:padding="32dp">
+
+    <ImageView
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:src="@drawable/instacom_logo"
+        android:contentDescription="InstacomPay" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Collect"
+        android:textColor="@color/brand"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.02"
+        android:layout_marginTop="14dp" />
+
+    <ProgressBar
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_marginTop="34dp"
+        style="?android:attr/progressBarStyle"
+        android:indeterminateTint="@color/brand" />
+</LinearLayout>

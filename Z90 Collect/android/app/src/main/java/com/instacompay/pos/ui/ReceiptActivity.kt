@@ -2,17 +2,23 @@ package com.instacompay.pos.ui
 
 import android.graphics.Typeface
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.instacompay.pos.R
+import com.instacompay.pos.api.ApiException
+import com.instacompay.pos.api.GatewayApi
 import com.instacompay.pos.api.Txn
+import com.instacompay.pos.data.SecureCredentialStore
 import com.instacompay.pos.databinding.ActivityReceiptBinding
 import com.instacompay.pos.hardware.PrinterService
 import com.instacompay.pos.hardware.ReceiptData
@@ -25,6 +31,7 @@ class ReceiptActivity : AppCompatActivity() {
     private lateinit var txn: Txn
     private lateinit var network: String
     private var printedOnce = false
+    private val api by lazy { GatewayApi(SecureCredentialStore(this)) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,7 +64,42 @@ class ReceiptActivity : AppCompatActivity() {
         if (printedOnce) b.printBtn.text = "Print again"
 
         b.printBtn.setOnClickListener { print() }
+        b.smsBtn.setOnClickListener { textReceiptDialog() }
         b.newSaleBtn.setOnClickListener { finish() }
+        // Texting needs a server transaction id (a fully-offline sale has none yet).
+        b.smsBtn.isEnabled = txn.id.isNotBlank()
+    }
+
+    private fun textReceiptDialog() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_PHONE
+            setText(txn.msisdn ?: "")
+            hint = "260XXXXXXXXX"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Text receipt")
+            .setMessage("Send an SMS with the receipt link.")
+            .setView(input)
+            .setPositiveButton("Send") { _, _ -> sendReceipt(input.text.toString().trim()) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun sendReceipt(phone: String) {
+        if (!phone.matches(Regex("^(\\+?260|0)\\d{8,10}$"))) { toast("Enter a valid phone number"); return }
+        b.smsBtn.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                api.sendReceipt(txn.id, phone)
+                toast("Receipt sent to $phone")
+            } catch (e: ApiException) {
+                toast(e.message ?: "Could not send")
+            } catch (e: Exception) {
+                toast("Error: ${e.message}")
+            } finally {
+                b.smsBtn.isEnabled = true
+            }
+        }
     }
 
     private fun print() {

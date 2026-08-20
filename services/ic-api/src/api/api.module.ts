@@ -9,6 +9,7 @@ import { RateLimitGuard } from './rate-limit.guard';
 import { ApiReadService } from './read.service';
 import { PayoutService } from '../merchant/payout.service';
 import { AuditService } from '../audit/audit.service';
+import { SmsModule } from '../sms/sms.module';
 import {
   AccountsController,
   CollectionsController,
@@ -20,7 +21,7 @@ import {
 
 // The §8 HTTP surface: six /v1 endpoints over the money engine, with HMAC auth.
 @Module({
-  imports: [DatabaseModule, MoneyModule, AirtelModule, MtnModule, CredentialsModule],
+  imports: [DatabaseModule, MoneyModule, AirtelModule, MtnModule, CredentialsModule, SmsModule],
   controllers: [
     CollectionsController,
     DisbursementsController,

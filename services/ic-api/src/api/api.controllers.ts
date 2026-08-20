@@ -31,6 +31,8 @@ import { MtnDispatchService } from '../mtn/mtn-dispatch.service';
 import { mtnGlobalConfig } from '../mtn/mtn.config';
 import { CollectionDto } from './dto/collection.dto';
 import { DisbursementDto } from './dto/disbursement.dto';
+import { SendReceiptDto } from './dto/send-receipt.dto';
+import { ReceiptSmsService } from '../sms/receipt-sms.service';
 import type { CredentialContext } from '../credentials/credential.service';
 import { PayoutService } from '../merchant/payout.service';
 import { Inject } from '@nestjs/common';
@@ -206,7 +208,20 @@ export class TransactionsController {
     private readonly read: ApiReadService,
     private readonly airtel: AirtelDispatchService,
     private readonly mtn: MtnDispatchService,
+    private readonly receiptSms: ReceiptSmsService,
   ) {}
+
+  @Post(':id/send-receipt')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Text the customer a link to their receipt' })
+  async sendReceipt(
+    @CurrentCredential() cred: CredentialContext,
+    @Param('id') id: string,
+    @Body() dto: SendReceiptDto,
+  ): Promise<{ sent: true }> {
+    await this.receiptSms.sendForTransaction(cred.accountId, id, dto.phone ?? null);
+    return { sent: true };
+  }
 
   @Get()
   @ApiOperation({ summary: 'List transactions (device-scoped for a terminal credential)' })

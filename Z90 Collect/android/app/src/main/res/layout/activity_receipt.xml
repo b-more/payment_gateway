@@ -62,6 +62,16 @@
             android:textAllCaps="false"
             android:textSize="17sp" />
         <Button
+            android:id="@+id/smsBtn"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="Text receipt to customer"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/brand"
+            style="?attr/materialButtonOutlinedStyle" />
+        <Button
             android:id="@+id/newSaleBtn"
             android:layout_width="match_parent"
             android:layout_height="50dp"

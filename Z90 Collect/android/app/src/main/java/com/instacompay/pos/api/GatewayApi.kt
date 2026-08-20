@@ -64,6 +64,14 @@ class GatewayApi(private val creds: SecureCredentialStore) {
         txn(call(get("/v1/transactions/$id")))
     }
 
+    /** Text the customer a link to their receipt (defaults to the payer's number). */
+    suspend fun sendReceipt(txnId: String, phone: String?): Unit = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+        if (!phone.isNullOrBlank()) body.put("phone", phone)
+        call(post("/v1/transactions/$txnId/send-receipt", body, auth = true, idempotencyKey = null))
+        Unit
+    }
+
     // ── request plumbing ──
     private fun post(path: String, body: JSONObject, auth: Boolean, idempotencyKey: String?): Request {
         val b = Request.Builder().url(AppConfig.baseUrl + path).post(body.toString().toRequestBody(jsonType))

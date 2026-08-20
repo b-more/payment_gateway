@@ -82,6 +82,36 @@ class PrinterService(driver: DriverManager) {
         cut()
     }
 
+    /** End-of-shift cash-up slip: takings broken down by attendant and network. */
+    fun printCashUp(d: CashUpData) {
+        ensureReady()
+        printer.setPrintAppendString(d.merchantName, fmt(28, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.BOLD))
+        printer.setPrintAppendString("SHIFT CASH-UP", fmt(23, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.BOLD))
+        printer.setPrintAppendString(d.period, fmt(19, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+        printer.setPrintAppendString("Printed ${d.printedAt}", fmt(18, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+
+        printer.setPrintAppendString("--------------------------------", body())
+        printer.setPrintAppendString("BY ATTENDANT", fmt(21, Layout.Alignment.ALIGN_NORMAL, PrnTextStyle.BOLD))
+        for (a in d.attendants) {
+            row(a.name, a.total)
+            printer.setPrintAppendString("  ${a.count} sale${if (a.count == 1) "" else "s"}", fmt(19, Layout.Alignment.ALIGN_NORMAL, PrnTextStyle.NORMAL))
+        }
+
+        printer.setPrintAppendString("--------------------------------", body())
+        printer.setPrintAppendString("BY NETWORK", fmt(21, Layout.Alignment.ALIGN_NORMAL, PrnTextStyle.BOLD))
+        for (n in d.networks) row(n.name, n.total)
+
+        printer.setPrintAppendString("--------------------------------", body())
+        row("SALES", d.totalCount.toString())
+        row("TOTAL", d.grandTotal, big = true)
+        printer.setPrintLine(1)
+        printer.setPrintAppendString("Signature: ____________________", fmt(19, Layout.Alignment.ALIGN_NORMAL, PrnTextStyle.NORMAL))
+        printer.setPrintAppendString("Powered by InstacomPay", fmt(18, Layout.Alignment.ALIGN_CENTER, PrnTextStyle.NORMAL))
+        printer.setPrintLine(5)
+        printer.setPrintStart()
+        cut()
+    }
+
     /** Two-column label/value row (label left, value right-aligned). */
     private fun row(label: String, value: String, big: Boolean = false) {
         val size = if (big) 26 else 23
@@ -138,6 +168,17 @@ class PrinterService(driver: DriverManager) {
         return f
     }
 }
+
+data class CashUpLine(val name: String, val count: Int, val total: String)
+data class CashUpData(
+    val merchantName: String,
+    val period: String,
+    val printedAt: String,
+    val attendants: List<CashUpLine>,
+    val networks: List<CashUpLine>,
+    val totalCount: Int,
+    val grandTotal: String,
+)
 
 data class ReceiptData(
     val merchantName: String,

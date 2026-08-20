@@ -23,6 +23,7 @@ data class LocalSale(
     val reference: String,
     val failureReason: String?,
     val createdAt: Long,
+    val attendant: String = "",  // who took this sale (blank if staff not in use)
 ) {
     val isTerminal: Boolean get() = status in TERMINAL
     val isSuccess: Boolean get() = status == "SUCCESS"
@@ -37,7 +38,7 @@ data class LocalSale(
 data class DaySummary(val count: Int, val totalNgwee: Long)
 
 /** On-device sales log — survives restarts for reprint history and offline retry. */
-class LocalTxnStore(context: Context) : SQLiteOpenHelper(context, "collect.db", null, 1) {
+class LocalTxnStore(context: Context) : SQLiteOpenHelper(context, "collect.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -54,14 +55,17 @@ class LocalTxnStore(context: Context) : SQLiteOpenHelper(context, "collect.db", 
               status TEXT,
               reference TEXT,
               failure_reason TEXT,
-              created_at INTEGER
+              created_at INTEGER,
+              attendant TEXT
             )
             """.trimIndent(),
         )
         db.execSQL("CREATE INDEX idx_sales_created ON sales(created_at DESC)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { /* v1 */ }
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) db.execSQL("ALTER TABLE sales ADD COLUMN attendant TEXT")
+    }
 
     fun upsert(s: LocalSale) {
         val cv = ContentValues().apply {
@@ -77,6 +81,7 @@ class LocalTxnStore(context: Context) : SQLiteOpenHelper(context, "collect.db", 
             put("reference", s.reference)
             put("failure_reason", s.failureReason)
             put("created_at", s.createdAt)
+            put("attendant", s.attendant)
         }
         writableDatabase.insertWithOnConflict("sales", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
     }
@@ -99,11 +104,15 @@ class LocalTxnStore(context: Context) : SQLiteOpenHelper(context, "collect.db", 
     fun needingReconcile(): List<LocalSale> =
         query("WHERE status IN ('PENDING','PROCESSING','UNKNOWN') ORDER BY created_at ASC LIMIT 20", emptyArray())
 
+    /** Successful sales since a given time (for shift cash-up). */
+    fun successSince(sinceMs: Long): List<LocalSale> =
+        query("WHERE status='SUCCESS' AND created_at >= ? ORDER BY created_at ASC", arrayOf(sinceMs.toString()))
+
     private fun query(clause: String, args: Array<String>): List<LocalSale> {
         val out = ArrayList<LocalSale>()
         readableDatabase.rawQuery(
             "SELECT idempotency_key,server_id,processor,network_label,msisdn,amount_ngwee,charge_ngwee," +
-                "total_ngwee,status,reference,failure_reason,created_at FROM sales $clause",
+                "total_ngwee,status,reference,failure_reason,created_at,attendant FROM sales $clause",
             args,
         ).use { c ->
             while (c.moveToNext()) out.add(
@@ -120,6 +129,7 @@ class LocalTxnStore(context: Context) : SQLiteOpenHelper(context, "collect.db", 
                     reference = c.getString(9).orEmpty(),
                     failureReason = c.getString(10),
                     createdAt = c.getLong(11),
+                    attendant = c.getString(12).orEmpty(),
                 ),
             )
         }

@@ -10,10 +10,15 @@ import androidx.lifecycle.lifecycleScope
 import com.instacompay.pos.R
 import com.instacompay.pos.api.ApiException
 import com.instacompay.pos.api.GatewayApi
+import android.text.InputType
+import android.widget.EditText
+import androidx.appcompat.app.AlertDialog
 import com.instacompay.pos.api.Txn
 import com.instacompay.pos.data.LocalSale
 import com.instacompay.pos.data.LocalTxnStore
 import com.instacompay.pos.data.SecureCredentialStore
+import com.instacompay.pos.data.Staff
+import com.instacompay.pos.data.StaffStore
 import com.instacompay.pos.databinding.ActivityCollectBinding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -25,6 +30,7 @@ class CollectActivity : AppCompatActivity() {
     private val store by lazy { SecureCredentialStore(this) }
     private val api by lazy { GatewayApi(store) }
     private val local by lazy { LocalTxnStore(this) }
+    private val staff by lazy { StaffStore(this) }
 
     private var typed = ""
     private var processor = "MTN"
@@ -40,6 +46,8 @@ class CollectActivity : AppCompatActivity() {
         b.envBadge.visibility = if (c?.environment == "LIVE") View.GONE else View.VISIBLE
 
         b.historyBtn.setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
+        b.attendantChip.setOnClickListener { onAttendantTap() }
+        b.staffBtn.setOnClickListener { openStaff() }
         b.mtnBtn.setOnClickListener { setProcessor("MTN") }
         b.airtelBtn.setOnClickListener { setProcessor("AIRTEL") }
 
@@ -59,8 +67,74 @@ class CollectActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshToday()
+        refreshAttendant()
         reconcilePending()
     }
+
+    // ── Staff / attendant ──
+    private val usesStaff: Boolean get() = staff.listStaff().isNotEmpty()
+
+    private fun refreshAttendant() {
+        b.attendantChip.text = when {
+            !usesStaff -> "Single operator"
+            staff.isSignedIn -> "👤 ${staff.currentAttendantName}"
+            else -> "Tap to sign in"
+        }
+    }
+
+    private fun onAttendantTap() {
+        if (!usesStaff) { openStaff(); return }
+        if (staff.isSignedIn) {
+            AlertDialog.Builder(this)
+                .setTitle("Signed in as ${staff.currentAttendantName}")
+                .setPositiveButton("Switch attendant") { _, _ -> signInFlow() }
+                .setNegativeButton("Sign out") { _, _ -> staff.signOut(); refreshAttendant() }
+                .show()
+        } else signInFlow()
+    }
+
+    private fun signInFlow() {
+        val roster = staff.listStaff()
+        if (roster.isEmpty()) { openStaff(); return }
+        AlertDialog.Builder(this)
+            .setTitle("Who's on the till?")
+            .setItems(roster.map { it.name }.toTypedArray()) { _, i -> pinPrompt(roster[i]) }
+            .show()
+    }
+
+    private fun pinPrompt(s: Staff) {
+        val input = pinInput()
+        AlertDialog.Builder(this)
+            .setTitle("${s.name} — enter PIN")
+            .setView(input)
+            .setPositiveButton("Sign in") { _, _ ->
+                if (staff.verifyStaff(s.id, input.text.toString())) { staff.signIn(s); refreshAttendant() }
+                else toast("Wrong PIN")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun openStaff() {
+        if (!staff.hasManagerPin) { startActivity(Intent(this, StaffActivity::class.java)); return }
+        val input = pinInput()
+        AlertDialog.Builder(this)
+            .setTitle("Manager PIN")
+            .setView(input)
+            .setPositiveButton("OK") { _, _ ->
+                if (staff.verifyManager(input.text.toString())) startActivity(Intent(this, StaffActivity::class.java))
+                else toast("Wrong PIN")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun pinInput() = EditText(this).apply {
+        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        hint = "PIN"
+    }
+
+    private fun toast(m: String) = android.widget.Toast.makeText(this, m, android.widget.Toast.LENGTH_SHORT).show()
 
     private fun refreshToday() {
         val s = local.todaySummary()
@@ -127,6 +201,7 @@ class CollectActivity : AppCompatActivity() {
         val amountNgwee = kwachaToNgwee(typed) ?: return
         val msisdn = b.msisdn.text.toString().trim()
         if (!msisdn.matches(Regex("^260\\d{9}$"))) { setStatus("Phone must be 260XXXXXXXXX", true); return }
+        if (usesStaff && !staff.isSignedIn) { setStatus("Sign in as an attendant first", true); signInFlow(); return }
 
         setBusy(true)
         setStatus("Sending prompt to $msisdn…", false)
@@ -137,6 +212,7 @@ class CollectActivity : AppCompatActivity() {
             idempotencyKey = idem, serverId = "", processor = processor, networkLabel = netLabel,
             msisdn = msisdn, amountNgwee = amountNgwee, chargeNgwee = "0", totalNgwee = amountNgwee,
             status = "PENDING", reference = "", failureReason = null, createdAt = System.currentTimeMillis(),
+            attendant = staff.currentAttendantName.orEmpty(),
         )
         local.upsert(base)
 

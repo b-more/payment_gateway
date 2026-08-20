@@ -23,6 +23,19 @@
     </LinearLayout>
     <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
 
+    <!-- Attendant / staff bar (only meaningful once staff are set up) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingStart="16dp" android:paddingEnd="12dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+        <TextView android:id="@+id/attendantChip" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Single operator" android:textColor="@color/slate" android:textSize="13sp" android:textStyle="bold" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/staffBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Staff" android:textColor="@color/brand" android:textSize="13sp" android:textStyle="bold" android:paddingStart="12dp" android:paddingEnd="8dp" android:paddingTop="4dp" android:paddingBottom="4dp" android:clickable="true" android:focusable="true" />
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"

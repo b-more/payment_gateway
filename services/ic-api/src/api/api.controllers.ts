@@ -92,16 +92,23 @@ export class CollectionsController {
 
     const record = await this.txns.processTransaction(input);
     if (record.status === 'PROCESSING') {
-      const reference = dto.collectionReference ?? record.id;
-      // Debit the payer the GROSS, not the principal. Under SOURCE the customer
-      // owes amount + charge; sending `amount` here is what previously let the
-      // fee vanish, because the merchant was then credited the full amount and
-      // nothing was left over for Instacom. Under MERCHANT the two are equal.
-      const payerOwes = record.totalAmount;
-      if (dto.processor === 'AIRTEL') {
-        await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, reference });
-      } else {
-        await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, externalId: reference });
+      // Idempotency: `processTransaction` returns the EXISTING transaction when the
+      // Idempotency-Key is replayed. Dispatching again would send the customer a
+      // second prompt, so only dispatch when there is no live attempt yet — a
+      // retried create just re-reads the in-flight transaction.
+      const alreadyDispatched =
+        dto.processor === 'AIRTEL'
+          ? await this.airtel.hasLiveAttempt(record.id)
+          : await this.mtn.hasLiveAttempt(record.id);
+      if (!alreadyDispatched) {
+        const reference = dto.collectionReference ?? record.id;
+        // Debit the payer the GROSS, not the principal (SOURCE: amount + charge).
+        const payerOwes = record.totalAmount;
+        if (dto.processor === 'AIRTEL') {
+          await this.airtel.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, reference });
+        } else {
+          await this.mtn.dispatchCollection({ id: record.id, msisdn: dto.msisdn, amountNgwee: payerOwes, externalId: reference });
+        }
       }
       return serializeTransaction(await this.txns.getForAccount(cred.accountId, record.id));
     }

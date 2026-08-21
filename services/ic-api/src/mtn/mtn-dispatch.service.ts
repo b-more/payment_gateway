@@ -26,6 +26,12 @@ export class MtnDispatchService {
     private readonly txns: TransactionService,
   ) {}
 
+  /** True when a live (non-FAILED) attempt already exists — see AirtelDispatchService. */
+  async hasLiveAttempt(transactionId: string): Promise<boolean> {
+    const a = await this.attempts.findLatestByTransactionId(transactionId);
+    return !!a && a.state !== 'FAILED';
+  }
+
   async dispatchCollection(txn: DispatchTxn): Promise<AttemptOutcome> {
     const outcome = await this.collections.initiateCollection({
       transactionId: txn.id,

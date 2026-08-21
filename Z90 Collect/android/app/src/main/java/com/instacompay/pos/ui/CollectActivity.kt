@@ -149,22 +149,9 @@ class CollectActivity : AppCompatActivity() {
     /** Re-check any sale whose outcome we never confirmed (network dropped). */
     private fun reconcilePending() {
         lifecycleScope.launch {
-            for (s in local.needingReconcile()) {
-                try {
-                    // Idempotent re-issue: same key returns the existing txn, no double charge.
-                    var txn = api.createCollection(s.processor, s.amountNgwee, s.msisdn, null, s.idempotencyKey)
-                    var tries = 0
-                    while (!txn.isTerminal && tries < 2) { delay(1500); txn = api.getTransaction(txn.id); tries++ }
-                    local.upsert(s.copy(
-                        serverId = txn.id, status = txn.status, chargeNgwee = txn.charge,
-                        totalNgwee = txn.totalAmount, reference = txn.id.take(8).uppercase(),
-                        failureReason = txn.failureReason,
-                    ))
-                } catch (e: ApiException) {
-                    if (lockIfRevoked(e)) return@launch
-                    // leave for next time
-                } catch (_: Exception) { /* still offline — try again later */ }
-            }
+            try { reconcileLocal(api, local) }
+            catch (e: ApiException) { if (lockIfRevoked(e)) return@launch }
+            catch (_: Exception) { }
             refreshToday()
         }
     }

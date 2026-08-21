@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { PG_POOL } from '../database/database.module';
 import { isUniqueViolation, withTransaction } from '../database/tx';
@@ -106,6 +106,16 @@ function mapTxn(row: TxnRow): TransactionRecord {
  * (STATE-3). Every float-mutating step runs under a row lock inside one
  * transaction (TXN-1) and is idempotent on (account_id, idempotency_key).
  */
+/**
+ * Fires once when a transaction reaches a terminal state (the resolving call).
+ * Implemented by the SMS notifier; optional so the money engine stays decoupled
+ * and the standalone reconcile jobs can construct TransactionService without it.
+ */
+export interface TransactionNotifier {
+  onResolved(record: TransactionRecord): Promise<void>;
+}
+export const TRANSACTION_NOTIFIER = 'TRANSACTION_NOTIFIER';
+
 @Injectable()
 export class TransactionService {
   constructor(
@@ -114,6 +124,7 @@ export class TransactionService {
     private readonly audit: AuditService,
     private readonly processor: ProcessorService,
     private readonly webhooks: WebhookService,
+    @Optional() @Inject(TRANSACTION_NOTIFIER) private readonly notifier?: TransactionNotifier,
   ) {}
 
   private static isFinal(status: TransactionStatus): boolean {
@@ -347,8 +358,13 @@ export class TransactionService {
       });
       return { record: updated, resolved: true };
     });
-    // Only enqueue a webhook for the call that actually resolved the transaction.
-    if (outcome.resolved) await this.webhooks.enqueue(outcome.record.id, outcome.record.status); // WH-1
+    // Only fire side-effects for the call that actually resolved the transaction.
+    if (outcome.resolved) {
+      await this.webhooks.enqueue(outcome.record.id, outcome.record.status); // WH-1
+      // Text the customer their outcome (success or failure). Fire-and-forget so
+      // SMS latency/failure never delays or breaks completion.
+      if (this.notifier) void this.notifier.onResolved(outcome.record).catch(() => undefined);
+    }
     return outcome.record;
   }
 

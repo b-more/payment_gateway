@@ -28,6 +28,16 @@ export class AirtelDispatchService {
     private readonly txns: TransactionService,
   ) {}
 
+  /**
+   * True when this transaction already has a live (non-FAILED) attempt — i.e. a
+   * prompt has already gone to the customer. Used to make dispatch idempotent so
+   * a retried `POST /collections` (same Idempotency-Key) never re-prompts.
+   */
+  async hasLiveAttempt(transactionId: string): Promise<boolean> {
+    const a = await this.attempts.findLatestByTransactionId(transactionId);
+    return !!a && a.state !== 'FAILED';
+  }
+
   /** Initiate a collection for a PROCESSING transaction; resolve now if final. */
   async dispatchCollection(txn: DispatchTxn): Promise<AttemptOutcome> {
     const outcome = await this.payments.initiateCollection({

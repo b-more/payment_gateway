@@ -17,7 +17,6 @@ import com.instacompay.pos.data.LocalTxnStore
 import com.instacompay.pos.data.SecureCredentialStore
 import com.instacompay.pos.data.StaffStore
 import com.instacompay.pos.databinding.ActivityDashboardBinding
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -177,20 +176,10 @@ class DashboardActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 if (lockIfRevoked(e)) return@launch
             }
-            // Confirm any sale whose outcome we never saw (idempotent — no double charge).
-            var changed = false
-            for (s in local.needingReconcile()) {
-                try {
-                    var txn = api.createCollection(s.processor, s.amountNgwee, s.msisdn, null, s.idempotencyKey)
-                    var tries = 0
-                    while (!txn.isTerminal && tries < 2) { delay(1500); txn = api.getTransaction(txn.id); tries++ }
-                    local.upsert(s.copy(serverId = txn.id, status = txn.status, chargeNgwee = txn.charge, totalNgwee = txn.totalAmount, reference = txn.id.take(8).uppercase(), failureReason = txn.failureReason))
-                    changed = true
-                } catch (e: ApiException) {
-                    if (lockIfRevoked(e)) return@launch
-                } catch (_: Exception) { /* still offline */ }
-            }
-            if (changed) renderLocal()
+            // Confirm any sale whose outcome we never saw — polls by id, never re-prompts.
+            try { reconcileLocal(api, local); renderLocal() }
+            catch (e: ApiException) { if (lockIfRevoked(e)) return@launch }
+            catch (_: Exception) { }
         }
     }
 

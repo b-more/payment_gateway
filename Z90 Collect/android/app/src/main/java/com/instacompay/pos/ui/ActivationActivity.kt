@@ -12,6 +12,7 @@ import com.instacompay.pos.data.SecureCredentialStore
 import com.instacompay.pos.databinding.ActivityActivationBinding
 import com.instacompay.pos.hardware.SdkManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Enter the one-time activation code → issue + store the device credential. */
 class ActivationActivity : AppCompatActivity() {
@@ -34,9 +35,16 @@ class ActivationActivity : AppCompatActivity() {
         setStatus("Activating…", false)
         lifecycleScope.launch {
             try {
-                val serial = runCatching {
-                    SdkManager.onHardware { if (SdkManager.init()) SdkManager.serialNumber() else "" }
-                }.getOrDefault("")
+                // The serial is optional server-side, and reading it needs the ZCS SDK to
+                // be initialised — which powers on the secure module and can take many
+                // seconds on the Z90. Don't hold up activation for it: give it a short
+                // budget, and proceed with an empty serial if the SDK isn't ready yet
+                // (it keeps initialising in the background for printing).
+                val serial = withTimeoutOrNull(2500) {
+                    runCatching {
+                        SdkManager.onHardware { if (SdkManager.init()) SdkManager.serialNumber() else "" }
+                    }.getOrNull()
+                } ?: ""
                 val result = api.activate(code, serial)
                 store.save(result)
                 startActivity(Intent(this@ActivationActivity, DashboardActivity::class.java)

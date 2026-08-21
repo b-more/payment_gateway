@@ -5,6 +5,8 @@ import { ProcessorService } from '../processors/processor.service';
 import { WebhookService } from '../webhooks/webhook.service';
 import { createRedis } from '../redis/redis.module';
 import { TransactionService } from '../transactions/transaction.service';
+import { SmsService } from '../sms/sms.service';
+import { TransactionSmsNotifier } from '../sms/transaction-sms-notifier';
 import { AirtelAttemptsRepository } from '../airtel/airtel-attempts.repository';
 import { AirtelClient } from '../airtel/airtel.client';
 import { AirtelTokenManager } from '../airtel/airtel-token.manager';
@@ -34,7 +36,11 @@ async function main(): Promise<void> {
     backoffSeconds: [60, 300, 1800, 7200],
     timeoutMs: Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000),
   });
-  const txns = new TransactionService(pool, new LedgerService(), audit, new ProcessorService(), webhooks);
+  // Wire the SMS notifier so a late approval resolved here still texts the customer.
+  const txns = new TransactionService(
+    pool, new LedgerService(), audit, new ProcessorService(), webhooks,
+    new TransactionSmsNotifier(pool, new SmsService()),
+  );
   const dispatch = new AirtelDispatchService(
     new AirtelPaymentsService(client, attempts, airtelEnvConfig, airtelGlobalConfig),
     new AirtelDisbursementsService(client, attempts, airtelEnvConfig),

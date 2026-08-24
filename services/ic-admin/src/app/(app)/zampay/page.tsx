@@ -23,6 +23,7 @@ interface ZampaySettlement {
   currency: string;
   status: string;
   payment_reference: string | null;
+  instacom_bank_ref: string;
   bank_batch_reference: string | null;
   callback_status: string | null;
   callback_attempts: number;
@@ -38,7 +39,12 @@ export default function ZampayPage(): ReactNode {
   const { principal } = useAuth();
   const canAct = principal.roles.includes('ADMIN') || principal.roles.includes('FINANCE');
 
-  const { data, loading, error, reload } = useData<ZampaySettlement[]>('/v1/admin/zampay/settlements');
+  const [q, setQ] = useState('');
+  const [applied, setApplied] = useState('');
+  const path = applied.trim()
+    ? `/v1/admin/zampay/settlements?search=${encodeURIComponent(applied.trim())}`
+    : '/v1/admin/zampay/settlements';
+  const { data, loading, error, reload } = useData<ZampaySettlement[]>(path);
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState('');
@@ -95,12 +101,33 @@ export default function ZampayPage(): ReactNode {
         <StatCard label="Failed" value={String(count('FAILED'))} sub="Need attention" copper={count('FAILED') > 0} />
       </div>
 
+      <form
+        onSubmit={(e) => { e.preventDefault(); setApplied(q); }}
+        style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}
+      >
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by bank batch ref, IBR, invoice, account…"
+          style={{ flex: '0 1 380px', padding: '7px 10px', border: '1px solid var(--line, #ccc)', borderRadius: 6, fontSize: 13 }}
+        />
+        <button className="btn sm" type="submit">Search</button>
+        {applied ? (
+          <button className="btn sm" type="button" onClick={() => { setQ(''); setApplied(''); }}>Clear</button>
+        ) : null}
+        {applied ? <span className="muted" style={{ fontSize: 12 }}>Showing matches for “{applied}”</span> : null}
+      </form>
+
       {msg ? <div className="err" style={{ marginBottom: 12 }}>{msg}</div> : null}
       {ok ? <div className="devhint" style={{ marginBottom: 12, color: 'var(--success)', background: '#e6f4ee', borderColor: '#cce8dc' }}>{ok}</div> : null}
 
       <div className="card">
         {data.length === 0 ? (
-          <Empty>No ZamPay settlements yet. They appear once a GSB collection succeeds and its invoice is read.</Empty>
+          <Empty>
+            {applied
+              ? `No settlements match “${applied}”.`
+              : 'No ZamPay settlements yet. They appear once a GSB collection succeeds and its invoice is read.'}
+          </Empty>
         ) : (
           <table className="table">
             <thead>
@@ -111,6 +138,7 @@ export default function ZampayPage(): ReactNode {
                 <th className="num">Amount</th>
                 <th className="num">Services</th>
                 <th>Status</th>
+                <th>Instacom ref</th>
                 <th>Our reference</th>
                 <th>Bank batch ref</th>
                 <th />
@@ -157,6 +185,7 @@ export default function ZampayPage(): ReactNode {
                         </span>
                       ) : null}
                     </td>
+                    <td className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{z.instacom_bank_ref}</td>
                     <td className="mono" style={{ fontSize: 12 }}>{z.payment_reference ?? '—'}</td>
                     <td style={{ fontSize: 12 }}>
                       {editing === z.id ? (

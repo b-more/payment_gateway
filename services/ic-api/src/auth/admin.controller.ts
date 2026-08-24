@@ -342,9 +342,12 @@ export class AdminController {
 
   @Get('zampay/settlements')
   @Roles('ADMIN', 'FINANCE')
-  @ApiOperation({ summary: 'List ZamPay settlement instructions (optional ?status=)' })
-  listZampaySettlements(@Query('status') status?: string): Promise<unknown[]> {
-    return this.read.listZampaySettlements(status ?? null);
+  @ApiOperation({ summary: 'List/search ZamPay settlements (?status=, ?search= by batch ref / IBR / invoice / account)' })
+  listZampaySettlements(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ): Promise<unknown[]> {
+    return this.read.listZampaySettlements(status ?? null, search ?? null);
   }
 
   @Post('zampay/settlements/:id/retry')

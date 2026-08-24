@@ -133,11 +133,13 @@ export class AdminReadService {
   }
 
   /** ZamPay settlement worklist. Optional status filter (e.g. READY_TO_WIRE). */
-  async listZampaySettlements(status: string | null): Promise<unknown[]> {
+  async listZampaySettlements(status: string | null, search: string | null): Promise<unknown[]> {
+    const term = search && search.trim() ? `%${search.trim()}%` : null;
     const res = await this.pool.query(
       `SELECT z.id, z.transaction_id, z.zampay_reference, z.invoice_number, z.transaction_number,
               z.service_ids, z.destination, z.amount_ngwee::text AS amount_ngwee, z.currency, z.status,
-              z.payment_reference, z.bank_batch_reference, z.callback_status, z.callback_attempts, z.failure_reason, z.environment,
+              z.payment_reference, z.instacom_bank_ref, z.bank_batch_reference,
+              z.callback_status, z.callback_attempts, z.failure_reason, z.environment,
               to_char(z.settled_at, 'YYYY-MM-DD HH24:MI') AS settled_at,
               to_char(z.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
               a.account_number, m.name AS merchant_name
@@ -145,8 +147,17 @@ export class AdminReadService {
          JOIN accounts a ON a.id = z.account_id
          JOIN merchants m ON m.id = a.merchant_id
         WHERE ($1::text IS NULL OR z.status = $1::zampay_settlement_status)
+          AND ($2::text IS NULL OR (
+                z.bank_batch_reference ILIKE $2
+             OR z.instacom_bank_ref    ILIKE $2
+             OR z.invoice_number       ILIKE $2
+             OR z.payment_reference    ILIKE $2
+             OR z.zampay_reference     ILIKE $2
+             OR a.account_number       ILIKE $2
+             OR m.name                 ILIKE $2
+          ))
         ORDER BY z.created_at DESC LIMIT 200`,
-      [status],
+      [status, term],
     );
     return res.rows;
   }

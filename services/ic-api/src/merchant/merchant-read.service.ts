@@ -125,6 +125,32 @@ export class MerchantReadService {
     return res.rows;
   }
 
+  /**
+   * This merchant's GSB (ZamPay) settlements — read-only, account-scoped, with an
+   * optional search across the Instacom bank ref, bank batch reference, invoice
+   * and payment reference. Never exposes other merchants' settlements.
+   */
+  async zampaySettlements(merchantId: string, search: string | null): Promise<unknown[]> {
+    const term = search && search.trim() ? `%${search.trim()}%` : null;
+    const res = await this.pool.query(
+      `SELECT z.id, z.instacom_bank_ref, z.bank_batch_reference, z.invoice_number,
+              z.destination, z.amount_ngwee::text AS amount_ngwee, z.currency, z.status,
+              to_char(z.settled_at, 'YYYY-MM-DD HH24:MI') AS settled_at,
+              to_char(z.created_at, 'YYYY-MM-DD HH24:MI') AS created_at
+         FROM zampay_settlements z JOIN accounts a ON a.id = z.account_id
+        WHERE a.merchant_id = $1
+          AND ($2::text IS NULL OR (
+                z.bank_batch_reference ILIKE $2
+             OR z.instacom_bank_ref    ILIKE $2
+             OR z.invoice_number       ILIKE $2
+             OR z.payment_reference    ILIKE $2
+          ))
+        ORDER BY z.created_at DESC LIMIT 200`,
+      [merchantId, term],
+    );
+    return res.rows;
+  }
+
   /** Public credential metadata only — never secret_hash or signing key. */
   async listCredentials(merchantId: string): Promise<unknown[]> {
     const res = await this.pool.query(

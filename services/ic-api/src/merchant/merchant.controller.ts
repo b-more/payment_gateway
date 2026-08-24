@@ -270,6 +270,15 @@ export class MerchantController {
     return this.read.settlements(this.merchantId(p));
   }
 
+  @Get('zampay/settlements')
+  @ApiOperation({ summary: 'GSB (ZamPay) settlements — read-only, ?search= by batch ref / IBR / invoice' })
+  zampaySettlements(
+    @CurrentPrincipal() p: Principal,
+    @Query('search') search?: string,
+  ): Promise<unknown[]> {
+    return this.read.zampaySettlements(this.merchantId(p), search ?? null);
+  }
+
   @Get('credentials')
   @ApiOperation({ summary: 'API credentials (public metadata only)' })
   credentials(@CurrentPrincipal() p: Principal): Promise<unknown[]> {

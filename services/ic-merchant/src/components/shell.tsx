@@ -14,7 +14,6 @@ const NAV: Array<[string, string]> = [
   ['Terminals', '/terminals'],
   ['Transactions', '/transactions'],
   ['Settlements', '/settlements'],
-  ['GSB Settlements', '/gsb-settlements'],
   ['Reports', '/reports'],
   ['User Management', '/users'],
   ['API Documentation', '/api-docs'],

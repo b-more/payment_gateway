@@ -23,6 +23,7 @@ interface ZampaySettlement {
   currency: string;
   status: string;
   payment_reference: string | null;
+  bank_batch_reference: string | null;
   callback_status: string | null;
   callback_attempts: number;
   failure_reason: string | null;
@@ -41,6 +42,8 @@ export default function ZampayPage(): ReactNode {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState('');
+  const [editing, setEditing] = useState('');
+  const [draft, setDraft] = useState('');
 
   if (loading) return <Spinner />;
   if (error || !data) return <Empty>Could not load ZamPay settlements. {error}</Empty>;
@@ -57,6 +60,22 @@ export default function ZampayPage(): ReactNode {
       reload();
     } catch (err) {
       setMsg(err instanceof ApiError ? err.message : 'Could not retry.');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function saveBatchRef(id: string): Promise<void> {
+    setBusy(id);
+    setMsg('');
+    setOk('');
+    try {
+      await apiPost(`/v1/admin/zampay/settlements/${id}/batch-reference`, { bankBatchReference: draft.trim() });
+      setOk('Bank batch reference saved.');
+      setEditing('');
+      reload();
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'Could not save.');
     } finally {
       setBusy('');
     }
@@ -93,6 +112,7 @@ export default function ZampayPage(): ReactNode {
                 <th className="num">Services</th>
                 <th>Status</th>
                 <th>Our reference</th>
+                <th>Bank batch ref</th>
                 <th />
               </tr>
             </thead>
@@ -138,6 +158,35 @@ export default function ZampayPage(): ReactNode {
                       ) : null}
                     </td>
                     <td className="mono" style={{ fontSize: 12 }}>{z.payment_reference ?? '—'}</td>
+                    <td style={{ fontSize: 12 }}>
+                      {editing === z.id ? (
+                        <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          <input
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            placeholder="Batch reference"
+                            autoFocus
+                            style={{ width: 140, padding: '3px 6px', border: '1px solid var(--line, #ccc)', borderRadius: 4, fontSize: 12 }}
+                          />
+                          <button className="btn sm" disabled={busy === z.id} onClick={() => void saveBatchRef(z.id)}>
+                            {busy === z.id ? '…' : 'Save'}
+                          </button>
+                          <button className="btn sm" onClick={() => setEditing('')}>✕</button>
+                        </span>
+                      ) : (
+                        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span className="mono">{z.bank_batch_reference ?? '—'}</span>
+                          {canAct ? (
+                            <button
+                              className="btn sm"
+                              onClick={() => { setEditing(z.id); setDraft(z.bank_batch_reference ?? ''); }}
+                            >
+                              {z.bank_batch_reference ? 'Edit' : 'Set'}
+                            </button>
+                          ) : null}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       {canAct && z.status === 'FAILED' ? (
                         <button className="btn sm" disabled={busy === z.id} onClick={() => void retry(z.id)}>

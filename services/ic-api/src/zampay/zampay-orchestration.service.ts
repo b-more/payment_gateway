@@ -24,6 +24,7 @@ import { AuditService } from '../audit/audit.service';
 import { ZampayInvoiceService, type ZampaySettlementGroup } from './zampay-invoice.service';
 import { ZampaySettlementService } from './zampay-settlement.service';
 import { ZampayError } from './zampay.errors';
+import { NotFoundError } from '../money/errors';
 import { zampayEnvConfig } from './zampay.config';
 
 const MAX_CALLBACK_ATTEMPTS = 6;
@@ -180,6 +181,29 @@ export class ZampayOrchestrationService {
         action: 'ZAMPAY_SETTLEMENT_RETRIED',
         target: res.rows[0].transaction_id,
         metadata: { settlementId: id },
+      });
+    });
+  }
+
+  /**
+   * Record (or clear) the bank batch reference against a settlement — the
+   * reference finance gets from the bank when the payout is batched, used to
+   * reconcile against the bank statement. Free-text; pass null/empty to clear.
+   */
+  async setBankBatchReference(id: string, bankBatchReference: string | null, actorId: string): Promise<void> {
+    const value = bankBatchReference?.trim() || null;
+    const res = await this.pool.query<{ transaction_id: string }>(
+      `UPDATE zampay_settlements SET bank_batch_reference = $2 WHERE id = $1 RETURNING transaction_id`,
+      [id, value],
+    );
+    if (res.rowCount === 0) throw new NotFoundError(`settlement not found: ${id}`);
+    await withTransaction(this.pool, async (client) => {
+      await this.audit.write(client, {
+        actorId,
+        actorScope: 'SYSTEM',
+        action: 'ZAMPAY_BANK_BATCH_REFERENCE_SET',
+        target: res.rows[0].transaction_id,
+        metadata: { settlementId: id, bankBatchReference: value },
       });
     });
   }

@@ -17,6 +17,7 @@ import { ReportService } from '../reports/report.service';
 import { CreateReportDto } from '../reports/report.dto';
 import { ChargeConfigDto, AdminSettingsDto, ModeDto } from './dto/admin-config.dto';
 import { CreateUserDto, AssignRoleDto, CreateRoleDto } from './dto/user-admin.dto';
+import { ZampayBatchReferenceDto } from './dto/zampay-batch-reference.dto';
 import { serializeTransaction, type TransactionResponse } from '../api/serializers';
 import { toNgwee } from '../money/money';
 import { getClientIp } from '../api/request-context';
@@ -356,6 +357,19 @@ export class AdminController {
   ): Promise<{ id: string; status: 'RETRYING' }> {
     await this.zampay.retryCallback(id, p.userId);
     return { id, status: 'RETRYING' };
+  }
+
+  @Post('zampay/settlements/:id/batch-reference')
+  @HttpCode(200)
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Record the bank batch reference for a ZamPay settlement' })
+  async setZampayBatchReference(
+    @Param('id') id: string,
+    @Body() dto: ZampayBatchReferenceDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<{ id: string; ok: true }> {
+    await this.zampay.setBankBatchReference(id, dto.bankBatchReference ?? null, p.userId);
+    return { id, ok: true };
   }
 
   // ── Settlement lifecycle (§5.8). The scheduled job (ic-settlement-run) also

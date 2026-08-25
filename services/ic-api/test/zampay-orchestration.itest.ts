@@ -61,7 +61,7 @@ async function reset(): Promise<void> {
 
 describe('zampay orchestration', { concurrency: 1 }, () => {
 
-test('happy path: discover -> resolve(NotPaid) -> auto callback -> settled', async () => {
+test('happy path: discover -> resolve(NotPaid) -> held -> batch ref -> settled', async () => {
   await reset();
   const { txn, accountNumber } = await seedCollection('REF-' + randomUUID().slice(0, 6));
   const sink: ZampaySettlementCallbackInput[] = [];
@@ -76,8 +76,8 @@ test('happy path: discover -> resolve(NotPaid) -> auto callback -> settled', asy
   assert.equal(await orch.discoverPending(accountNumber), 1);
   assert.deepEqual(await orch.resolvePending(), { resolved: 1, failed: 0 });
 
-  // Resolve leaves it RESOLVED with a pending callback and our payment reference
-  // (the transaction id) — no operator wire step.
+  // Resolve leaves it RESOLVED with a pending callback. The callback is HELD
+  // until a bank batch reference is recorded (see below).
   const row = (await pool.query("SELECT id, status, callback_status, payment_reference, destination->>'bankAccountNumber' acc, array_length(service_ids,1) n FROM zampay_settlements WHERE transaction_id=$1", [txn])).rows[0];
   assert.equal(row.status, 'RESOLVED');
   assert.equal(row.callback_status, 'PENDING');
@@ -85,7 +85,13 @@ test('happy path: discover -> resolve(NotPaid) -> auto callback -> settled', asy
   assert.equal(row.acc, '0132030000194');
   assert.equal(row.n, 2);
 
-  // The callback fires automatically on the next pass.
+  // Held: resolved, but no bank batch reference yet -> GSB is NOT called.
+  assert.deepEqual(await orch.sendDueCallbacks(), { sent: 0, failed: 0 });
+  assert.equal((await pool.query('SELECT status FROM zampay_settlements WHERE id=$1', [row.id])).rows[0].status, 'RESOLVED');
+
+  // Finance records the bank batch reference; THAT reference is what we send to
+  // GSB as paymentReferenceNumber (no Instacom-generated id is sent).
+  await pool.query('UPDATE zampay_settlements SET bank_batch_reference=$2 WHERE id=$1', [row.id, 'BBR-77']);
   assert.deepEqual(await orch.sendDueCallbacks(), { sent: 1, failed: 0 });
   const settled = (await pool.query('SELECT status, callback_status, settled_at FROM zampay_settlements WHERE id=$1', [row.id])).rows[0];
   assert.equal(settled.status, 'SETTLED');
@@ -93,7 +99,7 @@ test('happy path: discover -> resolve(NotPaid) -> auto callback -> settled', asy
   assert.ok(settled.settled_at);
 
   assert.equal(sink.length, 1);
-  assert.equal(sink[0].paymentReferenceNumber, txn); // our payment reference
+  assert.equal(sink[0].paymentReferenceNumber, 'BBR-77'); // the bank batch reference
   assert.equal(sink[0].amountNgwee, 980n);
   assert.deepEqual(sink[0].serviceIds, ['s1', 's2']);
 });
@@ -136,11 +142,12 @@ test('Paid invoice with settleable services -> RESOLVED -> settled', async () =>
   const row = (await pool.query("SELECT id, status, callback_status FROM zampay_settlements WHERE transaction_id=$1", [txn])).rows[0];
   assert.equal(row.status, 'RESOLVED');
   assert.equal(row.callback_status, 'PENDING');
+  await pool.query('UPDATE zampay_settlements SET bank_batch_reference=$2 WHERE id=$1', [row.id, 'BBR-3']);
   await orch.sendDueCallbacks();
   const settled = (await pool.query('SELECT status FROM zampay_settlements WHERE id=$1', [row.id])).rows[0];
   assert.equal(settled.status, 'SETTLED');
   assert.equal(sink.length, 1);
-  assert.equal(sink[0].paymentReferenceNumber, txn);
+  assert.equal(sink[0].paymentReferenceNumber, 'BBR-3');
 });
 
 test('Paid invoice with no settleable services -> INVOICE_PAID', async () => {
@@ -170,6 +177,8 @@ test('callback failure increments attempts and stays pending', async () => {
   await orch.discoverPending(accountNumber);
   await orch.resolvePending();
   const id = (await pool.query('SELECT id FROM zampay_settlements WHERE transaction_id=$1', [txn])).rows[0].id;
+  // Record the batch reference so the callback is actually attempted (and fails).
+  await pool.query('UPDATE zampay_settlements SET bank_batch_reference=$2 WHERE id=$1', [id, 'BBR-4']);
   assert.deepEqual(await orch.sendDueCallbacks(), { sent: 0, failed: 1 });
   const after1 = (await pool.query('SELECT status, callback_status, callback_attempts FROM zampay_settlements WHERE id=$1', [id])).rows[0];
   assert.equal(after1.status, 'RESOLVED');       // stays resolved, callback retried next run

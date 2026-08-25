@@ -300,10 +300,10 @@ export class ZampayOrchestrationService {
     for (const { id } of candidates.rows) {
       const outcome = await withTransaction(this.pool, async (client) => {
         const locked = await client.query<{
-          id: string; payment_reference: string; amount_ngwee: string; currency: string;
+          id: string; bank_batch_reference: string; amount_ngwee: string; currency: string;
           destination: Record<string, string>; service_ids: string[]; paid_date: string;
         }>(
-          `SELECT id, payment_reference, amount_ngwee::text, currency, destination, service_ids,
+          `SELECT id, bank_batch_reference, amount_ngwee::text, currency, destination, service_ids,
                   to_char(created_at, 'YYYY-MM-DD') AS paid_date
              FROM zampay_settlements
             WHERE id=$1 AND status='RESOLVED' AND callback_status='PENDING'
@@ -317,7 +317,11 @@ export class ZampayOrchestrationService {
         const row = locked.rows[0];
         try {
           await this.settlement.sendCallback({
-            paymentReferenceNumber: row.payment_reference,
+            // GSB's paymentReferenceNumber carries the BANK BATCH REFERENCE — the
+            // bank's own reference for the payout batch. We no longer send any
+            // Instacom-generated id to GSB. The callback is gated on this being
+            // present, so it is guaranteed non-null here.
+            paymentReferenceNumber: row.bank_batch_reference,
             amountNgwee: BigInt(row.amount_ngwee),
             currency: row.currency,
             destination: row.destination as never,

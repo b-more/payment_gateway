@@ -24,7 +24,7 @@ import { AuditService } from '../audit/audit.service';
 import { ZampayInvoiceService, type ZampaySettlementGroup } from './zampay-invoice.service';
 import { ZampaySettlementService } from './zampay-settlement.service';
 import { ZampayError } from './zampay.errors';
-import { NotFoundError } from '../money/errors';
+import { NotFoundError, ValidationError } from '../money/errors';
 import { zampayEnvConfig } from './zampay.config';
 
 const MAX_CALLBACK_ATTEMPTS = 6;
@@ -243,6 +243,30 @@ export class ZampayOrchestrationService {
         metadata: { settlementId: id, bankBatchReference: value },
       });
     });
+  }
+
+  /**
+   * Tag many settlements with ONE bank batch reference at once — the reference
+   * the bank returns when a whole batch of payouts is wired together. Audited.
+   */
+  async setBankBatchReferenceBulk(ids: string[], bankBatchReference: string, actorId: string): Promise<{ updated: number }> {
+    const value = bankBatchReference?.trim();
+    if (!value) throw new ValidationError('a bank batch reference is required');
+    if (!ids.length) throw new ValidationError('select at least one settlement');
+    const res = await this.pool.query<{ id: string }>(
+      `UPDATE zampay_settlements SET bank_batch_reference = $2 WHERE id = ANY($1::uuid[]) RETURNING id`,
+      [ids, value],
+    );
+    await withTransaction(this.pool, async (client) => {
+      await this.audit.write(client, {
+        actorId,
+        actorScope: 'SYSTEM',
+        action: 'ZAMPAY_BANK_BATCH_REFERENCE_BULK_SET',
+        target: value,
+        metadata: { bankBatchReference: value, count: res.rowCount ?? 0, settlementIds: res.rows.map((r) => r.id) },
+      });
+    });
+    return { updated: res.rowCount ?? 0 };
   }
 
   /** Send the settlement callback for every RESOLVED row whose callback is pending. */

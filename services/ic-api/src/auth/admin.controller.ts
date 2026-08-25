@@ -18,6 +18,7 @@ import { CreateReportDto } from '../reports/report.dto';
 import { ChargeConfigDto, AdminSettingsDto, ModeDto } from './dto/admin-config.dto';
 import { CreateUserDto, AssignRoleDto, CreateRoleDto } from './dto/user-admin.dto';
 import { ZampayBatchReferenceDto } from './dto/zampay-batch-reference.dto';
+import { ZampayBulkBatchReferenceDto } from './dto/zampay-bulk-batch-reference.dto';
 import { serializeTransaction, type TransactionResponse } from '../api/serializers';
 import { toNgwee } from '../money/money';
 import { getClientIp } from '../api/request-context';
@@ -360,6 +361,17 @@ export class AdminController {
   ): Promise<{ id: string; status: 'RETRYING' }> {
     await this.zampay.retryCallback(id, p.userId);
     return { id, status: 'RETRYING' };
+  }
+
+  @Post('zampay/settlements/batch-reference')
+  @HttpCode(200)
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Tag many ZamPay settlements with one bank batch reference' })
+  async setZampayBatchReferenceBulk(
+    @Body() dto: ZampayBulkBatchReferenceDto,
+    @CurrentPrincipal() p: Principal,
+  ): Promise<{ updated: number }> {
+    return this.zampay.setBankBatchReferenceBulk(dto.ids, dto.bankBatchReference, p.userId);
   }
 
   @Post('zampay/settlements/:id/batch-reference')

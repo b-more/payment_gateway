@@ -50,11 +50,46 @@ export default function ZampayPage(): ReactNode {
   const [ok, setOk] = useState('');
   const [editing, setEditing] = useState('');
   const [draft, setDraft] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchDraft, setBatchDraft] = useState('');
 
   if (loading) return <Spinner />;
   if (error || !data) return <Empty>Could not load ZamPay settlements. {error}</Empty>;
 
   const count = (s: string): number => data.filter((z) => z.status === s).length;
+
+  function toggle(id: string): void {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll(): void {
+    setSelected((prev) => (prev.size === data!.length ? new Set() : new Set(data!.map((z) => z.id))));
+  }
+
+  async function applyBulk(): Promise<void> {
+    const ref = batchDraft.trim();
+    if (!ref || selected.size === 0) return;
+    setBusy('bulk');
+    setMsg('');
+    setOk('');
+    try {
+      const res = await apiPost<{ updated: number }>(
+        '/v1/admin/zampay/settlements/batch-reference',
+        { ids: [...selected], bankBatchReference: ref },
+      );
+      setOk(`Bank batch reference “${ref}” applied to ${res.updated} settlement${res.updated === 1 ? '' : 's'}.`);
+      setSelected(new Set());
+      setBatchDraft('');
+      reload();
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'Could not apply batch reference.');
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function retry(id: string): Promise<void> {
     setBusy(id);
@@ -121,6 +156,25 @@ export default function ZampayPage(): ReactNode {
       {msg ? <div className="err" style={{ marginBottom: 12 }}>{msg}</div> : null}
       {ok ? <div className="devhint" style={{ marginBottom: 12, color: 'var(--success)', background: '#e6f4ee', borderColor: '#cce8dc' }}>{ok}</div> : null}
 
+      {canAct && selected.size > 0 ? (
+        <div
+          className="card"
+          style={{ marginBottom: 12, padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center', background: 'var(--surface-2, #f6f8fb)' }}
+        >
+          <strong style={{ fontSize: 13 }}>{selected.size} selected</strong>
+          <input
+            value={batchDraft}
+            onChange={(e) => setBatchDraft(e.target.value)}
+            placeholder="Bank batch reference"
+            style={{ flex: '0 1 260px', padding: '7px 10px', border: '1px solid var(--line, #ccc)', borderRadius: 6, fontSize: 13 }}
+          />
+          <button className="btn sm" disabled={busy === 'bulk' || !batchDraft.trim()} onClick={() => void applyBulk()}>
+            {busy === 'bulk' ? '…' : `Apply to ${selected.size}`}
+          </button>
+          <button className="btn sm" type="button" onClick={() => setSelected(new Set())}>Clear selection</button>
+        </div>
+      ) : null}
+
       <div className="card">
         {data.length === 0 ? (
           <Empty>
@@ -132,6 +186,16 @@ export default function ZampayPage(): ReactNode {
           <table className="table">
             <thead>
               <tr>
+                {canAct ? (
+                  <th style={{ width: 28 }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.size === data.length && data.length > 0}
+                      onChange={toggleAll}
+                      aria-label="Select all"
+                    />
+                  </th>
+                ) : null}
                 <th>Merchant</th>
                 <th>Destination</th>
                 <th>Invoice</th>
@@ -149,6 +213,16 @@ export default function ZampayPage(): ReactNode {
                 const dest = z.destination;
                 return (
                   <tr key={z.id}>
+                    {canAct ? (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(z.id)}
+                          onChange={() => toggle(z.id)}
+                          aria-label={`Select ${z.instacom_bank_ref}`}
+                        />
+                      </td>
+                    ) : null}
                     <td style={{ fontWeight: 600 }}>
                       {z.merchant_name ?? '—'}
                       <div className="muted" style={{ fontSize: 12 }}>{z.account_number}</div>

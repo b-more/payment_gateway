@@ -125,8 +125,45 @@ export class ZampayOrchestrationService {
     const paymentRef = row.transaction_id; // our payment reference to GSB
 
     await withTransaction(this.pool, async (client) => {
-      // First group updates the NEW row in place; the rest are separate rows.
-      const first = allGroups[0];
+      // Double-payment guard: split groups into ones we can settle and ones whose
+      // (invoice, destination) is already settled/resolved under ANOTHER
+      // transaction — a repeat payment for the same GSB invoice. We never pay
+      // those twice.
+      const fresh: typeof allGroups = [];
+      const dups: Array<{ invoiceNumber: string; conflictTxn: string }> = [];
+      for (const g of allGroups) {
+        const existing = await client.query<{ transaction_id: string }>(
+          `SELECT transaction_id FROM zampay_settlements
+            WHERE invoice_number = $1 AND destination->>'bankAccountNumber' = $2
+              AND status IN ('RESOLVED', 'SETTLED') AND transaction_id <> $3
+            LIMIT 1`,
+          [g.invoiceNumber, g.group.destination.bankAccountNumber, row.transaction_id],
+        );
+        if (existing.rowCount) dups.push({ invoiceNumber: g.invoiceNumber, conflictTxn: existing.rows[0].transaction_id });
+        else fresh.push(g);
+      }
+
+      // Nothing left to settle — the whole invoice was already paid elsewhere.
+      if (fresh.length === 0) {
+        const d = dups[0];
+        await client.query(
+          `UPDATE zampay_settlements
+              SET status='DUPLICATE', invoice_number=$2, callback_status=NULL, failure_reason=$3
+            WHERE id=$1 AND status='NEW'`,
+          [row.id, firstInvoice, `invoice ${d?.invoiceNumber ?? firstInvoice} already settled under transaction ${d?.conflictTxn ?? 'another transaction'}`],
+        );
+        await this.audit.write(client, {
+          actorId: null,
+          actorScope: 'SYSTEM',
+          action: 'ZAMPAY_SETTLEMENT_DUPLICATE',
+          target: row.transaction_id,
+          metadata: { invoice: firstInvoice, conflictTransaction: d?.conflictTxn ?? null, blockedGroups: dups.length },
+        });
+        return;
+      }
+
+      // First FRESH group updates the NEW row in place; the rest are separate rows.
+      const first = fresh[0];
       await client.query(
         `UPDATE zampay_settlements
             SET status='RESOLVED', invoice_number=$2, transaction_number=$3,
@@ -136,7 +173,7 @@ export class ZampayOrchestrationService {
         [row.id, first.invoiceNumber, first.transactionNumber, first.group.serviceIds,
          JSON.stringify(first.group.destination), first.group.amountNgwee.toString(), first.group.currency, paymentRef],
       );
-      for (const extra of allGroups.slice(1)) {
+      for (const extra of fresh.slice(1)) {
         await client.query(
           `INSERT INTO zampay_settlements
              (transaction_id, account_id, zampay_reference, invoice_number, transaction_number,
@@ -153,7 +190,7 @@ export class ZampayOrchestrationService {
         actorScope: 'SYSTEM',
         action: 'ZAMPAY_SETTLEMENT_RESOLVED',
         target: row.transaction_id,
-        metadata: { invoices: resolutions.map((r) => r.invoiceNumber), groups: allGroups.length },
+        metadata: { invoices: resolutions.map((r) => r.invoiceNumber), groups: fresh.length, skippedDuplicates: dups.length },
       });
     });
   }

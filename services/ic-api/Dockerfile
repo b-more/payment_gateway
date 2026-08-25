@@ -16,6 +16,13 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8030
+# Central Africa Time (Lusaka, UTC+2, no DST) so OS-level time — shell `date`,
+# logs, cron — is correct. Node also honors TZ via its bundled ICU data, and
+# Postgres stores timestamptz in UTC regardless (display is converted).
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Africa/Lusaka /etc/localtime && \
+    echo "Africa/Lusaka" > /etc/timezone
+ENV TZ=Africa/Lusaka
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/migrations ./migrations

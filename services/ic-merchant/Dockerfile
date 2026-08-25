@@ -26,6 +26,12 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=8020
+# Central Africa Time (Lusaka, UTC+2, no DST) for OS-level time; Node honors TZ
+# via bundled ICU data.
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Africa/Lusaka /etc/localtime && \
+    echo "Africa/Lusaka" > /etc/timezone
+ENV TZ=Africa/Lusaka
 COPY --from=build /app/public ./public
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static

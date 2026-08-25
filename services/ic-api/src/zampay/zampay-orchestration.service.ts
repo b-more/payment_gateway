@@ -243,6 +243,10 @@ export class ZampayOrchestrationService {
         metadata: { settlementId: id, bankBatchReference: value },
       });
     });
+    // Recording the batch reference is the production trigger for the settlement
+    // callback — fire promptly (best-effort; the 10-min cron is the backstop).
+    // Skip when clearing the reference (value === null).
+    if (value) void this.sendDueCallbacks().catch(() => undefined);
   }
 
   /**
@@ -266,55 +270,84 @@ export class ZampayOrchestrationService {
         metadata: { bankBatchReference: value, count: res.rowCount ?? 0, settlementIds: res.rows.map((r) => r.id) },
       });
     });
+    // Recording the batch reference is the production trigger for the settlement
+    // callback — fire promptly (best-effort; the 10-min cron is the backstop).
+    if (res.rowCount) void this.sendDueCallbacks().catch(() => undefined);
     return { updated: res.rowCount ?? 0 };
   }
 
-  /** Send the settlement callback for every RESOLVED row whose callback is pending. */
+  /**
+   * Send the settlement callback for every RESOLVED row whose callback is pending
+   * AND whose bank batch reference has been recorded. This is the production rule:
+   * we only tell GSB "settled" once finance has entered the bank payout batch
+   * reference — i.e. after the money has actually been wired to the destination
+   * bank. A resolved row with no batch reference is HELD, not sent.
+   *
+   * Safe to run concurrently (the 10-min cron and an on-demand fire when finance
+   * records the batch reference): each row is claimed with FOR UPDATE SKIP LOCKED
+   * inside its own transaction, so a settlement is never sent to GSB twice.
+   */
   async sendDueCallbacks(): Promise<{ sent: number; failed: number }> {
-    const due = await this.pool.query<{
-      id: string; transaction_id: string; payment_reference: string; amount_ngwee: string;
-      currency: string; destination: Record<string, string>; service_ids: string[]; paid_date: string;
-    }>(
-      `SELECT id, transaction_id, payment_reference, amount_ngwee::text, currency, destination, service_ids,
-              to_char(created_at, 'YYYY-MM-DD') AS paid_date
-         FROM zampay_settlements
-        WHERE status='RESOLVED' AND callback_status='PENDING' AND callback_attempts < $1
+    const candidates = await this.pool.query<{ id: string }>(
+      `SELECT id FROM zampay_settlements
+        WHERE status='RESOLVED' AND callback_status='PENDING'
+          AND bank_batch_reference IS NOT NULL AND callback_attempts < $1
         ORDER BY created_at LIMIT 50`,
       [MAX_CALLBACK_ATTEMPTS],
     );
     let sent = 0;
     let failed = 0;
-    for (const row of due.rows) {
-      try {
-        await this.settlement.sendCallback({
-          paymentReferenceNumber: row.payment_reference,
-          amountNgwee: BigInt(row.amount_ngwee),
-          currency: row.currency,
-          destination: row.destination as never,
-          serviceIds: row.service_ids,
-          createdAt: row.paid_date ?? new Date().toISOString().slice(0, 10),
-        });
-        await this.pool.query(
-          `UPDATE zampay_settlements
-              SET status='SETTLED', callback_status='DELIVERED', settled_at=now(),
-                  callback_attempts=callback_attempts+1, last_callback_at=now()
-            WHERE id=$1`,
-          [row.id],
+    for (const { id } of candidates.rows) {
+      const outcome = await withTransaction(this.pool, async (client) => {
+        const locked = await client.query<{
+          id: string; payment_reference: string; amount_ngwee: string; currency: string;
+          destination: Record<string, string>; service_ids: string[]; paid_date: string;
+        }>(
+          `SELECT id, payment_reference, amount_ngwee::text, currency, destination, service_ids,
+                  to_char(created_at, 'YYYY-MM-DD') AS paid_date
+             FROM zampay_settlements
+            WHERE id=$1 AND status='RESOLVED' AND callback_status='PENDING'
+              AND bank_batch_reference IS NOT NULL AND callback_attempts < $2
+            FOR UPDATE SKIP LOCKED`,
+          [id, MAX_CALLBACK_ATTEMPTS],
         );
-        sent += 1;
-      } catch (e) {
-        failed += 1;
-        const msg = e instanceof Error ? e.message : 'callback failed';
-        await this.pool.query(
-          `UPDATE zampay_settlements
-              SET callback_attempts=callback_attempts+1, last_callback_at=now(),
-                  callback_status=CASE WHEN callback_attempts+1 >= $2 THEN 'GIVEN_UP' ELSE 'PENDING' END,
-                  status=CASE WHEN callback_attempts+1 >= $2 THEN 'FAILED' ELSE status END,
-                  failure_reason=CASE WHEN callback_attempts+1 >= $2 THEN $3 ELSE failure_reason END
-            WHERE id=$1`,
-          [row.id, MAX_CALLBACK_ATTEMPTS, msg.slice(0, 500)],
-        );
-      }
+        // Claimed by a concurrent run, or no longer due (state changed since the
+        // candidate scan) — nothing to do.
+        if (locked.rowCount === 0) return 'skip' as const;
+        const row = locked.rows[0];
+        try {
+          await this.settlement.sendCallback({
+            paymentReferenceNumber: row.payment_reference,
+            amountNgwee: BigInt(row.amount_ngwee),
+            currency: row.currency,
+            destination: row.destination as never,
+            serviceIds: row.service_ids,
+            createdAt: row.paid_date ?? new Date().toISOString().slice(0, 10),
+          });
+          await client.query(
+            `UPDATE zampay_settlements
+                SET status='SETTLED', callback_status='DELIVERED', settled_at=now(),
+                    callback_attempts=callback_attempts+1, last_callback_at=now()
+              WHERE id=$1`,
+            [row.id],
+          );
+          return 'sent' as const;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : 'callback failed';
+          await client.query(
+            `UPDATE zampay_settlements
+                SET callback_attempts=callback_attempts+1, last_callback_at=now(),
+                    callback_status=CASE WHEN callback_attempts+1 >= $2 THEN 'GIVEN_UP' ELSE 'PENDING' END,
+                    status=CASE WHEN callback_attempts+1 >= $2 THEN 'FAILED' ELSE status END,
+                    failure_reason=CASE WHEN callback_attempts+1 >= $2 THEN $3 ELSE failure_reason END
+              WHERE id=$1`,
+            [row.id, MAX_CALLBACK_ATTEMPTS, msg.slice(0, 500)],
+          );
+          return 'failed' as const;
+        }
+      });
+      if (outcome === 'sent') sent += 1;
+      else if (outcome === 'failed') failed += 1;
     }
     return { sent, failed };
   }

@@ -90,7 +90,7 @@ export default function ZampayPage(): ReactNode {
         '/v1/admin/zampay/settlements/batch-reference',
         { ids: [...selected], bankBatchReference: ref },
       );
-      setOk(`Bank batch reference “${ref}” applied to ${res.updated} settlement${res.updated === 1 ? '' : 's'}.`);
+      setOk(`Bank batch reference “${ref}” applied to ${res.updated} settlement${res.updated === 1 ? '' : 's'} — confirming to GSB now.`);
       setSelected(new Set());
       setBatchDraft('');
       reload();
@@ -122,7 +122,7 @@ export default function ZampayPage(): ReactNode {
     setOk('');
     try {
       await apiPost(`/v1/admin/zampay/settlements/${id}/batch-reference`, { bankBatchReference: draft.trim() });
-      setOk('Bank batch reference saved.');
+      setOk('Bank batch reference saved — confirming settlement to GSB now.');
       setEditing('');
       reload();
     } catch (err) {
@@ -136,11 +136,11 @@ export default function ZampayPage(): ReactNode {
     <>
       <PageHead
         title="ZamPay Settlements"
-        subtitle="Government (GSB) collections. Once collected, we confirm the payment to ZamPay automatically with our payment reference — no manual step. This is a monitor of that activity."
+        subtitle="Government (GSB) collections. A resolved collection is HELD until you enter its bank batch reference (the bank's reference for the payout batch). Recording that reference is what confirms the settlement to GSB — so only settle a batch here once the funds have actually been wired to the destination bank."
       />
 
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        <StatCard label="Resolved" value={String(count('RESOLVED'))} sub="Callback pending" />
+        <StatCard label="Resolved" value={String(count('RESOLVED'))} sub="Awaiting bank batch ref" />
         <StatCard label="Settled" value={String(count('SETTLED'))} sub="Confirmed to GSB" />
         <StatCard label="Already paid" value={String(count('INVOICE_PAID'))} sub="Paid, nothing to settle" />
         <StatCard label="Failed" value={String(count('FAILED'))} sub="Need attention" copper={count('FAILED') > 0} />

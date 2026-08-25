@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { useData } from '@/lib/useData';
+import { downloadFile } from '@/lib/api';
 import { PageHead } from '@/components/shell';
 import { Badge, Money, Spinner, Empty } from '@/components/ui';
 import { shortId } from '@/lib/format';
@@ -105,6 +106,17 @@ export default function SettlementsPage(): ReactNode {
               <button className="btn ghost" type="button" onClick={() => { setQ(''); setApplied(''); }}>Clear</button>
             ) : null}
             {applied ? <span className="muted" style={{ fontSize: 12 }}>Showing matches for “{applied}”</span> : null}
+            <span style={{ flex: 1 }} />
+            <button
+              className="btn ghost"
+              type="button"
+              onClick={() => {
+                const qs = applied.trim() ? `?search=${encodeURIComponent(applied.trim())}` : '';
+                void downloadFile(`/v1/merchant/zampay/settlements/export${qs}`, 'gsb-settlements.csv');
+              }}
+            >
+              Export CSV
+            </button>
           </form>
 
           <div className="card">

@@ -363,6 +363,20 @@ export class AdminController {
     return { id, status: 'RETRYING' };
   }
 
+  @Get('zampay/settlements/export')
+  @Roles('ADMIN', 'FINANCE')
+  @ApiOperation({ summary: 'Download the ZamPay settlements (filtered) as CSV' })
+  async exportZampaySettlements(
+    @Res({ passthrough: true }) res: Response,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ): Promise<string> {
+    const csv = await this.read.zampaySettlementsExportCsv(status ?? null, search ?? null);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="gsb-settlements.csv"');
+    return csv;
+  }
+
   @Post('zampay/settlements/batch-reference')
   @HttpCode(200)
   @Roles('ADMIN', 'FINANCE')

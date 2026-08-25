@@ -55,6 +55,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const apiGet = <T>(path: string): Promise<T> => request<T>('GET', path);
 export const apiPost = <T>(path: string, body?: unknown): Promise<T> => request<T>('POST', path, body);
 export const apiPut = <T>(path: string, body?: unknown): Promise<T> => request<T>('PUT', path, body);
+
+/** Fetch a file (credentialed) and save it via a temporary download link. */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, 'ERROR', res.statusText || `Download failed (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 export const apiDelete = <T>(path: string): Promise<T> => request<T>('DELETE', path);
 
 /** Download a file (e.g. CSV) with credentials, triggering a browser save. */

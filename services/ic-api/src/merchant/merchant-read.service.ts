@@ -7,6 +7,7 @@ import { CredentialService, type GeneratedCredential } from '../credentials/cred
 import { generateWebhookSecret } from '../credentials/crypto';
 import { ForbiddenError, NotFoundError, ValidationError } from '../money/errors';
 import { assertSafeWebhookUrl, UnsafeWebhookUrlError } from '../webhooks/ssrf-guard';
+import { zampaySettlementsCsv } from '../auth/admin-read.service';
 
 // Every method is scoped to the authenticated merchant's accounts (NN-6/SEC-Z2):
 // the merchant id comes from the session principal, never the request body, and
@@ -149,6 +150,12 @@ export class MerchantReadService {
       [merchantId, term],
     );
     return res.rows;
+  }
+
+  /** CSV export of this merchant's GSB settlements matching the same filter. */
+  async zampaySettlementsCsv(merchantId: string, search: string | null): Promise<string> {
+    const rows = (await this.zampaySettlements(merchantId, search)) as Array<Record<string, unknown>>;
+    return zampaySettlementsCsv(rows);
   }
 
   /** Public credential metadata only — never secret_hash or signing key. */

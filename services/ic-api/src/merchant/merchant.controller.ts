@@ -279,6 +279,19 @@ export class MerchantController {
     return this.read.zampaySettlements(this.merchantId(p), search ?? null);
   }
 
+  @Get('zampay/settlements/export')
+  @ApiOperation({ summary: 'Download this merchant’s GSB settlements (filtered) as CSV' })
+  async exportZampaySettlements(
+    @CurrentPrincipal() p: Principal,
+    @Res({ passthrough: true }) res: Response,
+    @Query('search') search?: string,
+  ): Promise<string> {
+    const csv = await this.read.zampaySettlementsCsv(this.merchantId(p), search ?? null);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="gsb-settlements.csv"');
+    return csv;
+  }
+
   @Get('credentials')
   @ApiOperation({ summary: 'API credentials (public metadata only)' })
   credentials(@CurrentPrincipal() p: Principal): Promise<unknown[]> {

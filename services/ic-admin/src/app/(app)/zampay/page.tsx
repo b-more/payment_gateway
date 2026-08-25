@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { useData } from '@/lib/useData';
-import { apiPost, ApiError } from '@/lib/api';
+import { apiPost, apiDownload, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { PageHead } from '@/components/shell';
 import { Badge, Money, StatCard, Spinner, Empty } from '@/components/ui';
@@ -67,6 +67,16 @@ export default function ZampayPage(): ReactNode {
   }
   function toggleAll(): void {
     setSelected((prev) => (prev.size === data!.length ? new Set() : new Set(data!.map((z) => z.id))));
+  }
+
+  async function exportCsv(): Promise<void> {
+    setMsg('');
+    try {
+      const qs = applied.trim() ? `?search=${encodeURIComponent(applied.trim())}` : '';
+      await apiDownload(`/v1/admin/zampay/settlements/export${qs}`, 'gsb-settlements.csv');
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'Could not export.');
+    }
   }
 
   async function applyBulk(): Promise<void> {
@@ -151,6 +161,8 @@ export default function ZampayPage(): ReactNode {
           <button className="btn sm" type="button" onClick={() => { setQ(''); setApplied(''); }}>Clear</button>
         ) : null}
         {applied ? <span className="muted" style={{ fontSize: 12 }}>Showing matches for “{applied}”</span> : null}
+        <span style={{ flex: 1 }} />
+        <button className="btn sm" type="button" onClick={() => void exportCsv()}>Export CSV</button>
       </form>
 
       {msg ? <div className="err" style={{ marginBottom: 12 }}>{msg}</div> : null}

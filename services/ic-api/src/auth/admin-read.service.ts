@@ -6,6 +6,41 @@ import { NotFoundError } from '../money/errors';
 // Read projections for the admin portal (§6.1). All money is returned as
 // integer-ngwee strings (NN-1). Scope/role gating is applied at the controller.
 
+/** RFC-4180 CSV cell escaping. */
+export function csvCell(v: unknown): string {
+  const s = v === null || v === undefined ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+/** Integer ngwee string → decimal ZMW (e.g. "1538" → "15.38"). */
+export function zmwFromNgwee(ngwee: string | null): string {
+  let n: bigint;
+  try { n = BigInt(ngwee ?? '0'); } catch { return '0.00'; }
+  return `${(n / 100n).toString()}.${(n % 100n).toString().padStart(2, '0')}`;
+}
+
+const ZAMPAY_CSV_HEADERS = [
+  'Instacom ref', 'Bank batch ref', 'Invoice', 'GSB transaction', 'Destination account',
+  'Destination bank', 'Amount (ZMW)', 'Currency', 'Status', 'Settled at', 'Created at',
+];
+/** One CSV line per settlement — shared by the admin + merchant exports. */
+export function zampaySettlementCsvRow(r: Record<string, unknown>): string {
+  const dest = (r.destination as { bankAccountNumber?: string; bankName?: string } | null) ?? {};
+  return [
+    r.instacom_bank_ref, r.bank_batch_reference ?? '', r.invoice_number ?? '', r.transaction_number ?? '',
+    dest.bankAccountNumber ?? '', dest.bankName ?? '', zmwFromNgwee(r.amount_ngwee as string),
+    r.currency ?? 'ZMW', r.status, r.settled_at ?? '', r.created_at ?? '',
+  ].map(csvCell).join(',');
+}
+export function zampaySettlementsCsv(rows: Array<Record<string, unknown>>, extraHeaders: string[] = [], extraCols: (r: Record<string, unknown>) => unknown[] = () => []): string {
+  const header = [...ZAMPAY_CSV_HEADERS, ...extraHeaders].map(csvCell).join(',');
+  const body = rows.map((r) => {
+    const base = zampaySettlementCsvRow(r);
+    const extra = extraCols(r).map(csvCell).join(',');
+    return extra ? `${base},${extra}` : base;
+  });
+  return [header, ...body].join('\n') + '\n';
+}
+
 export interface DashboardSummary {
   totalCollections: string; // ngwee
   totalCommission: string; // ngwee — Instacom's earned charge (live, successful)
@@ -160,6 +195,14 @@ export class AdminReadService {
       [status, term],
     );
     return res.rows;
+  }
+
+  /** CSV export of the ZamPay settlements matching the same filter (admin view). */
+  async zampaySettlementsExportCsv(status: string | null, search: string | null): Promise<string> {
+    const rows = (await this.listZampaySettlements(status, search)) as Array<Record<string, unknown>>;
+    return zampaySettlementsCsv(rows, ['Account', 'Merchant', 'Environment'], (r) => [
+      r.account_number ?? '', r.merchant_name ?? '', r.environment ?? '',
+    ]);
   }
 
   async listMerchants(): Promise<unknown[]> {

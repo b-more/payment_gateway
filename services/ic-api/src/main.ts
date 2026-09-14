@@ -12,7 +12,10 @@ async function bootstrap(): Promise<void> {
 
   // KYC documents arrive base64-encoded inside the onboarding JSON body, so the
   // parser limit is raised well above the default 100kb (rawBody is preserved).
-  app.useBodyParser('json', { limit: '20mb' });
+  // The onboarding form allows 5 documents × 5MB; base64 inflates ~1.37x, so the
+  // worst-case body is ~34MB. 40mb covers it with headroom and matches the nginx
+  // client_max_body_size, so neither layer silently 413s a full submission.
+  app.useBodyParser('json', { limit: '40mb' });
 
   // Portals are separate origins; allow them to send session cookies (SEC-A3/A4).
   const origins = (process.env.CORS_ORIGINS ?? '').trim();

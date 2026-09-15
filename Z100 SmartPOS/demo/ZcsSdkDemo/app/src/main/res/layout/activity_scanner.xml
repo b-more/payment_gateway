@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    >
+
+<!--    <com.google.android.flexbox.FlexboxLayout-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        app:flexWrap="wrap"-->
+<!--        >-->
+
+        <Button
+            android:id="@+id/btn_scanner_poweron"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/scanner_poweron"
+            android:textAllCaps="false"
+            />
+
+        <Button
+            android:id="@+id/btn_open_scanner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/open_scanner"
+            android:textAllCaps="false"
+            />
+
+        <Button
+            android:id="@+id/btn_close_scanner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/close_scanner"
+            android:textAllCaps="false"
+            />
+
+        <Button
+            android:id="@+id/btn_scanner_poweroff"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/scanner_poweroff"
+            android:textAllCaps="false"
+            />
+<!--    </com.google.android.flexbox.FlexboxLayout>-->
+
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        >
+
+        <EditText
+            android:id="@+id/textview_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            />
+    </ScrollView>
+</LinearLayout>

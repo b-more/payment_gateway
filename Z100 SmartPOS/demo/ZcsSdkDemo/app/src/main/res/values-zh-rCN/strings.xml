@@ -1,0 +1,5 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="ExtraTranslation">
+    <string name="pinpad_keyboard_confirm">确认</string>
+    <string name="pinpad_keyboard_cancel">取消</string>
+    <string name="pinpad_keyboard_backspace">删除</string>
+</resources>

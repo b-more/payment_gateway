@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        android:key="common"
+        android:title="@string/pref_common">
+    <Preference
+        android:key="bluetooth_device_connect_key"
+        android:title="@string/pref_bluetooth_device_connect"/>
+
+    <Preference
+        android:key="bluetooth_device_system_info_key"
+        android:title="@string/pref_bluetooth_device_system_info"/>
+
+    <Preference
+        android:key="bluetooth_device_search_card_key"
+        android:title="@string/pref_bluetooth_device_card"
+        android:summary="Read card with 'searchCard' method"/>
+
+    <Preference
+        android:key="bluetooth_device_listen_card_key"
+        android:title="@string/pref_bluetooth_device_card"
+        android:summary="Read IC card with 'BluetoothEmvListener' listener"/>
+    </PreferenceCategory>
+    <PreferenceCategory
+        android:key="custom"
+        android:title="@string/pref_custom">
+        <Preference
+            android:key="bluetooth_device_verify_key"
+            android:title="@string/pref_bluetooth_device_verify"/>
+        <Preference
+            android:key="bluetooth_device_modify_key"
+            android:title="@string/pref_bluetooth_device_modify"/>
+        <Preference
+            android:key="bluetooth_device_update_firmware"
+            android:title="@string/pref_bluetooth_device_update_firmware"/>
+        <Preference
+            android:key="bluetooth_device_power_off"
+            android:title="@string/pref_bluetooth_device_power_off"/>
+        <Preference
+            android:key="bluetooth_device_custom_set_SCP03_key"
+            android:title="@string/pref_bluetooth_device_custom_set_SCP03_key"/>
+    </PreferenceCategory>
+</PreferenceScreen>
